@@ -39,7 +39,7 @@ Numeric giving the cost for opening or closing a gap in the alignment.
 Numeric giving the cost for extending an open gap in the alignment.
 }
   \item{substitutionMatrix}{
-Either a substitution matrix representing the substitution scores for an alignment or the name of the amino acid substitution matrix to use in alignment.  The latter may be one of the following:  ``BLOSUM45'', ``BLOSUM50'', ``BLOSUM62'', ``BLOSUM80'', ``BLOSUM100'', ``PAM30'', ``PAM40'', ``PAM70'', ``PAM120'', ``PAM250'', or ``MIQS''.  The default (NULL) will use the \code{perfectMatch} and \code{misMatch} penalties for DNA/RNA or ``MIQS'' for AA.  (See examples section below.)
+Either a substitution matrix representing the substitution scores for an alignment or the name of the amino acid substitution matrix to use in alignment.  The latter may be one of the following:  ``BLOSUM45'', ``BLOSUM50'', ``BLOSUM62'', ``BLOSUM80'', ``BLOSUM100'', ``PAM30'', ``PAM40'', ``PAM70'', ``PAM120'', ``PAM250'', or ``MIQS''.  The default (NULL) will use the \code{perfectMatch} and \code{misMatch} penalties for DNA/RNA or \code{PFASUM50} for AA.
 }
   \item{shiftPenalty}{
 Numeric giving the cost for every additional position that a group of gaps is shifted.
@@ -67,18 +67,22 @@ Wright, E. S. (2015). DECIPHER: harnessing local sequence context to improve pro
 Erik Wright \email{eswright@pitt.edu}
 }
 \seealso{
-\code{\link{AlignSeqs}}, \code{\link{AlignTranslation}}, \code{\link{StaggerAlignment}}
+\code{\link{AlignSeqs}}, \code{\link{AlignTranslation}}, \code{\link{PFASUM}}, \code{\link{StaggerAlignment}}
 }
 \examples{
 # a trivial example
 aa <- AAStringSet(c("ARN-PK", "ARRP-K"))
-aa
-AdjustAlignment(aa)
+aa # input alignment
+AdjustAlignment(aa) # output alignment
+
+# specifying an alternative substitution matrix
+AdjustAlignment(aa, substitutionMatrix="BLOSUM62")
 
 # a real example
 fas <- system.file("extdata", "Streptomyces_ITS_aligned.fas", package="DECIPHER")
 dna <- readDNAStringSet(fas)
-adjustedDNA <- AdjustAlignment(dna)
+dna # input alignment
+adjustedDNA <- AdjustAlignment(dna) # output alignment
 BrowseSeqs(adjustedDNA, highlight=1)
-adjustedDNA==dna # most sequences were adjusted
+adjustedDNA==dna # most sequences were adjusted (those marked FALSE)
 }

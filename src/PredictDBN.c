@@ -201,7 +201,7 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 			l = 0;
 			
 			for (s = 0; s < x_length; s++) {
-				if (i < endpoints[s] || j > endpoints[x_length + s])
+				if (pos[i] < endpoints[s] || pos[j] > endpoints[x_length + s])
 					continue;
 				
 				x_s = get_elt_from_XStringSet_holder(&x_set, s);

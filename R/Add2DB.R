@@ -64,8 +64,12 @@ Add2DB <- function(myData,
 	result  <- dbListTables(dbConn)
 	w <- which(result==tblName)
 	if (length(w)==0) { # need to make the table
-		dbWriteTable(dbConn, tblName, myData, row.names=TRUE,
-			overwrite=TRUE, append=FALSE)
+		dbWriteTable(dbConn,
+			tblName,
+			myData,
+			row.names=TRUE,
+			overwrite=TRUE,
+			append=FALSE)
 		if (verbose)
 			cat("Created table '", tblName, "'.\n", sep="")
 	} else {
@@ -100,7 +104,8 @@ Add2DB <- function(myData,
 							collapse="\n"),
 						"\n\n",
 						sep="")
-				dbGetQuery(dbConn, expression1)
+				rs <- dbSendStatement(dbConn, expression1)
+				dbClearResult(rs)
 			}
 			
 			# next update the column with new data
@@ -114,7 +119,7 @@ Add2DB <- function(myData,
 				sep="")
 			if (clause!="")
 				expression2 <- paste(expression2,
-					" where ",
+					" and ",
 					clause,
 					sep="")
 			if (verbose)
@@ -126,7 +131,6 @@ Add2DB <- function(myData,
 					sep="")
 			rs <- dbSendQuery(dbConn, expression2)
 			dbBind(rs, myData[, c("row_names", colIDs[i])])
-			dbFetch(rs, n=-1, row.names=FALSE)
 			dbClearResult(rs)
 		}
 		if (verbose) {
@@ -136,7 +140,7 @@ Add2DB <- function(myData,
 				paste(names(myData)[-match("row_names",
 					names(myData))],
 				collapse="\" and \""),
-				"\".\n",
+				"\".\n\n",
 				sep="")
 		}
 	}

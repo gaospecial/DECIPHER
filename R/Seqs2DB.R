@@ -127,7 +127,8 @@ Seqs2DB <- function(seqs,
 					sep="")
 				if (verbose)
 					cat("Expression:  ", expression1, "\n", sep="")
-				dbGetQuery(dbConn, expression1)
+				rs <- dbSendStatement(dbConn, expression1)
+				dbClearResult(rs)
 			}
 		}
 		
@@ -153,7 +154,8 @@ Seqs2DB <- function(seqs,
 					sep="")
 				if (verbose)
 					cat("Expression:  ", expression1, "\n", sep="")
-				dbGetQuery(dbConn, expression1)
+				rs <- dbSendStatement(dbConn, expression1)
+				dbClearResult(rs)
 			}
 		}
 	} else {

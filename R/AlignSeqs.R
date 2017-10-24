@@ -1,8 +1,8 @@
 AlignSeqs <- function(myXStringSet,
 	guideTree=NULL,
-	iterations=1,
+	iterations=2,
 	refinements=1,
-	gapOpening=c(-16, -12),
+	gapOpening=c(-18, -16),
 	gapExtension=c(-2, -1),
 	useStructures=TRUE,
 	structures=NULL,
@@ -167,7 +167,7 @@ AlignSeqs <- function(myXStringSet,
 					if (dim(structureMatrix)[1] != dim(structureMatrix)[2])
 						stop("structureMatrix is not square.")
 				} else {
-					structureMatrix <- matrix(c(5, 0, -2, 0, 9, -1, -2, -1, 2),
+					structureMatrix <- matrix(c(6, 1, -2, 1, 13, 0, -2, 0, 1),
 						nrow=3) # order is H, E, C
 				}
 				if (dim(structureMatrix)[1] != dim(structures[[1]])[1])
@@ -238,8 +238,7 @@ AlignSeqs <- function(myXStringSet,
 			sM <- args[[w]]
 			args[w] <- NULL
 			if (is.character(sM)) {
-				if (!(sM %in% c("BLOSUM45", "BLOSUM50", "BLOSUM62", "BLOSUM80", "BLOSUM100",
-			"PAM30", "PAM40", "PAM70", "PAM120", "PAM250", "MIQS")))
+				if (!(sM %in% c("BLOSUM45", "BLOSUM50", "BLOSUM62", "BLOSUM80", "BLOSUM100", "PAM30", "PAM40", "PAM70", "PAM120", "PAM250", "MIQS")))
 					stop("Invalid substitutionMatrix.")
 			}
 			AAs <- c("A", "R", "N", "D", "C", "Q", "E", "G", "H", "I",
@@ -254,8 +253,8 @@ AlignSeqs <- function(myXStringSet,
 			sM <- sM[AAs, AAs]
 			sM <- sM + 0 # convert to numeric matrix
 		} else {
-			# use MIQS
-			sM <- matrix(c(3.2,-1.3,-0.4,-0.4,1.5,-0.2,-0.4,0.4,-1.2,-1.3,-1.4,-0.7,-1,-2.3,-0.1,0.8,0.8,-3.6,-2.4,0,-6.1,-1.3,6.2,-0.1,-1.5,-2.7,1.8,-0.7,-1.9,0.9,-2.4,-2.5,3.3,-1.1,-3.3,-1.1,-0.3,-0.9,-3.8,-1.9,-2.3,-6.1,-0.4,-0.1,5.1,2.6,-1.6,0.9,0.8,0.2,1,-3.6,-3.5,0.7,-2.3,-3.5,-1.4,0.9,0,-4.5,-1.5,-2.6,-6.1,-0.4,-1.5,2.6,5.7,-3.7,0.9,2.7,-0.5,0.3,-4.5,-4.6,0.4,-3.3,-5.8,-0.3,0.3,-0.2,-5.3,-3.9,-3.5,-6.1,1.5,-2.7,-1.6,-3.7,11.7,-2.8,-3.2,-1.7,-1.2,0.2,-2.3,-3.2,0.1,-2.8,-2.8,1,0,-6.1,-0.7,1.8,-6.1,-0.2,1.8,0.9,0.9,-2.8,3.6,2.1,-1.6,1.2,-2.2,-1.9,1.7,-0.4,-2.4,-0.4,0.4,0.1,-5.4,-2.8,-1.8,-6.1,-0.4,-0.7,0.8,2.7,-3.2,2.1,4.3,-1.3,-0.2,-3.3,-2.8,1.1,-2.3,-4.1,0,0.4,-0.2,-5.8,-2.4,-2.3,-6.1,0.4,-1.9,0.2,-0.5,-1.7,-1.6,-1.3,7.6,-1.6,-5.4,-4.8,-1.7,-3.6,-4.6,-1.6,0,-1.9,-4.8,-4.5,-3.8,-6.1,-1.2,0.9,1,0.3,-1.2,1.2,-0.2,-1.6,7.5,-2.2,-1.9,0,-2.1,0,-1.5,0,-0.2,-0.3,2.1,-2.3,-6.1,-1.3,-2.4,-3.6,-4.5,0.2,-2.2,-3.3,-5.4,-2.2,4.6,3.1,-2.3,1.7,0.7,-3.7,-2.8,-0.7,-0.7,-0.8,3.3,-6.1,-1.4,-2.5,-3.5,-4.6,-2.3,-1.9,-2.8,-4.8,-1.9,3.1,4.6,-2.4,3.2,2.1,-2.8,-2.9,-1.6,-0.2,0,2,-6.1,-0.7,3.3,0.7,0.4,-3.2,1.7,1.1,-1.7,0,-2.3,-2.4,3.6,-1.1,-3.7,-0.1,0,0,-4,-2.3,-2,-6.1,-1,-1.1,-2.3,-3.3,0.1,-0.4,-2.3,-3.6,-2.1,1.7,3.2,-1.1,5.4,1.4,-2.8,-1.8,-0.8,-2.1,-0.9,1.4,-6.1,-2.3,-3.3,-3.5,-5.8,-2.8,-2.4,-4.1,-4.6,0,0.7,2.1,-3.7,1.4,7.4,-3.7,-2.6,-2.3,4.2,5.2,-0.3,-6.1,-0.1,-1.1,-1.4,-0.3,-2.8,-0.4,0,-1.6,-1.5,-3.7,-2.8,-0.1,-2.8,-3.7,8.4,-0.1,-0.5,-3.6,-4.5,-2.5,-6.1,0.8,-0.3,0.9,0.3,1,0.4,0.4,0,0,-2.8,-2.9,0,-1.8,-2.6,-0.1,3.1,1.6,-3.5,-1.5,-1.4,-6.1,0.8,-0.9,0,-0.2,0,0.1,-0.2,-1.9,-0.2,-0.7,-1.6,0,-0.8,-2.3,-0.5,1.6,3.8,-5.3,-2.1,-0.1,-6.1,-3.6,-3.8,-4.5,-5.3,-6.1,-5.4,-5.8,-4.8,-0.3,-0.7,-0.2,-4,-2.1,4.2,-3.6,-3.5,-5.3,14.8,4.9,-3.3,-6.1,-2.4,-1.9,-1.5,-3.9,-0.7,-2.8,-2.4,-4.5,2.1,-0.8,0,-2.3,-0.9,5.2,-4.5,-1.5,-2.1,4.9,8.3,-1.2,-6.1,0,-2.3,-2.6,-3.5,1.8,-1.8,-2.3,-3.8,-2.3,3.3,2,-2,1.4,-0.3,-2.5,-1.4,-0.1,-3.3,-1.2,3.5,-6.1,-6.1,-6.1,-6.1,-6.1,-6.1,-6.1,-6.1,-6.1,-6.1,-6.1,-6.1,-6.1,-6.1,-6.1,-6.1,-6.1,-6.1,-6.1,-6.1,-6.1,1),
+			# use PFASUM50
+			sM <- matrix(c(4.1181,-1.1516,-1.3187,-1.4135,0.4271,-0.5467,-0.6527,0.1777,-1.6582,-1.1243,-1.1843,-1.0235,-0.5685,-1.9515,-0.6072,0.8284,0.0361,-2.5368,-2.1701,0.0661,-11,-1.1516,6.341,0.0543,-0.6628,-3.2085,1.6006,0.5067,-1.961,0.7706,-3.5053,-3.0357,2.938,-1.9894,-3.7846,-1.3455,-0.4194,-0.5594,-2.1629,-1.7957,-2.9403,-11,-1.3187,0.0543,6.4672,2.3024,-2.5179,0.8192,0.5566,0.1585,1.104,-4.1629,-4.0977,0.8743,-2.6216,-3.805,-1.0904,1.1291,0.3253,-3.7763,-1.874,-3.6076,-11,-1.4135,-0.6628,2.3024,6.8156,-4.358,0.6705,2.582,-0.5667,-0.196,-5.475,-5.1661,0.226,-3.9595,-5.3456,-0.5662,0.4273,-0.5218,-4.7691,-3.4644,-4.5477,-11,0.4271,-3.2085,-2.5179,-4.358,13.5349,-3.3641,-4.3086,-2.1614,-1.8945,-0.7546,-0.9453,-3.8239,-0.5923,-0.8182,-3.6019,-0.3927,-0.801,-1.9317,-1.1607,0.0673,-11,-0.5467,1.6006,0.8192,0.6705,-3.3641,5.5795,2.1372,-1.5923,1.0862,-3.3001,-2.7545,1.872,-1.1216,-3.6631,-1.0426,0.1982,-0.0434,-3.061,-1.9214,-2.6993,-11,-0.6527,0.5067,0.5566,2.582,-4.3086,2.1372,5.5684,-1.6462,-0.2488,-4.1849,-4.0275,1.4821,-2.7964,-4.8311,-0.7028,0.0283,-0.312,-4.1969,-2.9489,-3.281,-11,0.1777,-1.961,0.1585,-0.5667,-2.1614,-1.5923,-1.6462,7.6508,-1.8185,-4.7058,-4.4215,-1.5991,-3.2786,-3.9992,-1.4409,0.184,-1.4823,-3.8328,-3.7343,-3.7264,-11,-1.6582,0.7706,1.104,-0.196,-1.8945,1.0862,-0.2488,-1.8185,9.7543,-3.3812,-2.8685,0.1425,-1.8724,-1.2545,-1.5333,-0.4285,-0.8896,-0.9385,1.6476,-2.8729,-11,-1.1243,-3.5053,-4.1629,-5.475,-0.7546,-3.3001,-4.1849,-4.7058,-3.3812,5.1229,2.5319,-3.5454,1.8309,0.9346,-3.4603,-3.0985,-1.2543,-1.5006,-1.117,3.3961,-11,-1.1843,-3.0357,-4.0977,-5.1661,-0.9453,-2.7545,-4.0275,-4.4215,-2.8685,2.5319,4.7049,-3.4581,2.5303,1.687,-3.365,-3.1578,-1.8626,-0.5308,-0.6881,1.4829,-11,-1.0235,2.938,0.8743,0.226,-3.8239,1.872,1.4821,-1.5991,0.1425,-3.5454,-3.4581,5.5476,-2.164,-4.3516,-0.7583,0.0275,-0.1516,-3.5889,-2.4422,-3.0453,-11,-0.5685,-1.9894,-2.6216,-3.9595,-0.5923,-1.1216,-2.7964,-3.2786,-1.8724,1.8309,2.5303,-2.164,7.0856,1.2339,-3.0823,-1.7587,-0.7402,-0.5841,-0.3946,0.9477,-11,-1.9515,-3.7846,-3.805,-5.3456,-0.8182,-3.6631,-4.8311,-3.9992,-1.2545,0.9346,1.687,-4.3516,1.2339,7.4322,-3.6222,-3.0316,-2.2851,2.6305,3.8302,0.1942,-11,-0.6072,-1.3455,-1.0904,-0.5662,-3.6019,-1.0426,-0.7028,-1.4409,-1.5333,-3.4603,-3.365,-0.7583,-3.0823,-3.6222,9.1796,-0.0652,-0.8587,-3.3634,-3.3006,-2.5443,-11,0.8284,-0.4194,1.1291,0.4273,-0.3927,0.1982,0.0283,0.184,-0.4285,-3.0985,-3.1578,0.0275,-1.7587,-3.0316,-0.0652,4.2366,1.8491,-3.1454,-2.1838,-2.1839,-11,0.0361,-0.5594,0.3253,-0.5218,-0.801,-0.0434,-0.312,-1.4823,-0.8896,-1.2543,-1.8626,-0.1516,-0.7402,-2.2851,-0.8587,1.8491,4.8833,-2.8511,-1.8993,-0.2699,-11,-2.5368,-2.1629,-3.7763,-4.7691,-1.9317,-3.061,-4.1969,-3.8328,-0.9385,-1.5006,-0.5308,-3.5889,-0.5841,2.6305,-3.3634,-3.1454,-2.8511,13.6485,3.3017,-1.851,-11,-2.1701,-1.7957,-1.874,-3.4644,-1.1607,-1.9214,-2.9489,-3.7343,1.6476,-1.117,-0.6881,-2.4422,-0.3946,3.8302,-3.3006,-2.1838,-1.8993,3.3017,8.7568,-1.2438,-11,0.0661,-2.9403,-3.6076,-4.5477,0.0673,-2.6993,-3.281,-3.7264,-2.8729,3.3961,1.4829,-3.0453,0.9477,0.1942,-2.5443,-2.1839,-0.2699,-1.851,-1.2438,4.6928,-11,-11,-11,-11,-11,-11,-11,-11,-11,-11,-11,-11,-11,-11,-11,-11,-11,-11,-11,-11,-11,14),
 				nrow=21,
 				ncol=21,
 				dimnames=list(AAs, AAs))
@@ -318,10 +317,6 @@ AlignSeqs <- function(myXStringSet,
 			diag(sM) <- PM
 		}
 	}
-	
-	# need to maximize the recursion depth temporarily
-	org.options <- options(expressions=5e5)
-	on.exit(options(org.options))
 	
 	if (length(args)==0)
 		args <- NULL
@@ -410,254 +405,314 @@ AlignSeqs <- function(myXStringSet,
 		nsteps <- l - 1L
 	}
 	
-	.align <- function(dend) {
-		l <- length(dend)
-		treeLengths <- numeric(l)
-		inherit <- attr(dend, "inherit")
-		if (!is.null(inherit)) {
-			if (inherit) {
-				u <- unlist(dend)
-				seqs <<- .replace(seqs,
-					.Call("removeCommonGaps",
-						.subset(seqs_prev, u),
-						type,
-						processors,
-						PACKAGE="DECIPHER"),
-					u)
+	.align <- function(guideTree) { # iteratively align sequences
+		# initialize a stack of maximum length (l)
+		stack <- vector("list", l)
+		visit <- logical(l) # node already visited
+		parent <- integer(l) # index of parent node
+		index <- integer(l) # index in parent node
+		pos <- 1L # current position in the stack
+		stack[[pos]] <- guideTree
+		while (pos > 0L) { # more nodes to visit
+			if (visit[pos]) { # ascending tree
+				visit[pos] <- FALSE # reset visit
+				dend <- stack[[pos]]
 				
-				if (verbose) {
-					steps <<- steps + 1L
-					percentComplete <- as.integer(100L*steps/nsteps)
-					if (percentComplete > before) {
-						setTxtProgressBar(pBar, percentComplete)
-						before <<- percentComplete
-					}
-				}
-			}
-			
-			if (l > 1) {
-				for (i in seq_len(l))
-					treeLengths[i] <- .align(dend[[i]])
-				
-				h <- attr(dend, "height")
-				for (i in seq_len(l)) {
-					m <- unlist(dend[i])
-					treeLengths[i] <- treeLengths[i] + h - heights[m[1]]
-					weights[m] <<- weights[m] + (h - heights[m])/length(m)
-					heights[m] <<- h
-				}
-			} else if (is.leaf(dend)) {
-				heights[unlist(dend)] <- attr(dend, "height")
-			} else {
-				treeLengths[1] <- .align(dend[[1]])
-			}
-		} else if (l > 1) {
-			for (i in seq_len(l))
-				treeLengths[i] <- .align(dend[[i]])
-			
-			h <- attr(dend, "height")
-			members <- vector("list", l)
-			for (i in seq_len(l)) {
-				m <- unlist(dend[i])
-				treeLengths[i] <- treeLengths[i] + h - heights[m[1]]
-				weights[m] <<- weights[m] + (h - heights[m])/length(m)
-				heights[m] <<- h
-				members[[i]] <- m
-			}
-			
-			h <- h*2 # total length of sub-tree
-			GO <- h*gapOpeningSlope + gapOpeningMin
-			GE <- h*gapExtensionSlope + gapExtensionMin
-			
-			for (i in 2:length(dend)) {
-				x <- unlist(members[1:(i - 1)])
-				y <- members[[i]]
-				combo <- c(x, y)
-				
-				p.weight <- weights[x]
-				w <- which(p.weight <= 0)
-				if (length(w) > 0)
-					p.weight[w] <- 1
-				p.weight <- p.weight/mean(p.weight)
-				s.weight <- weights[y]
-				w <- which(s.weight <= 0)
-				if (length(w) > 0)
-					s.weight[w] <- 1
-				s.weight <- s.weight/mean(s.weight)
-				
-				pattern <- .subset(seqs, x)
-				subject <- .subset(seqs, y)
-				
-				if (subM) {
-					if (useStructures) {
-						if (is.null(structures)) {
-							if (type==2L && h < LEVEL) {
-								# align as DNAStringSet (faster because no pairs matrix)
-								temp <- .switch(do.call(AlignProfiles,
-									args=c(list(pattern=.switch(pattern),
-											subject=.switch(subject),
-											p.weight=p.weight,
-											s.weight=s.weight,
-											substitutionMatrix=sM2,
-											processors=processors,
-											gapOpening=GO,
-											gapExtension=GE),
-										args)))
-							} else {
-								temp <- do.call(AlignProfiles,
-									args=c(list(pattern=pattern,
-											subject=subject,
-											p.weight=p.weight,
-											s.weight=s.weight,
-											substitutionMatrix=sM,
-											processors=processors,
-											gapOpening=GO,
-											gapExtension=GE),
-										args))
-							}
-						} else {
-							if (type==2L && h < LEVEL) {
-								# align as DNAStringSet (faster because no pairs matrix)
-								temp <- .switch(do.call(AlignProfiles,
-									args=c(list(pattern=.switch(pattern),
-											subject=.switch(subject),
-											p.weight=p.weight,
-											s.weight=s.weight,
-											p.struct=structures[x],
-											s.struct=structures[y],
-											substitutionMatrix=sM2,
-											processors=processors,
-											gapOpening=GO,
-											gapExtension=GE),
-										args)))
-							} else {
-								temp <- do.call(AlignProfiles,
-									args=c(list(pattern=pattern,
-											subject=subject,
-											p.weight=p.weight,
-											s.weight=s.weight,
-											p.struct=structures[x],
-											s.struct=structures[y],
-											substitutionMatrix=sM,
-											processors=processors,
-											gapOpening=GO,
-											gapExtension=GE),
-										args))
+				# align subtrees
+				treeLengths <- numeric(length(dend))
+				inherit <- attr(dend, "inherit")
+				if (!is.null(inherit)) {
+					if (inherit) {
+						u <- unlist(dend)
+						seqs <<- .replace(seqs,
+							.Call("removeCommonGaps",
+								.subset(seqs_prev, u),
+								type,
+								processors,
+								PACKAGE="DECIPHER"),
+							u)
+						
+						if (verbose) {
+							steps <<- steps + 1L
+							percentComplete <- as.integer(100L*steps/nsteps)
+							if (percentComplete > before) {
+								setTxtProgressBar(pBar, percentComplete)
+								before <<- percentComplete
 							}
 						}
-					} else {
-						if (type==2L && h < LEVEL) {
-							# align as DNAStringSet (faster because no pairs matrix)
-							temp <- .switch(do.call(AlignProfiles,
-								args=c(list(pattern=.switch(pattern),
-										subject=.switch(subject),
-										p.weight=p.weight,
-										s.weight=s.weight,
-										substitutionMatrix=sM2,
-										processors=processors,
-										gapOpening=GO,
-										gapExtension=GE),
-									args)))
-						} else {
-							temp <- do.call(AlignProfiles,
-								args=c(list(pattern=pattern,
-										subject=subject,
-										p.weight=p.weight,
-										s.weight=s.weight,
-										substitutionMatrix=sM,
-										processors=processors,
-										gapOpening=GO,
-										gapExtension=GE),
-									args))
-						}
 					}
-				} else {
-					if (useStructures) {
-						temp <- do.call(AlignProfiles,
-							args=c(list(pattern=pattern,
-									subject=subject,
-									p.weight=p.weight,
-									s.weight=s.weight,
-									p.struct=structures[x],
-									s.struct=structures[y],
-									processors=processors,
-									gapOpening=GO,
-									gapExtension=GE),
-								args))
-					} else {
-						temp <- do.call(AlignProfiles,
-							args=c(list(pattern=pattern,
-									subject=subject,
-									p.weight=p.weight,
-									s.weight=s.weight,
-									processors=processors,
-									gapOpening=GO,
-									gapExtension=GE),
-								args))
-					}
-				}
-				
-				if (h > LEVEL &&
-					length(temp) >= levels[6]) {
-					weight <- weights[combo]
-					w <- which(weight <= 0)
-					if (length(w) > 0)
-						weight[w] <- 1
-					weight <- weight/mean(weight)
 					
-					if (subM) {
-						temp <- FUN(temp,
-							substitutionMatrix=sM,
-							weight=weight,
-							processors=processors)
-					} else {
-						temp <- FUN(temp,
-							weight=weight,
-							processors=processors)
+					if (length(dend) > 1) {
+						for (i in seq_len(length(dend))) {
+							h <- attr(dend[[i]], "treeLength")
+							if (!is.null(h))
+								treeLengths[i] <- h
+						}
+						
+						h <- attr(dend, "height")
+						for (i in seq_len(length(dend))) {
+							m <- unlist(dend[i])
+							treeLengths[i] <- treeLengths[i] + h - heights[m[1]]
+							weights[m] <<- weights[m] + (h - heights[m])/length(m)
+							heights[m] <<- h
+						}
+					} else if (is.leaf(dend)) {
+						heights[unlist(dend)] <- attr(dend, "height")
+					} else { # inherit from subtree
+						treeLengths[1] <- attr(dend[[1]], "treeLength")
 					}
+				} else if (length(dend) > 1) {
+					for (i in seq_len(length(dend))) {
+						h <- attr(dend[[i]], "treeLength")
+						if (!is.null(h))
+							treeLengths[i] <- h
+					}
+					
+					h <- attr(dend, "height")
+					members <- vector("list", length(dend))
+					for (i in seq_len(length(dend))) {
+						m <- unlist(dend[i])
+						treeLengths[i] <- treeLengths[i] + h - heights[m[1]]
+						weights[m] <<- weights[m] + (h - heights[m])/length(m)
+						heights[m] <<- h
+						members[[i]] <- m
+					}
+					
+					h <- h*2 # total length of sub-tree
+					GO <- h*gapOpeningSlope + gapOpeningMin
+					GE <- h*gapExtensionSlope + gapExtensionMin
+					
+					for (i in 2:length(dend)) {
+						x <- unlist(members[1:(i - 1)])
+						y <- members[[i]]
+						combo <- c(x, y)
+						
+						p.weight <- weights[x]
+						w <- which(p.weight <= 0)
+						if (length(w) > 0)
+							p.weight[w] <- 1
+						p.weight <- p.weight/mean(p.weight)
+						s.weight <- weights[y]
+						w <- which(s.weight <= 0)
+						if (length(w) > 0)
+							s.weight[w] <- 1
+						s.weight <- s.weight/mean(s.weight)
+						
+						pattern <- .subset(seqs, x)
+						subject <- .subset(seqs, y)
+						
+						if (subM) {
+							if (useStructures) {
+								if (is.null(structures)) {
+									if (type==2L && h < LEVEL) {
+										# align as DNAStringSet (faster because no pairs matrix)
+										temp <- .switch(do.call(AlignProfiles,
+											args=c(list(pattern=.switch(pattern),
+													subject=.switch(subject),
+													p.weight=p.weight,
+													s.weight=s.weight,
+													substitutionMatrix=sM2,
+													processors=processors,
+													gapOpening=GO,
+													gapExtension=GE),
+												args)))
+									} else {
+										temp <- do.call(AlignProfiles,
+											args=c(list(pattern=pattern,
+													subject=subject,
+													p.weight=p.weight,
+													s.weight=s.weight,
+													substitutionMatrix=sM,
+													processors=processors,
+													gapOpening=GO,
+													gapExtension=GE),
+												args))
+									}
+								} else {
+									if (type==2L && h < LEVEL) {
+										# align as DNAStringSet (faster because no pairs matrix)
+										temp <- .switch(do.call(AlignProfiles,
+											args=c(list(pattern=.switch(pattern),
+													subject=.switch(subject),
+													p.weight=p.weight,
+													s.weight=s.weight,
+													p.struct=structures[x],
+													s.struct=structures[y],
+													substitutionMatrix=sM2,
+													processors=processors,
+													gapOpening=GO,
+													gapExtension=GE),
+												args)))
+									} else {
+										temp <- do.call(AlignProfiles,
+											args=c(list(pattern=pattern,
+													subject=subject,
+													p.weight=p.weight,
+													s.weight=s.weight,
+													p.struct=structures[x],
+													s.struct=structures[y],
+													substitutionMatrix=sM,
+													processors=processors,
+													gapOpening=GO,
+													gapExtension=GE),
+												args))
+									}
+								}
+							} else {
+								if (type==2L && h < LEVEL) {
+									# align as DNAStringSet (faster because no pairs matrix)
+									temp <- .switch(do.call(AlignProfiles,
+										args=c(list(pattern=.switch(pattern),
+												subject=.switch(subject),
+												p.weight=p.weight,
+												s.weight=s.weight,
+												substitutionMatrix=sM2,
+												processors=processors,
+												gapOpening=GO,
+												gapExtension=GE),
+											args)))
+								} else {
+									temp <- do.call(AlignProfiles,
+										args=c(list(pattern=pattern,
+												subject=subject,
+												p.weight=p.weight,
+												s.weight=s.weight,
+												substitutionMatrix=sM,
+												processors=processors,
+												gapOpening=GO,
+												gapExtension=GE),
+											args))
+								}
+							}
+						} else {
+							if (useStructures) {
+								temp <- do.call(AlignProfiles,
+									args=c(list(pattern=pattern,
+											subject=subject,
+											p.weight=p.weight,
+											s.weight=s.weight,
+											p.struct=structures[x],
+											s.struct=structures[y],
+											processors=processors,
+											gapOpening=GO,
+											gapExtension=GE),
+										args))
+							} else {
+								temp <- do.call(AlignProfiles,
+									args=c(list(pattern=pattern,
+											subject=subject,
+											p.weight=p.weight,
+											s.weight=s.weight,
+											processors=processors,
+											gapOpening=GO,
+											gapExtension=GE),
+										args))
+							}
+						}
+						
+						if (h > LEVEL &&
+							length(temp) >= levels[6]) {
+							weight <- weights[combo]
+							w <- which(weight <= 0)
+							if (length(w) > 0)
+								weight[w] <- 1
+							weight <- weight/mean(weight)
+							
+							if (subM) {
+								temp <- FUN(temp,
+									substitutionMatrix=sM,
+									weight=weight,
+									processors=processors)
+							} else {
+								temp <- FUN(temp,
+									weight=weight,
+									processors=processors)
+							}
+						}
+						
+						seqs <<- .replace(seqs,
+							temp,
+							combo)
+						
+						if (verbose) {
+							steps <<- steps + 1L
+							percentComplete <- as.integer(100L*steps/nsteps)
+							if (percentComplete > before) {
+								setTxtProgressBar(pBar, percentComplete)
+								before <<- percentComplete
+							}
+						}
+					}
+				} else if (is.leaf(dend)) {
+					heights[unlist(dend)] <- attr(dend, "height")
+				} else { # inherit from subtree
+					treeLengths[1] <- attr(dend[[1]], "treeLength")
 				}
 				
-				seqs <<- .replace(seqs,
-					temp,
-					combo)
-				
-				if (verbose) {
-					steps <<- steps + 1L
-					percentComplete <- as.integer(100L*steps/nsteps)
-					if (percentComplete > before) {
-						setTxtProgressBar(pBar, percentComplete)
-						before <<- percentComplete
+				attr(stack[[pos]], "treeLength") <- sum(treeLengths)
+				# replace self in parent
+				if (parent[pos] > 0)
+					stack[[parent[pos]]][[index[pos]]] <- stack[[pos]]
+				pos <- pos - 1L # pop off of stack
+			} else { # descending tree
+				visit[pos] <- TRUE
+				p <- pos
+				for (i in seq_along(stack[[p]])) {
+					if (!is.leaf(stack[[p]][[i]])) {
+						# push subtree onto stack
+						pos <- pos + 1L
+						stack[[pos]] <- stack[[p]][[i]]
+						parent[[pos]] <- p
+						index[[pos]] <- i
 					}
 				}
 			}
-		} else if (is.leaf(dend)) {
-			heights[unlist(dend)] <- attr(dend, "height")
-		} else {
-			treeLengths[1] <- .align(dend[[1]])
 		}
 		
-		return(sum(treeLengths))
+		return(attr(stack[[1]], "treeLength"))
 	}
 	
 	.reorder <- function(dend) {
-		l <- length(dend)
-		if (l > 1) {
-			for (i in seq_len(l))
-				dend[[i]] <- .reorder(dend[[i]])
-			
-			members <- lapply(dend, unlist)
-			# sort tree by descending width
-			o <- order(sapply(members,
-					function(x)
-						max(w.x[x])),
-				lengths(members),
-				sapply(members, min),
-				decreasing=TRUE)
-			dend[] <- dend[o]
-		} else if (!is.leaf(dend)) {
-			dend[[1]] <- .reorder(dend[[1]])
+		# initialize a stack of maximum length (l)
+		stack <- vector("list", l)
+		visit <- logical(l) # node already visited
+		parent <- integer(l) # index of parent node
+		index <- integer(l) # index in parent node
+		pos <- 1L # current position in the stack
+		stack[[pos]] <- dend
+		while (pos > 0L) { # more nodes to visit
+			if (visit[pos]) { # ascending tree
+				visit[pos] <- FALSE # reset visit
+				
+				# sort tree by descending width
+				members <- lapply(stack[[pos]], unlist)
+				o <- order(sapply(members,
+						function(x)
+							max(w.x[x])),
+					lengths(members),
+					sapply(members, min),
+					decreasing=TRUE)
+				stack[[pos]][] <- stack[[pos]][o]
+				
+				# replace self in parent
+				if (parent[pos] > 0)
+					stack[[parent[pos]]][[index[pos]]] <- stack[[pos]]
+				pos <- pos - 1L # pop off of stack
+			} else { # descending tree
+				visit[pos] <- TRUE
+				p <- pos
+				for (i in seq_along(stack[[p]])) {
+					if (!is.leaf(stack[[p]][[i]])) {
+						# push subtree onto stack
+						pos <- pos + 1L
+						stack[[pos]] <- stack[[p]][[i]]
+						parent[[pos]] <- p
+						index[[pos]] <- i
+					}
+				}
+			}
 		}
-		return(dend)
+		return(stack[[1L]])
 	}
 	guideTree <- .reorder(guideTree)
 	
@@ -723,15 +778,30 @@ AlignSeqs <- function(myXStringSet,
 		}
 		
 		.order <- function(dend) {
-			l <- length(dend)
-			if (l > 1) {
-				j <<- j + 1L
-				orders[[j]] <<- unlist(dend)
-				
-				for (i in seq_len(l))
-					.order(dend[[i]])
-			} else if (!is.leaf(dend)) {
-				.order(dend[[1]])
+			# initialize a stack of maximum length (l)
+			stack <- vector("list", l)
+			visit <- logical(l) # node already visited
+			pos <- 1L # current position in the stack
+			stack[[pos]] <- dend
+			while (pos > 0L) { # more nodes to visit
+				if (visit[pos]) { # ascending tree
+					visit[pos] <- FALSE # reset visit
+					
+					j <<- j + 1L
+					orders[[j]] <<- unlist(stack[[pos]])
+					
+					pos <- pos - 1L # pop off of stack
+				} else { # descending tree
+					visit[pos] <- TRUE
+					p <- pos
+					for (i in seq_along(stack[[p]])) {
+						if (!is.leaf(stack[[p]][[i]])) {
+							# push subtree onto stack
+							pos <- pos + 1L
+							stack[[pos]] <- stack[[p]][[i]]
+						}
+					}
+				}
 			}
 		}
 		
@@ -740,47 +810,59 @@ AlignSeqs <- function(myXStringSet,
 		orders <- vector("list", l - 1L)
 		.order(guideTree)
 		
-		.compare <- function(dend, found=FALSE) {
-			l <- length(dend)
-			if (found) {
-				if (l > 1) {
-					if (verbose)
-						nsteps <<- nsteps - 1L
+		.compare <- function(dend) {
+			# initialize a stack of maximum length (l)
+			stack <- vector("list", l)
+			visit <- logical(l) # node already visited
+			parent <- integer(l) # index of parent node
+			index <- integer(l) # index in parent node
+			found <- logical(l) # exact subtree found
+			pos <- 1L # current position in the stack
+			stack[[pos]] <- dend
+			while (pos > 0L) { # more nodes to visit
+				if (visit[pos]) { # ascending tree
+					visit[pos] <- FALSE # reset visit
 					
-					j <<- j + 1L
-					orders[[j]] <<- unlist(dend)
-					
-					attr(dend, "inherit") <- FALSE
-					
-					for (i in seq_len(l))
-						dend[[i]] <- .compare(dend[[i]], found)
-				} else if (!is.leaf(dend)) {
-					dend[[1]] <- .compare(dend[[1]], found)
-				}
-			} else if (l > 1) {
-				o <- unlist(dend)
-				j <<- j + 1L
-				orders[[j]] <<- o
-				
-				found <- FALSE
-				w <- which(ls==length(o))
-				for (i in seq_along(w)) {
-					if (all(orders_prev[[w[i]]]==o)) {
-						found <- TRUE
-						break
+					# replace self in parent
+					if (parent[pos] > 0)
+						stack[[parent[pos]]][[index[pos]]] <- stack[[pos]]
+					pos <- pos - 1L # pop off of stack
+				} else { # descending tree
+					if (found[pos]) {
+						attr(stack[[pos]], "inherit") <- FALSE
+						if (verbose)
+							nsteps <<- nsteps - 1L
+					} else {
+						o <- unlist(stack[[pos]])
+						j <<- j + 1L
+						orders[[j]] <<- o
+						
+						w <- which(ls==length(o))
+						for (i in seq_along(w)) {
+							if (all(orders_prev[[w[i]]]==o)) {
+								found[pos] <- TRUE
+								break
+							}
+						}
+						
+						if (found[pos])
+							attr(stack[[pos]], "inherit") <- TRUE
+					}
+					visit[pos] <- TRUE
+					p <- pos
+					for (i in seq_along(stack[[p]])) {
+						if (!is.leaf(stack[[p]][[i]])) {
+							# push subtree onto stack
+							pos <- pos + 1L
+							stack[[pos]] <- stack[[p]][[i]]
+							parent[[pos]] <- p
+							index[[pos]] <- i
+							found[pos] <- found[p]
+						}
 					}
 				}
-				
-				if (found)
-					attr(dend, "inherit") <- TRUE
-				
-				for (i in seq_len(l))
-					dend[[i]] <- .compare(dend[[i]], found)
-			} else if (!is.leaf(dend)) {
-				dend[[i]] <- .compare(dend[[1]], found)
 			}
-			
-			return(dend)
+			return(stack[[1L]])
 		}
 	}
 	

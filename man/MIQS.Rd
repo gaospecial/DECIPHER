@@ -19,7 +19,7 @@ The MIQS amino acid substitution matrix defined by Yamada & Tomii (2014).
 Substitution matrix values represent the log-odds of observing an aligned pair of amino acids versus the likelihood of finding the pair by chance.  Values in the MIQS matrix are in units of third-bits (\eqn{log(odds\ ratio)*3/log(2)}).
 }
 \source{
-Yamada, K., & Tomii, K. (2014). Revisiting amino acid substitution matrices for identifying distantly related proteins. \emph{Bioinformatics}, \bold{30(3)}, 317-325. doi:10.1093/bioinformatics/btt694.
+Yamada, K., & Tomii, K. (2014). Revisiting amino acid substitution matrices for identifying distantly related proteins. \emph{Bioinformatics}, \bold{30(3)}, 317-325.
 }
 \examples{
 data(MIQS)

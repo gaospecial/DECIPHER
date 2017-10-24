@@ -99,10 +99,12 @@ IdentifyByRank <- function(dbFile,
 			ifelse(is.character(add2tbl),add2tbl,tblName),
 			".rank = taxa.rank)",
 			sep="")
-		dbGetQuery(dbConn, searchExpression)
+		rs <- dbSendStatement(dbConn, searchExpression)
+		dbClearResult(rs)
 		
 		searchExpression <- "drop table taxa"
-		dbGetQuery(dbConn, searchExpression)
+		rs <- dbSendStatement(dbConn, searchExpression)
+		dbClearResult(rs)
 	}
 	
 	if (verbose) {

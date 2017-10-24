@@ -1,0 +1,135 @@
+/****************************************************************************
+ *                        Weighted Vector Summation                         *
+ *                           Author: Erik Wright                            *
+ ****************************************************************************/
+
+/*
+ * Rdefines.h is needed for the SEXP typedef, for the error(), INTEGER(),
+ * GET_DIM(), LOGICAL(), NEW_INTEGER(), PROTECT() and UNPROTECT() macros,
+ * and for the NA_INTEGER constant symbol.
+ */
+#include <Rdefines.h>
+
+/*
+ * R_ext/Rdynload.h is needed for the R_CallMethodDef typedef and the
+ * R_registerRoutines() prototype.
+ */
+#include <R_ext/Rdynload.h>
+
+/* for R_CheckUserInterrupt */
+#include <R_ext/Utils.h>
+
+// for OpenMP parallel processing
+#ifdef SUPPORT_OPENMP
+#include <omp.h>
+#endif
+
+// DECIPHER header file
+#include "DECIPHER.h"
+
+// Summation of x[z]*y[z] for b blocks,
+// divided by sum of y[z] in each block
+SEXP vectorSum(SEXP x, SEXP y, SEXP z, SEXP b)
+{
+	int *v = LOGICAL(x); // vector of matches
+	double *w = REAL(y); // vector of weights
+	int *m = INTEGER(z); // vector of indices
+	int size = asInteger(b); // block count
+	int l = length(z)/size; // block size
+	
+	SEXP ans;
+	PROTECT(ans = allocVector(REALSXP, size));
+	double *rans = REAL(ans);
+	
+	double curWeight, maxWeight;
+	int i, j = 0, k, index;
+	for (i = 0; i < size; i++) {
+		curWeight = 0;
+		maxWeight = 0;
+		for (k = 0; k < l; k++, j++) {
+			index = m[j] - 1;
+			maxWeight += w[index];
+			if (v[index])
+				curWeight += w[index];
+		}
+		if (maxWeight > 0) {
+			rans[i] = curWeight/maxWeight;
+		} else {
+			rans[i] = 0;
+		}
+	}
+	
+	UNPROTECT(1);
+	
+	return ans;
+}
+
+// First, temp = x %in% y for ordered integer vectors
+// Second, summation of temp[z]*a in b blocks by rows
+SEXP parallelMatch(SEXP x, SEXP y, SEXP indices, SEXP z, SEXP a, SEXP b, SEXP nThreads)
+{
+	int *v = INTEGER(x);
+	int size_x = length(x);
+	int *m = INTEGER(z); // vector of indices in x
+	double *weights = REAL(a);
+	int size = asInteger(b); // block count
+	int l = length(z);
+	int *u = INTEGER(indices);
+	int n = length(indices);
+	int nthreads = asInteger(nThreads);
+	int i, j, k;
+	
+	// build a vector of thread-safe pointers
+	int **ptrs = Calloc(n, int *); // sequences
+	int *size_y = Calloc(n, int); // lengths
+	for (i = 0; i < n; i++) {
+		ptrs[i] = INTEGER(VECTOR_ELT(y, u[i] - 1));
+		size_y[i] = length(VECTOR_ELT(y, u[i] - 1));
+	}
+	
+	SEXP ans;
+	PROTECT(ans = allocMatrix(REALSXP, n, size));
+	double *rans;
+	rans = REAL(ans);
+	for (i = 0; i < n*size; i++)
+		rans[i] = 0;
+	
+	#pragma omp parallel for private(i, j, k) schedule(guided) num_threads(nthreads)
+	for (k = 0; k < n; k++) {
+		int *w = ptrs[k];
+		
+		// temp = x %in% y
+		int *temp = Calloc(size_x, int); // initialized to zero
+		int s = 0;
+		for (i = 0; i < size_x; i++) {
+			for (j = s; j < size_y[k]; j++) {
+				if (v[i] == w[j]) {
+					temp[i] = 1;
+					break;
+				} else if (v[i] < w[j]) {
+					break;
+				}
+			}
+			s = j;
+		}
+		
+		// sum temp[m]*weights by rows
+		j = 0;
+		for (i = 0; i < l; i++) {
+			rans[j*n + k] += temp[m[i] - 1]*weights[i];
+			
+			j++;
+			if (j==size)
+				j = 0;
+		}
+		
+		Free(temp);
+	}
+	
+	Free(ptrs);
+	Free(size_y);
+	
+	UNPROTECT(1);
+	
+	return ans;
+}

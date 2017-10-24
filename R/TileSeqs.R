@@ -82,10 +82,10 @@ TileSeqs <- function(dbFile,
 	
 	if (is.character(add2tbl) || add2tbl) {
 		result <- dbListTables(dbConn)
-		w <- which(result==ifelse(is.character(add2tbl),add2tbl,tblName))
+		w <- which(result==ifelse(is.character(add2tbl), add2tbl, tblName))
 		if (length(w)==1) { # add to existing table
 			searchExpression <- paste("select max(row_names) from ",
-				ifelse(is.character(add2tbl),add2tbl,tblName),
+				ifelse(is.character(add2tbl), add2tbl, tblName),
 				sep="")
 			row_start <- as.integer(dbGetQuery(dbConn, searchExpression))
 		} else { # create new table
@@ -100,7 +100,7 @@ TileSeqs <- function(dbFile,
 		time.1 <- Sys.time()
 	}
 	count <- 0
-	for (k in 1:length(identifier)) {
+	for (k in seq_along(identifier)) {
 		target <- SearchDB(dbConn,
 			tblName=tblName,
 			type="DNAStringSet",
@@ -159,7 +159,7 @@ TileSeqs <- function(dbFile,
 		tGaps <- TerminalChar(target)
 		
 		count <- 0
-		for (i in 1:l) {
+		for (i in seq_len(l)) {
 			# find all target_sites within terminal gaps
 			w <- which(pos[i] > tGaps[,1] &
 				pos[i + maxLength - 1] <= tGaps[,1] + tGaps[,3])
@@ -230,7 +230,7 @@ TileSeqs <- function(dbFile,
 			end[count + index] <- i + maxLength - 1
 			target_sites[count + index] <- target_site
 			
-			for (j in 1:length(target_site)) {
+			for (j in seq_along(target_site)) {
 				count <- count + 1
 				ts <- strsplit(target_site[j], "", fixed=FALSE)[[1]]
 				repeats <- 0
@@ -282,16 +282,10 @@ TileSeqs <- function(dbFile,
 		} else {
 			tiles_all <- tiles
 		}
-		count <- dim(tiles_all)[1]
 		
-		if (is.character(add2tbl) || add2tbl)
-			dbWriteTable(dbConn,
-				ifelse(is.character(add2tbl),add2tbl,tblName),
-				tiles,
-				row.names=FALSE,
-				overwrite=FALSE,
-				append=TRUE,
-				field.types=list(row_names="INTEGER PRIMARY KEY ASC",
+		if (is.character(add2tbl) || add2tbl) {
+			if (count==0 && row_start==0) {
+				ft <- list(row_names="INTEGER PRIMARY KEY ASC",
 					start="INTEGER",
 					end="INTEGER",
 					start_aligned="INTEGER",
@@ -301,7 +295,23 @@ TileSeqs <- function(dbFile,
 					id="TEXT",
 					coverage="REAL",
 					groupCoverage="REAL",
-					target_site="TEXT"))
+					target_site="TEXT")
+				append <- FALSE
+			} else {
+				ft <- NULL
+				append <- TRUE
+			}
+			dbWriteTable(dbConn,
+				ifelse(is.character(add2tbl),
+					add2tbl,
+					tblName),
+				tiles,
+				row.names=FALSE,
+				overwrite=FALSE,
+				append=append,
+				field.types=ft)
+		}
+		count <- dim(tiles_all)[1]
 		
 		if (verbose)
 			setTxtProgressBar(pBar,

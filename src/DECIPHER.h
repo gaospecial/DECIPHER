@@ -84,6 +84,8 @@ SEXP intMatchOnce(SEXP x, SEXP y, SEXP o1, SEXP o2);
 
 SEXP matchListsDual(SEXP x, SEXP y, SEXP verbose, SEXP pBar, SEXP nThreads);
 
+SEXP groupMax(SEXP x, SEXP y, SEXP z);
+
 // ReplaceChars.c
 
 SEXP replaceChars(SEXP x, SEXP r, SEXP t);
@@ -153,6 +155,8 @@ SEXP expandAmbiguities(SEXP x, SEXP c);
 // RemoveGaps.c
 
 SEXP removeCommonGaps(SEXP x, SEXP type, SEXP nThreads);
+
+SEXP removeGaps(SEXP x, SEXP type, SEXP nThreads);
 
 // PredictHEC.c
 
@@ -229,3 +233,9 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 SEXP informationContent(SEXP p, SEXP nS, SEXP correction);
 
 SEXP informationContentAA(SEXP p, SEXP nS, SEXP correction);
+
+// VectorSums.c
+
+SEXP vectorSum(SEXP x, SEXP y, SEXP z, SEXP b);
+
+SEXP parallelMatch(SEXP x, SEXP y, SEXP indices, SEXP z, SEXP a, SEXP b, SEXP nThreads);

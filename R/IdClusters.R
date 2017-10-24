@@ -53,62 +53,84 @@ to.dendrogram <- function(object) {
 	z
 }
 
-.collapse <- function(dend, collapse=collapse) {
-	
-	if (is.leaf(dend))
-		return(dend)
-	
-	dend[[1]] <- .collapse(dend[[1]], collapse)
-	dend[[2]] <- .collapse(dend[[2]], collapse)
-	
-	if (!is.leaf(dend[[1]])) {
-		h1 <- attr(dend[[1]], "height")
-	} else {
-		h1 <- -Inf
-	}
-	if (!is.leaf(dend[[2]])) {
-		h2 <- attr(dend[[2]], "height")
-	} else {
-		h2 <- -Inf
-	}
-	
-	h <- attr(dend, "height")
-	
-	if ((h - h1) <= collapse || (h - h2) <= collapse) {
-		# make multifurcating
-		m1 <- attr(dend[[1]], "members")
-		m2 <- attr(dend[[2]], "members")
-		m <- m1 + m2
-		if ((h - h1) <= collapse && (h - h2) <= collapse) {
-			l1 <- length(dend[[1]])
-			l2 <- length(dend[[2]])
-			x <- vector("list", l1 + l2)
-			for (i in seq_len(l1))
-				x[i] <- dend[[1]][i]
-			for (i in seq_len(l2))
-				x[i + l1] <- dend[[2]][i]
-		} else if ((h - h1) <= collapse) {
-			l <- length(dend[[1]])
-			x <- vector("list", l + 1)
-			for (i in seq_len(l))
-				x[i] <- dend[[1]][i]
-			x[l + 1] <- dend[-1]
-		} else if ((h - h2) <= collapse) {
-			l <- length(dend[[2]])
-			x <- vector("list", l + 1)
-			x[1] <- dend[-2]
-			for (i in seq_len(l))
-				x[i + 1] <- dend[[2]][i]
+.collapse <- function(dend, collapse, dim) {
+	# initialize a stack of maximum length (dim)
+	stack <- vector("list", dim)
+	visit <- logical(dim) # node already visited
+	parent <- integer(dim) # index of parent node
+	index <- integer(dim) # index in parent node
+	pos <- 1L # current position in the stack
+	stack[[pos]] <- dend
+	while (pos > 0L) { # more nodes to visit
+		if (visit[pos]) { # ascending tree
+			visit[pos] <- FALSE # reset visit
+			
+			if (!is.leaf(stack[[pos]][[1]])) {
+				h1 <- attr(stack[[pos]][[1]], "height")
+			} else {
+				h1 <- -Inf
+			}
+			if (!is.leaf(stack[[pos]][[2]])) {
+				h2 <- attr(stack[[pos]][[2]], "height")
+			} else {
+				h2 <- -Inf
+			}
+			
+			h <- attr(stack[[pos]], "height")
+			
+			if ((h - h1) <= collapse || (h - h2) <= collapse) {
+				# make multifurcating
+				m1 <- attr(stack[[pos]][[1]], "members")
+				m2 <- attr(stack[[pos]][[2]], "members")
+				m <- m1 + m2
+				if ((h - h1) <= collapse && (h - h2) <= collapse) {
+					l1 <- length(stack[[pos]][[1]])
+					l2 <- length(stack[[pos]][[2]])
+					x <- vector("list", l1 + l2)
+					for (i in seq_len(l1))
+						x[i] <- stack[[pos]][[1]][i]
+					for (i in seq_len(l2))
+						x[i + l1] <- stack[[pos]][[2]][i]
+				} else if ((h - h1) <= collapse) {
+					l <- length(stack[[pos]][[1]])
+					x <- vector("list", l + 1)
+					for (i in seq_len(l))
+						x[i] <- stack[[pos]][[1]][i]
+					x[l + 1] <- stack[[pos]][-1]
+				} else if ((h - h2) <= collapse) {
+					l <- length(stack[[pos]][[2]])
+					x <- vector("list", l + 1)
+					x[1] <- stack[[pos]][-2]
+					for (i in seq_len(l))
+						x[i + 1] <- stack[[pos]][[2]][i]
+				}
+				stack[[pos]] <- x
+				
+				attr(stack[[pos]], "height") <- h
+				attr(stack[[pos]], "members") <- m
+				
+				class(stack[[pos]]) <- "dendrogram"
+			}
+			
+			# replace self in parent
+			if (parent[pos] > 0)
+				stack[[parent[pos]]][[index[pos]]] <- stack[[pos]]
+			pos <- pos - 1L # pop off of stack
+		} else { # descending tree
+			visit[pos] <- TRUE
+			p <- pos
+			for (i in seq_along(stack[[p]])) {
+				if (!is.leaf(stack[[p]][[i]])) {
+					# push subtree onto stack
+					pos <- pos + 1L
+					stack[[pos]] <- stack[[p]][[i]]
+					parent[[pos]] <- p
+					index[[pos]] <- i
+				}
+			}
 		}
-		dend <- x
-		
-		attr(dend, "height") <- h
-		attr(dend, "members") <- m
-		
-		class(dend) <- "dendrogram"
 	}
-	
-	return(dend)
+	return(stack[[1L]])
 }
 
 .organizeClusters <- function(myClusters,
@@ -884,185 +906,340 @@ MODELS <- c("JC69",
 	return(X)
 }
 
-.midpointRoot <- function(dendrogram) {
+.midpointRoot <- function(dendrogram, dim) {
 	
 	# mid-point root the tree based on which
 	# leaf is furthest from the leaf at zero
 	
 	# find the tip that is at zero height
 	.zeroFound <- FALSE
-	.containsZero <- function(x) {
-		if (is.leaf(x)) {
-			if (!.zeroFound && isTRUE(all.equal(attr(x, "height"), 0))) {
-				.zeroFound <<- TRUE
-				attr(x, "containsZero") <- TRUE
-			} else {
-				attr(x, "containsZero") <- FALSE
-			}
-		} else {
-			x[[1]] <- .containsZero(x[[1]])
-			x[[2]] <- .containsZero(x[[2]])
-			if (attr(x[[1]], "containsZero") || attr(x[[2]], "containsZero")) {
-				attr(x, "containsZero") <- TRUE
-			} else {
-				attr(x, "containsZero") <- FALSE
+	.containsZero <- function(dend) {
+		# initialize a stack of maximum length (dim)
+		stack <- vector("list", dim)
+		visit <- logical(dim) # node already visited
+		parent <- integer(dim) # index of parent node
+		index <- integer(dim) # index in parent node
+		pos <- 1L # current position in the stack
+		stack[[pos]] <- dend
+		while (pos > 0L) { # more nodes to visit
+			if (visit[pos]) { # ascending tree
+				visit[pos] <- FALSE # reset visit
+				
+				if (attr(stack[[pos]][[1]], "containsZero") ||
+					attr(stack[[pos]][[2]], "containsZero")) {
+					attr(stack[[pos]], "containsZero") <- TRUE
+				} else {
+					attr(stack[[pos]], "containsZero") <- FALSE
+				}
+				
+				# replace self in parent
+				if (parent[pos] > 0)
+					stack[[parent[pos]]][[index[pos]]] <- stack[[pos]]
+				pos <- pos - 1L # pop off of stack
+			} else { # descending tree
+				visit[pos] <- TRUE
+				p <- pos
+				for (i in seq_along(stack[[p]])) {
+					if (is.leaf(stack[[p]][[i]])) {
+						if (!.zeroFound &&
+							isTRUE(all.equal(attr(stack[[p]][[i]], "height"), 0))) {
+							.zeroFound <<- TRUE
+							attr(stack[[p]][[i]], "containsZero") <- TRUE
+						} else {
+							attr(stack[[p]][[i]], "containsZero") <- FALSE
+						}
+					} else {
+						# push subtree onto stack
+						pos <- pos + 1L
+						stack[[pos]] <- stack[[p]][[i]]
+						parent[[pos]] <- p
+						index[[pos]] <- i
+					}
+				}
 			}
 		}
-		
-		return(x)
+		return(stack[[1L]])
 	}
 	
 	dendrogram <- .containsZero(dendrogram)
 	
-	# find the maximum distance to the zeroth tip
+	# find the tip with maximum distance to the zeroth tip
 	.maxDist <- 0
 	.maxLeaf <- NA
-	.findMax <- function(x, height=NA) {
-		if (is.leaf(x)) {
-			dist <- 2*height - attr(x, "height")
-			if (!is.na(dist) &&
-				(dist > .maxDist ||
-				isTRUE(all.equal(dist, .maxDist)))) {
-				.maxDist <<- dist
-				.maxLeaf <<- as.integer(x)
-			}
-		} else {
-			if (is.na(height)) {
-				if (attr(x[[1]], "containsZero")) {
-					x[[1]] <- .findMax(x[[1]])
-				} else {
-					x[[1]] <- .findMax(x[[1]], attr(x, "height"))
+	.findMax <- function(dend) {
+		# initialize a stack of maximum length (dim)
+		stack <- vector("list", dim)
+		visit <- logical(dim) # node already visited
+		parent <- integer(dim) # index of parent node
+		index <- integer(dim) # index in parent node
+		pos <- 1L # current position in the stack
+		stack[[pos]] <- dend
+		height <- rep(NA_real_, dim)
+		while (pos > 0L) { # more nodes to visit
+			if (visit[pos]) { # ascending tree
+				visit[pos] <- FALSE # reset visit
+				
+				# replace self in parent
+				if (parent[pos] > 0)
+					stack[[parent[pos]]][[index[pos]]] <- stack[[pos]]
+				pos <- pos - 1L # pop off of stack
+			} else { # descending tree
+				visit[pos] <- TRUE
+				p <- pos
+				for (i in seq_along(stack[[p]])) {
+					if (is.leaf(stack[[p]][[i]])) {
+						if (is.na(height[p]) &&
+							!attr(stack[[p]][[i]], "containsZero")) {
+							dist <- 2*attr(stack[[p]], "height") - attr(stack[[p]][[i]], "height")
+						} else {
+							dist <- 2*height[p] - attr(stack[[p]][[i]], "height")
+						}
+						
+						if (!is.na(dist) &&
+							(dist > .maxDist ||
+							isTRUE(all.equal(dist, .maxDist)))) {
+							.maxDist <<- dist
+							.maxLeaf <<- as.integer(stack[[p]][[i]])
+						}
+					} else {
+						# push subtree onto stack
+						pos <- pos + 1L
+						stack[[pos]] <- stack[[p]][[i]]
+						parent[[pos]] <- p
+						index[[pos]] <- i
+						if (is.na(height[p])) {
+							if (attr(stack[[pos]], "containsZero")) {
+								height[pos] <- NA_real_
+							} else {
+								height[pos] <- attr(stack[[p]], "height")
+							}
+						} else {
+							height[pos] <- height[p]
+						}
+					}
 				}
-				if (attr(x[[2]], "containsZero")) {
-					x[[2]] <- .findMax(x[[2]])
-				} else {
-					x[[2]] <- .findMax(x[[2]], attr(x, "height"))
-				}
-			} else {
-				x[[1]] <- .findMax(x[[1]], height)
-				x[[2]] <- .findMax(x[[2]], height)
 			}
 		}
-		
-		return(x)
+		return(stack[[1L]])
 	}
 	
 	dendrogram <- .findMax(dendrogram)
 	
 	# find paths that contain the most distant tips
-	.containsMax <- function(x) {
-		if (is.leaf(x)) {
-			if (x==.maxLeaf) {
-				attr(x, "containsMax") <- TRUE
-			} else {
-				attr(x, "containsMax") <- FALSE
-			}
-		} else {
-			x[[1]] <- .containsMax(x[[1]])
-			x[[2]] <- .containsMax(x[[2]])
-			if (attr(x[[1]], "containsMax") || attr(x[[2]], "containsMax")) {
-				attr(x, "containsMax") <- TRUE
-			} else {
-				attr(x, "containsMax") <- FALSE
+	.containsMax <- function(dend) {
+		# initialize a stack of maximum length (dim)
+		stack <- vector("list", dim)
+		visit <- logical(dim) # node already visited
+		parent <- integer(dim) # index of parent node
+		index <- integer(dim) # index in parent node
+		pos <- 1L # current position in the stack
+		stack[[pos]] <- dend
+		while (pos > 0L) { # more nodes to visit
+			if (visit[pos]) { # ascending tree
+				visit[pos] <- FALSE # reset visit
+				
+				if (attr(stack[[pos]][[1]], "containsMax") ||
+					attr(stack[[pos]][[2]], "containsMax")) {
+					attr(stack[[pos]], "containsMax") <- TRUE
+				} else {
+					attr(stack[[pos]], "containsMax") <- FALSE
+				}
+				
+				# replace self in parent
+				if (parent[pos] > 0)
+					stack[[parent[pos]]][[index[pos]]] <- stack[[pos]]
+				pos <- pos - 1L # pop off of stack
+			} else { # descending tree
+				visit[pos] <- TRUE
+				p <- pos
+				for (i in seq_along(stack[[p]])) {
+					if (is.leaf(stack[[p]][[i]])) {
+						if (stack[[p]][[i]]==.maxLeaf) {
+							attr(stack[[p]][[i]], "containsMax") <- TRUE
+						} else {
+							attr(stack[[p]][[i]], "containsMax") <- FALSE
+						}
+					} else {
+						# push subtree onto stack
+						pos <- pos + 1L
+						stack[[pos]] <- stack[[p]][[i]]
+						parent[[pos]] <- p
+						index[[pos]] <- i
+					}
+				}
 			}
 		}
-		
-		return(x)
+		return(stack[[1L]])
 	}
 	
 	dendrogram <- .containsMax(dendrogram)
 	
-	
 	# midpoint root the tree
-	.findMidpoint <- function(x) {
-		if (is.leaf(x)) {
-			if (attr(x, "containsZero")) {
-				attr(x, "containsRoot") <- TRUE
-				attr(x, "isRoot") <- TRUE
-			} else {
-				attr(x, "containsRoot") <- FALSE
-			}
-		} else if ((attr(x, "height") > .maxDist/2 ||
-			isTRUE(all.equal(attr(x, "height"), .maxDist/2))) &&
-			attr(x, "containsZero")) {
-			if (is.leaf(x[[1]])) {
-				if (attr(x[[1]], "containsZero")) {
-					attr(x[[1]], "containsRoot") <- TRUE
-					attr(x[[1]], "isRoot") <- TRUE
-				} else {
-					attr(x[[1]], "containsRoot") <- FALSE
+	.findMidpoint <- function(dend) {
+		# initialize a stack of maximum length (dim)
+		stack <- vector("list", dim)
+		visit <- logical(dim) # node already visited
+		parent <- integer(dim) # index of parent node
+		index <- integer(dim) # index in parent node
+		pos <- 1L # current position in the stack
+		stack[[pos]] <- dend
+		while (pos > 0L) { # more nodes to visit
+			if (visit[pos]) { # ascending tree
+				visit[pos] <- FALSE # reset visit
+				
+				if ((attr(stack[[pos]], "height") > .maxDist/2 ||
+					isTRUE(all.equal(attr(stack[[pos]], "height"), .maxDist/2))) &&
+					attr(stack[[pos]], "containsZero")) {
+					if (attr(stack[[pos]][[1]], "height") < .maxDist/2 &&
+						attr(stack[[pos]][[1]], "containsZero") &&
+						!attr(stack[[pos]][[1]], "containsMax")) {
+						attr(stack[[pos]], "containsRoot") <- TRUE
+						attr(stack[[pos]], "isRoot") <- TRUE
+					} else if (attr(stack[[pos]][[2]], "height") < .maxDist/2 &&
+						attr(stack[[pos]][[2]], "containsZero") &&
+						!attr(stack[[pos]][[2]], "containsMax")) {
+						attr(stack[[pos]], "containsRoot") <- TRUE
+						attr(stack[[pos]], "isRoot") <- TRUE
+					} else {
+						attr(stack[[pos]], "containsRoot") <- attr(stack[[pos]][[1]], "containsRoot") ||
+							attr(stack[[pos]][[2]], "containsRoot")
+					}
 				}
-			} else {
-				x[[1]] <- .findMidpoint(x[[1]])
-			}
-			if (is.leaf(x[[2]])) {
-				if (attr(x[[2]], "containsZero")) {
-					attr(x[[2]], "containsRoot") <- TRUE
-					attr(x[[2]], "isRoot") <- TRUE
+				
+				# replace self in parent
+				if (parent[pos] > 0)
+					stack[[parent[pos]]][[index[pos]]] <- stack[[pos]]
+				pos <- pos - 1L # pop off of stack
+			} else { # descending tree
+				visit[pos] <- TRUE
+				p <- pos
+				
+				if (is.leaf(stack[[p]])) {
+					if (attr(stack[[p]], "containsZero")) {
+						attr(stack[[p]], "containsRoot") <- TRUE
+						attr(stack[[p]], "isRoot") <- TRUE
+					} else {
+						attr(stack[[p]], "containsRoot") <- FALSE
+					}
+				} else if ((attr(stack[[p]], "height") > .maxDist/2 ||
+					isTRUE(all.equal(attr(stack[[p]], "height"), .maxDist/2))) &&
+					attr(stack[[p]], "containsZero")) {
+					if (is.leaf(stack[[p]][[1]])) {
+						if (attr(stack[[p]][[1]], "containsZero")) {
+							attr(stack[[p]][[1]], "containsRoot") <- TRUE
+							attr(stack[[p]][[1]], "isRoot") <- TRUE
+						} else {
+							attr(stack[[p]][[1]], "containsRoot") <- FALSE
+						}
+					} else {
+						# push subtree onto stack
+						pos <- pos + 1L
+						stack[[pos]] <- stack[[p]][[1]]
+						parent[[pos]] <- p
+						index[[pos]] <- 1
+					}
+					if (is.leaf(stack[[p]][[2]])) {
+						if (attr(stack[[p]][[2]], "containsZero")) {
+							attr(stack[[p]][[2]], "containsRoot") <- TRUE
+							attr(stack[[p]][[2]], "isRoot") <- TRUE
+						} else {
+							attr(stack[[p]][[2]], "containsRoot") <- FALSE
+						}
+					} else {
+						# push subtree onto stack
+						pos <- pos + 1L
+						stack[[pos]] <- stack[[p]][[2]]
+						parent[[pos]] <- p
+						index[[pos]] <- 2
+					}
 				} else {
-					attr(x[[2]], "containsRoot") <- FALSE
+					attr(stack[[p]], "containsRoot") <- FALSE
 				}
-			} else {
-				x[[2]] <- .findMidpoint(x[[2]])
 			}
-			if (attr(x[[1]], "height") < .maxDist/2 &&
-				attr(x[[1]], "containsZero") &&
-				!attr(x[[1]], "containsMax")) {
-				attr(x, "containsRoot") <- TRUE
-				attr(x, "isRoot") <- TRUE
-			} else if (attr(x[[2]], "height") < .maxDist/2 &&
-				attr(x[[2]], "containsZero") &&
-				!attr(x[[2]], "containsMax")) {
-				attr(x, "containsRoot") <- TRUE
-				attr(x, "isRoot") <- TRUE
-			} else {
-				attr(x, "containsRoot") <- attr(x[[1]], "containsRoot") ||
-				attr(x[[2]], "containsRoot")
-			}
-		} else {
-			attr(x, "containsRoot") <- FALSE
 		}
-		
-		return(x)
+		return(stack[[1L]])
 	}
 	
 	dendrogram <- .findMidpoint(dendrogram)
 	
 	lower <- list()
-	.adjustHeight <- function(x, diff=NA) {
-		if (!is.null(attr(x, "containsRoot")) &&
-			attr(x, "containsRoot"))
-			diff <- 2*attr(x, "height") - .maxDist
-		if (!is.na(diff)) {
-			attr(x, "height") <- attr(x, "height") - diff
-			if (!is.leaf(x)) {
-				if (is.null(attr(x, "isRoot"))) {
-					x[[1]] <- .adjustHeight(x[[1]], diff)
-					if (length(x) > 1) {
-						x[[2]] <- .adjustHeight(x[[2]], diff)
-					} else { # first child was removed
-						x[[1]] <- .adjustHeight(x[[1]], diff)
+	.adjustHeight <- function(dend) {
+		# initialize a stack of maximum length (2*dim - 1)
+		stack <- vector("list", 2*dim - 1)
+		visit <- logical(2*dim - 1) # node already visited
+		parent <- integer(2*dim - 1) # index of parent node
+		index <- integer(2*dim - 1) # index in parent node
+		pos <- 1L # current position in the stack
+		stack[[pos]] <- dend
+		diff <- rep(NA_real_, 2*dim - 1)
+		while (pos > 0L) { # more nodes to visit
+			if (visit[pos]) { # ascending tree
+				visit[pos] <- FALSE # reset visit
+				
+				# do something with stack[[pos]]
+				
+				if (!is.null(attr(stack[[pos]], "isRoot"))) {
+					if (is.leaf(stack[[pos]])) {
+						lower <<- stack[[pos]]
+						x <- NULL
+					} else if (attr(stack[[pos]][[1]], "containsZero")) {
+						lower <<- stack[[pos]][[1]]
+						stack[[pos]][[1]] <- NULL
+						x <- stack[[pos]]
+					} else {
+						lower <<- stack[[pos]][[2]]
+						stack[[pos]][[2]] <- NULL
+						x <- stack[[pos]]
 					}
-				} else if (attr(x[[1]], "containsZero")) {
-					x[[2]] <- .adjustHeight(x[[2]], diff)
 				} else {
-					x[[1]] <- .adjustHeight(x[[1]], diff)
+					x <- stack[[pos]]
+				}
+				
+				# replace self in parent
+				if (parent[pos] > 0)
+					stack[[parent[pos]]][[index[pos]]] <- x
+				diff[pos] <- NA_real_
+				pos <- pos - 1L # pop off of stack
+			} else { # descending tree
+				visit[pos] <- TRUE
+				p <- pos
+				
+				if (!is.null(attr(stack[[p]], "containsRoot")) &&
+					attr(stack[[p]], "containsRoot"))
+					diff[p] <- 2*attr(stack[[p]], "height") - .maxDist
+				
+				if (!is.na(diff[p])) {
+					attr(stack[[p]], "height") <- attr(stack[[p]], "height") - diff[p]
+					if (!is.leaf(stack[[p]])) {
+						if (is.null(attr(stack[[p]], "isRoot"))) {
+							for (i in seq_along(stack[[p]])) {
+								# push subtree onto stack
+								pos <- pos + 1L
+								stack[[pos]] <- stack[[p]][[i]]
+								parent[[pos]] <- p
+								index[[pos]] <- i
+								diff[pos] <- diff[p]
+							}
+						} else if (attr(stack[[p]][[1]], "containsZero")) {
+							# push subtree onto stack
+							pos <- pos + 1L
+							stack[[pos]] <- stack[[p]][[2]]
+							parent[[pos]] <- p
+							index[[pos]] <- 2L
+							diff[pos] <- diff[p]
+						} else {
+							# push subtree onto stack
+							pos <- pos + 1L
+							stack[[pos]] <- stack[[p]][[1]]
+							parent[[pos]] <- p
+							index[[pos]] <- 1L
+							diff[pos] <- diff[p]
+						}
+					}
 				}
 			}
 		}
-		if (!is.null(attr(x, "isRoot"))) {
-			if (is.leaf(x)) {
-				lower <<- x
-				x <- NULL
-			} else if (attr(x[[1]], "containsZero")) {
-				lower <<- x[[1]]
-				x[[1]] <- NULL
-			} else {
-				lower <<- x[[2]]
-				x[[2]] <- NULL
-			}
-		}
-		return(x)
+		return(stack[[1L]])
 	}
 	
 	upper <- .adjustHeight(dendrogram)
@@ -1076,66 +1253,185 @@ MODELS <- c("JC69",
 	attr(tree, "members") <- total
 	total <- total - attr(lower, "members")
 	# reverse edges between original and new root
-	.revertList <- function(x) {
-		temp <- NULL
-		if (!is.null(attr(x[[1]], "containsRoot")) &&
-			attr(x[[1]], "containsRoot")) {
-			.revertList(x[[1]]) # continue descending
-			temp <- x[[2]]
-		} else if (length(x) > 1 &&
-			!is.null(attr(x[[2]], "containsRoot")) &&
-			attr(x[[2]], "containsRoot")) {
-			.revertList(x[[2]]) # continue descending
-			temp <- x[[1]]
-		} else if (!is.null(attr(x, "isRoot")) &&
-			attr(x, "isRoot")) {
-			temp <- x # last node
-			attr(temp, "members") <- attr(temp, "members") - attr(lower, "members")
-		}
-		if (!is.null(temp)) {
-			if (!is.leaf(temp) && length(temp)==1)
-				temp <- temp[[1L]] # remove node
-			branch <<- branch + 1L # go to next branch
-			index <- rep(2L, branch)
-			# initialize the subtree
-			tree[[index]] <<- list()
-			class(tree[[index]]) <<- "dendrogram"
-			attr(tree[[index]], "height") <<- attr(x, "height")
-			attr(tree[[index]], "members") <<- total
-			if (is.leaf(temp)) {
-				total <<- total - 1L
-			} else {
-				total <<- total - attr(temp, "members")
+	.revertList <- function(dend) {
+		# initialize a stack of maximum length (dim)
+		stack <- vector("list", dim)
+		visit <- logical(dim) # node already visited
+		pos <- 1L # current position in the stack
+		stack[[pos]] <- dend
+		while (pos > 0L) { # more nodes to visit
+			if (visit[pos]) { # ascending tree
+				visit[pos] <- FALSE # reset visit
+				
+				temp <- NULL
+				if (!is.null(attr(stack[[pos]][[1]], "containsRoot")) &&
+					attr(stack[[pos]][[1]], "containsRoot")) {
+					temp <- stack[[pos]][[2]]
+				} else if (length(stack[[pos]]) > 1 &&
+					!is.null(attr(stack[[pos]][[2]], "containsRoot")) &&
+					attr(stack[[pos]][[2]], "containsRoot")) {
+					temp <- stack[[pos]][[1]]
+				} else if (!is.null(attr(stack[[pos]], "isRoot")) &&
+					attr(stack[[pos]], "isRoot")) {
+					temp <- stack[[pos]] # last node
+					attr(temp, "members") <- attr(temp, "members") - attr(lower, "members")
+				}
+				if (!is.null(temp)) {
+					if (!is.leaf(temp) && length(temp)==1)
+						temp <- temp[[1L]] # remove node
+					branch <<- branch + 1L # go to next branch
+					index <- rep(2L, branch)
+					# initialize the subtree
+					tree[[index]] <<- list()
+					class(tree[[index]]) <<- "dendrogram"
+					attr(tree[[index]], "height") <<- attr(stack[[pos]], "height")
+					attr(tree[[index]], "members") <<- total
+					if (is.leaf(temp)) {
+						total <<- total - 1L
+					} else {
+						total <<- total - attr(temp, "members")
+					}
+					if (total > 0) {
+						tree[[c(index, 1L)]] <<- temp
+					} else { # last branch
+						tree[[index]] <<- temp
+					}
+				}
+				
+				pos <- pos - 1L # pop off of stack
+			} else { # descending tree
+				visit[pos] <- TRUE
+				p <- pos
+				
+				if (!is.null(attr(stack[[p]][[1]], "containsRoot")) &&
+					attr(stack[[p]][[1]], "containsRoot")) {
+					# push subtree onto stack
+					pos <- pos + 1L
+					stack[[pos]] <- stack[[p]][[1]]
+				} else if (length(stack[[p]]) > 1 &&
+					!is.null(attr(stack[[p]][[2]], "containsRoot")) &&
+					attr(stack[[p]][[2]], "containsRoot")) {
+					# push subtree onto stack
+					pos <- pos + 1L
+					stack[[pos]] <- stack[[p]][[2]]
+				}
 			}
-			if (total > 0) {
-				tree[[c(index, 1L)]] <<- temp
-			} else { # last branch
-				tree[[index]] <<- temp
-			}
 		}
-		invisible(NULL)
+		return(stack[[1L]])
 	}
 	
 	.revertList(upper)
 	if (length(tree[[2]])==0)
 		tree[[2]] <- upper[[1]]
 	
-	.removeAttributes <- function(x) {
-		if (!is.null(attr(x, "isRoot")))
-			attr(x, "isRoot") <- NULL
-		if (!is.null(attr(x, "containsRoot")))
-			attr(x, "containsRoot") <- NULL
-		if (!is.null(attr(x, "containsZero")))
-			attr(x, "containsZero") <- NULL
-		if (!is.null(attr(x, "containsMax")))
-			attr(x, "containsMax") <- NULL
-		
-		return(x)
+	.removeAttributes <- function(dend) {
+		# initialize a stack of maximum length (dim)
+		stack <- vector("list", dim)
+		visit <- logical(dim) # node already visited
+		parent <- integer(dim) # index of parent node
+		index <- integer(dim) # index in parent node
+		pos <- 1L # current position in the stack
+		stack[[pos]] <- dend
+		while (pos > 0L) { # more nodes to visit
+			if (visit[pos]) { # ascending tree
+				visit[pos] <- FALSE # reset visit
+				
+				if (!is.null(attr(stack[[pos]], "isRoot")))
+					attr(stack[[pos]], "isRoot") <- NULL
+				if (!is.null(attr(stack[[pos]], "containsRoot")))
+					attr(stack[[pos]], "containsRoot") <- NULL
+				if (!is.null(attr(stack[[pos]], "containsZero")))
+					attr(stack[[pos]], "containsZero") <- NULL
+				if (!is.null(attr(stack[[pos]], "containsMax")))
+					attr(stack[[pos]], "containsMax") <- NULL
+				
+				# replace self in parent
+				if (parent[pos] > 0)
+					stack[[parent[pos]]][[index[pos]]] <- stack[[pos]]
+				pos <- pos - 1L # pop off of stack
+			} else { # descending tree
+				visit[pos] <- TRUE
+				p <- pos
+				for (i in seq_along(stack[[p]])) {
+					if (!is.leaf(stack[[p]][[i]])) {
+						# push subtree onto stack
+						pos <- pos + 1L
+						stack[[pos]] <- stack[[p]][[i]]
+						parent[[pos]] <- p
+						index[[pos]] <- i
+					} else {
+						if (!is.null(attr(stack[[p]][[i]], "isRoot")))
+							attr(stack[[p]][[i]], "isRoot") <- NULL
+						if (!is.null(attr(stack[[p]][[i]], "containsRoot")))
+							attr(stack[[p]][[i]], "containsRoot") <- NULL
+						if (!is.null(attr(stack[[p]][[i]], "containsZero")))
+							attr(stack[[p]][[i]], "containsZero") <- NULL
+						if (!is.null(attr(stack[[p]][[i]], "containsMax")))
+							attr(stack[[p]][[i]], "containsMax") <- NULL
+					}
+				}
+			}
+		}
+		return(stack[[1L]])
 	}
 	
 	rooted <- .removeAttributes(tree)
 	
 	return(rooted)
+}
+
+.applyMidpoints <- function(dend, dim) {
+	# initialize a stack of maximum length (dim)
+	stack <- vector("list", dim)
+	visit <- logical(dim) # node already visited
+	parent <- integer(dim) # index of parent node
+	index <- integer(dim) # index in parent node
+	pos <- 1L # current position in the stack
+	stack[[pos]] <- dend
+	while (pos > 0L) { # more nodes to visit
+		if (visit[pos]) { # ascending tree
+			visit[pos] <- FALSE # reset visit
+			
+			members <- sapply(stack[[pos]],
+				function(x) {
+					m <- attr(x, "members")
+					if (is.null(m)) {
+						return(1L)
+					} else {
+						return(m)
+					}
+				})
+			
+			l <- length(stack[[pos]])
+			if (is.leaf(stack[[pos]][[1]]) && is.leaf(stack[[pos]][[l]])) {
+				attr(stack[[pos]], "midpoint") <- (sum(members) - 1)/2
+			} else if (is.leaf(stack[[pos]][[1]])) {
+				attr(stack[[pos]], "midpoint") <- (sum(members[-l]) + attr(stack[[pos]][[l]], "midpoint"))/2
+			} else if (is.leaf(stack[[pos]][[l]])) {
+				attr(stack[[pos]], "midpoint") <- (attr(stack[[pos]][[1]], "midpoint") + sum(members[-l]))/2
+			} else {
+				attr(stack[[pos]], "midpoint") <- (sum(members[-l]) + attr(stack[[pos]][[1]], "midpoint") + attr(stack[[pos]][[l]], "midpoint"))/2
+			}
+			
+			# replace self in parent
+			if (parent[pos] > 0)
+				stack[[parent[pos]]][[index[pos]]] <- stack[[pos]]
+			pos <- pos - 1L # pop off of stack
+		} else { # descending tree
+			visit[pos] <- TRUE
+			p <- pos
+			for (i in seq_along(stack[[p]])) {
+				if (!is.leaf(stack[[p]][[i]])) {
+					# push subtree onto stack
+					pos <- pos + 1L
+					stack[[pos]] <- stack[[p]][[i]]
+					parent[[pos]] <- p
+					index[[pos]] <- i
+				}
+			}
+		}
+	}
+	return(stack[[1L]])
 }
 
 IdClusters <- function(myDistMatrix=NULL,
@@ -1232,7 +1528,7 @@ IdClusters <- function(myDistMatrix=NULL,
 	}
 	if (method != 7 && !is(myDistMatrix, "matrix")) {
 		stop(paste("myDistMatrix must be a matrix for method '", METHODS[method], "'.", sep=""))
-	} else if (method != 7 && method != 8) {
+	} else if (method != 7) {
 		dim <- dim(myDistMatrix)
 		if (dim[2]!=dim[1])
 			stop("myDistMatrix is not square.")
@@ -1843,13 +2139,13 @@ IdClusters <- function(myDistMatrix=NULL,
 			myClustersList$lengths <- matrix(myClusters[,4:5], ncol=2)
 			myClustersList$clusters <- matrix(myClusters[,9:10], ncol=2)
 			if (dim > 100) {
-				fontSize <- .6
+				fontSize <- 0.6
 			} else if (dim > 70) {
-				fontSize <- .7
+				fontSize <- 0.7
 			} else if (dim > 40) {
-				fontSize <- .8
+				fontSize <- 0.8
 			} else {
-				fontSize <- .9
+				fontSize <- 0.9
 			}
 			if (dim > 300) {
 				leaves <- "none"
@@ -1859,17 +2155,13 @@ IdClusters <- function(myDistMatrix=NULL,
 			
 			d <- to.dendrogram(myClustersList)
 			
-			# need to maximize the recursion depth temporarily
-			org.options <- options(expressions=5e5)
-			on.exit(options(org.options))
-			
 			# midpoint root the dendrogram
 			if (method==1 || method==3)
-				d <- .midpointRoot(d)
+				d <- .midpointRoot(d, dim)
 			
 			# convert bifurcating tree to multifurcating
 			if (collapse >= 0)
-				d <- .collapse(d, collapse)
+				d <- .collapse(d, collapse, dim)
 			
 			# specify the order of clusters that
 			# will match the plotted dendrogram
@@ -1895,58 +2187,49 @@ IdClusters <- function(myDistMatrix=NULL,
 				d <- dendrapply(d, colEdge, c, r)
 				
 				.reorder <- function(dend) {
-					l <- length(dend)
-					if (l > 1) {
-						for (i in seq_len(l))
-							dend[[i]] <- .reorder(dend[[i]])
-						
-						members <- lapply(dend, unlist)
-						# sort tree by ascending cluster number
-						o <- sort.list(sapply(members,
-								function(x)
-									min(c[x, 1])))
-						dend[] <- dend[o]
-					} else if (!is.leaf(dend)) {
-						dend[[1]] <- .reorder(dend[[1]])
+					# initialize a stack of maximum length (dim)
+					stack <- vector("list", dim)
+					visit <- logical(dim) # node already visited
+					parent <- integer(dim) # index of parent node
+					index <- integer(dim) # index in parent node
+					pos <- 1L # current position in the stack
+					stack[[pos]] <- dend
+					while (pos > 0L) { # more nodes to visit
+						if (visit[pos]) { # ascending tree
+							visit[pos] <- FALSE # reset visit
+							
+							members <- lapply(stack[[pos]], unlist)
+							# sort tree by ascending cluster number
+							o <- sort.list(sapply(members,
+									function(x)
+										min(c[x, 1])))
+							stack[[pos]][] <- stack[[pos]][o]
+							
+							# replace self in parent
+							if (parent[pos] > 0)
+								stack[[parent[pos]]][[index[pos]]] <- stack[[pos]]
+							pos <- pos - 1L # pop off of stack
+						} else { # descending tree
+							visit[pos] <- TRUE
+							p <- pos
+							for (i in seq_along(stack[[p]])) {
+								if (!is.leaf(stack[[p]][[i]])) {
+									# push subtree onto stack
+									pos <- pos + 1L
+									stack[[pos]] <- stack[[p]][[i]]
+									parent[[pos]] <- p
+									index[[pos]] <- i
+								}
+							}
+						}
 					}
-					return(dend)
+					return(stack[[1L]])
 				}
 				d <- .reorder(d)
 			}
 			
 			# add midpoints to the tree
-			.applyMidpoints <- function(x) {
-				if (is.leaf(x))
-					return(x)
-				
-				l <- length(x)
-				for (i in seq_len(l))
-					x[[i]] <- .applyMidpoints(x[[i]])
-				
-				members <- sapply(x,
-					function(x) {
-						m <- attr(x, "members")
-						if (is.null(m)) {
-							return(1L)
-						} else {
-							return(m)
-						}
-					})
-				
-				if (is.leaf(x[[1]]) && is.leaf(x[[l]])) {
-					attr(x, "midpoint") <- (sum(members) - 1)/2
-				} else if (is.leaf(x[[1]])) {
-					attr(x, "midpoint") <- (sum(members[-l]) + attr(x[[l]], "midpoint"))/2
-				} else if (is.leaf(x[[l]])) {
-					attr(x, "midpoint") <- (attr(x[[1]], "midpoint") + sum(members[-l]))/2
-				} else {
-					attr(x, "midpoint") <- (sum(members[-l]) + attr(x[[1]], "midpoint") + attr(x[[l]], "midpoint"))/2
-				}
-				
-				return(x)
-			}
-			
-			d <- .applyMidpoints(d)
+			d <- .applyMidpoints(d, dim)
 		}
 		if (type==1 || type==3) {
 			if (is.null(dimnames(myDistMatrix)[[1]])) {

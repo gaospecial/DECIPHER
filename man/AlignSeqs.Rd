@@ -9,9 +9,9 @@ Performs profile-to-profile alignment of multiple unaligned sequences following 
 \usage{
 AlignSeqs(myXStringSet,
          guideTree = NULL,
-         iterations = 1,
+         iterations = 2,
          refinements = 1,
-         gapOpening = c(-16, -12),
+         gapOpening = c(-18, -16),
          gapExtension = c(-2, -1),
          useStructures = TRUE,
          structures = NULL,
@@ -65,11 +65,11 @@ Further arguments to be passed directly to \code{\link{AlignProfiles}}, includin
 \details{
 The profile-to-profile method aligns a sequence set by merging profiles along a guide tree until all the input sequences are aligned.  This process has three main steps:  (1)  If \code{guideTree=NULL}, an initial single-linkage guide tree is constructed based on a distance matrix of shared k-mers.  Alternatively, a \code{dendrogram} can be provided as the initial \code{guideTree}.  (2)  If \code{iterations} is greater than zero, then a UPGMA guide tree is built based on the initial alignment and the sequences are re-aligned along this tree.  This process repeated \code{iterations} times or until convergence.  (3)  If \code{refinements} is greater than zero, then subsets of the alignment are re-aligned to the remainder of the alignment.  This process generates two alignments, the best of which is chosen based on its sum-of-pairs score.  This refinement process is repeated \code{refinements} times, or until convergence.
 
-The purpose of \code{levels} is to speed-up the alignment process by not running time consuming processes when they are unlikely to change the outcome.  The first four \code{levels} control when \code{refinements} occur and the function \code{FUN} is run on the alignment.  The default \code{levels} specify that these events should happen when above 0.9 (AA; \code{levels[1]}) or 0.7 (DNA/RNA; \code{levels[3]}) average dissimilarity on the initial tree, when above 0.7 (AA; \code{levels[2]}) or 0.4 (DNA/RNA; \code{levels[4]}) average dissimilarity on the iterative tree, and after every tenth improvement made during refinement.  The sixth element of levels (\code{levels[6]}) prevents \code{FUN} from being applied at any point to less than 5 sequences.
+The purpose of \code{levels} is to speed-up the alignment process by not running time consuming processes when they are unlikely to change the outcome.  The first four \code{levels} control when \code{refinements} occur and the function \code{FUN} is run on the alignment.  The default \code{levels} specify that these events should happen when above 0.9 (AA; \code{levels[1]}) or 0.7 (DNA/RNA; \code{levels[3]}) average dissimilarity on the initial tree, when above 0.7 (AA; \code{levels[2]}) or 0.4 (DNA/RNA; \code{levels[4]}) average dissimilarity on the iterative tree(s), and after every tenth improvement made during refinement.  The sixth element of levels (\code{levels[6]}) prevents \code{FUN} from being applied at any point to less than 5 sequences.
 
 The \code{FUN} function is always applied just before returning the alignment so long as there are at least \code{levels[6]} sequences.  The default \code{FUN} is \code{AdjustAlignment}, but \code{FUN} can be any function that takes in an \code{XStringSet} as its first argument, as well as \code{weights}, \code{processors}, and \code{substitutionMatrix} as optional arguments.  For example, the default \code{FUN} could be altered to not perform any changes by setting it equal to \code{function(x, ...) return(x)}, where \code{x} is an \code{XStringSet}.
 
-Secondary structures are automatically computed for amino acid and RNA sequences unless \code{structures} are provided or \code{useStructures} is \code{FALSE}.  The default \code{structureMatrix} is used unless an alternative is provided.  For RNA sequences, secondary structures are only computed when there are at least 5 (\code{levels[6]}) sequences and when the total length of the initial guide tree is at least 5 (\code{levels[7]}) or the length of subsequent trees is at least 2 (\code{levels[8]}).
+Secondary structures are automatically computed for amino acid and RNA sequences unless \code{structures} are provided or \code{useStructures} is \code{FALSE}.  The default \code{structureMatrix} is used unless an alternative is provided.  For RNA sequences, secondary structures are only computed when the total length of the initial guide tree is at least 5 (\code{levels[7]}) or the length of subsequent trees is at least 2 (\code{levels[8]}).
 }
 \value{
 An \code{XStringSet} of aligned sequences.

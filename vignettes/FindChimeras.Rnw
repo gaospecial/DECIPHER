@@ -57,7 +57,7 @@ This document illustrates how to detect chimeric sequences using the \Rpackage{D
 \section{Chimera Finding Problems}
 %------------------------------------------------------------
 
-Chimeras are a common type of sequence anomaly that result from the use of PCR amplification.  Chimeras masquerade as normal sequences, but actually are made up of several different sequence parts that do not exist together in reality.  Undetected chimeras can have insidious effects, such as causing incorrect assessments of sequence diversity or primer/probe specificity.  Chimeras are very difficult to detect, and several detections methods have been proposed to varying degrees of success.  The basic problem can be described as the search for one or more regions of a sequence that do not belong with the rest of the sequence.
+Chimeras are a common type of sequence anomaly that result from the use of PCR amplification.  Chimeras masquerade as normal sequences, but actually are made up of several different sequence parts that do not exist together in reality.  Undetected chimeras can have insidious effects, such as causing incorrect assessments of sequence diversity or primer/probe specificity.  Chimeras are very difficult to detect, and several detection methods have been proposed with varying degrees of success.  The basic problem can be described as the search for one or more regions of a sequence that do not belong with the rest of the sequence.
 
 The \Rfunction{FindChimeras} algorithm works by finding suspect sequence fragments that are uncommon in the group where the sequence belongs, but very common in another group where the sequence does not belong.  Each sequence in the \Rfunarg{dbFile} is tiled into short sequence segments called fragments.  If the fragments are infrequent in their respective group in the \Rfunarg{dbFileReference} then they are considered suspect.  If enough suspect fragments from a sequence meet the specified constraints then the sequence is flagged as a chimera.
 
@@ -95,71 +95,80 @@ If \Rpackage{DECIPHER} is installed on your system, the code in each example can
 \section{Obtaining/Building A Reference Database}
 %------------------------------------------------------------
 
-The first step necessary to use \Rfunction{FindChimeras} is to obtain a reference database (\Rfunarg{dbFileReference}) of good sequences.  In order for the algorithm to work accurately, it is crucial that the reference database is free of any chimeras.  The examples given in this document use 16S rRNA sequences, and a suitable reference database can be found at \underline{\url{http://DECIPHER.codes/Download.html}}.  The 16S reference database must be unzipped after download.
+The first step necessary to use \Rfunction{FindChimeras} is to obtain a reference database (\Rfunarg{dbFileReference}) of good sequences.  In order for the algorithm to work accurately, it is crucial that the reference database is free of any chimeras.  The examples given in this document use 16S rRNA sequences, and a suitable reference database can be found at \underline{\url{http://DECIPHER.codes/Download.html}}.
 
-If a reference database is not present then it is feasible to create a one if a significantly large repository of sequences is available.  By using the input database as the reference database it is possible to remove chimeras from the database.  Iteratively repeating the process can eventually result in a clean reference database that is chimera free.
+If a reference database is not present then it is feasible to create one if a significantly large repository of sequences is available.  By using the input database as the reference database it is possible to remove chimeras from the database.  Iteratively repeating the process can eventually result in a clean reference database that is chimera free.
 
 The reference database is required to have several fields of information that are not found in a newly created sequence database:
 \begin{enumerate}
 \item \term{bases} and \term{nonbases} as provided by the function \Rfunction{IdLengths}.
-\item \term{origin} as provided by the function \Rfunction{FormGroups}.  The origin column contains the taxonomic rank above the level shared by the whole group.  For example, the origin of the group \textit{Nanoarchaeum} would be \textit{Root; Archaea; Nanoarchaeota}.  Without the taxonomic rank it would be possible to substitute numbers.  For example, the rank 3.1.4.2 with a group named 4 that included 4.1 and 4.2 would have origin 3.1.  These numbers could be generated using \Rfunction{IdClusters} with multiple \Rfunarg{cutoffs}.
+\item \term{origin} as provided by the function \Rfunction{FormGroups}.  The origin column contains the taxonomic rank above the level shared by the whole group.  For example, the origin of the group \textit{Nanoarchaeum} would be \textit{Root; Archaea; Nanoarchaeota}.  Without the taxonomic classifications it would be possible to substitute numbers.  For example, the rank 3.1.4.2 with a group named 4 that included 4.1 and 4.2 would have origin 3.1.  These numbers could be generated using \Rfunction{IdClusters} with multiple \Rfunarg{cutoffs}.
 \end{enumerate}
 
-Below is an example of building a reference database \textit{de novo} from a FASTA file of LSU rRNA (23S) sequences downloaded from SILVA (\underline{\url{http://www.arb-silva.de/}}).  Of course, the reference database must match the type of the query sequences, so in the remainder of this vignette we use a comprehensive SSU rRNA (16S) database.  The information in this section is only given as an example of how to build a reference database from scratch.
+Below is an example of building a reference database \textit{de novo} from a FASTA file of ribosomal RNA (rRNA) sequences downloaded from SILVA (\underline{\url{http://www.arb-silva.de/}}).  Of course, the reference database must match the type of the query sequences, so in the remainder of this vignette we use a comprehensive SSU rRNA (16S) database.  The information in this section is only given as an example of how to build a reference database from scratch.
 
 \begin{Schunk}
 \begin{Sinput}
-> dbConn <- dbConnect(SQLite(), "SILVA-117 23S Reference Database.sqlite")
-> Seqs2DB("SILVA 23S RefDB.fasta", "FASTA", dbConn, "")
-
-50675 total sequences in the table DNA.
-Time difference of 192.56 secs
-
-[1] 50675
+> dbRef <- dbConnect(SQLite(), "<<path to reference database>>")
+> Seqs2DB("<<path to reference sequences>>", "FASTA", dbRef, "")
+645151 total sequences in table Seqs.
+Time difference of 172.81 secs
 \end{Sinput}
 \end{Schunk}
 
-When importing a GenBank file the rank (classification) information is automatically imported from the ORGANISM field.  The classification is simply the levels of taxonomic rank separated by semicolons.  In this case the classification must be parsed from each sequence's description information following the ``>'' symbol.
+When importing a GenBank file the rank (classification) information is automatically imported from the ORGANISM field.  The classification is simply each level of taxonomic rank separated by semicolons.  In this case the classification must be parsed from each sequence's description information following the ``>'' symbol.
 
 \begin{Schunk}
 \begin{Sinput}
-> class <- dbGetQuery(dbConn, "select description from Seqs")
-> f <- function (x) {paste(x[2:length(x)], collapse="")}
-> class <- unlist(lapply(strsplit(class$description, " ", fixed=TRUE), f))
-> Add2DB(data.frame(rank=class), dbConn)
-Expression:  alter table DNA add column rank TEXT
-Expression:  update or replace DNA set rank = :rank where row_names = :row_names 
+> ns <- dbGetQuery(dbRef, "select description from Seqs")
+> ns$rank <- gsub("(.+) (.+)?", "\\2", ns$description)
+> ns$rank <- gsub("(.+)?;(.*)$", "\\2\nRoot;\\1", ns$rank)
+> ns$description <- gsub("(.+) (.+)?", "\\1", ns$description)
+> Add2DB(ns, dbRef)
+Expression:
+update Seqs set description = :description where row_names = :row_names
 
-Added to table DNA:  "rank".
-Time difference of 0.88 secs
+Expression:
+alter table Seqs add column rank TEXT
 
-[1] TRUE
+Expression:
+update Seqs set rank = :rank where row_names = :row_names
+
+Added to table Seqs:  "description" and "rank".
+
+Time difference of 883.32 secs
 \end{Sinput}
 \end{Schunk}
 
-We can now screen the reference database for chimeras.  This process can be repeated until no new chimeras can be found in the reference database.  After completing this process the reference database will be ready for checking new sequences.
-
+It is necessary to perform two more steps before we can use the reference database for chimera finding:
 \begin{Schunk}
 \begin{Sinput}
-> lengths <- IdLengths(dbConn, add2tbl=TRUE)
+> lengths <- IdLengths(dbRef, add2tbl=TRUE)
   |===============================================================| 100%
-Lengths counted for 50675 sequences.
-Added to DNA:  "bases", "nonbases", and "width".
+Lengths counted for 645151 sequences.
+Added to Seqs:  "bases", "nonbases", and "width".
 
-> groups <- FormGroups(dbConn, add2tbl=TRUE)
+Time difference of 3924.83 secs
+
+> groups <- FormGroups(dbRef, add2tbl=TRUE)
   |===============================================================| 100%
 Updating column: "identifier"...
 Updating column: "origin"...
-Formed 72 distinct groups.
-Added to table DNA: "identifier", "origin".
-Time difference of 917.76 secs
+Formed 1760 distinct groups.
+Added to table Seqs: "identifier", "origin".
 
-> chimeras <- FindChimeras(dbConn, dbFileReference=dbConn, add2tbl=TRUE)
+Time difference of 19860.67 secs
+\end{Sinput}
+\end{Schunk}
+
+We can now screen the reference database for chimeras.  This process can be repeated until no new chimeras can be found in the reference database, at which point the reference database will be ready for checking new sequences.
+
+\begin{Schunk}
+\begin{Sinput}
+> chimeras <- FindChimeras(dbRef, dbFileReference=dbRef, add2tbl=TRUE)
 Found 102 possible chimeras.
-Added to table DNA:  "chimera".
+Added to table Seqs:  "chimera".
 Time difference of 13387.34 secs
-
-> dbDisconnect(dbConn)
 \end{Sinput}
 \end{Schunk}
 
@@ -169,151 +178,49 @@ Note that sequences in the reference database must be in the same orientation as
 \section{Steps to Find Chimeras}
 %------------------------------------------------------------
 
-\subsection{Assigning Sequences To A Reference Group}
+\subsection{Assigning Sequences to Reference Groups}
 
-\subsubsection{Classifying Sequences}
+\subsubsection{Training the Classifier}
 
-In order to assign new sequences to a group in the reference database, it is necessary to first classify the sequences.  There are a wide variety of classification methods that would work for this purpose.  Here we make use of the RDP Multiclassifier available from \underline{\url{http://rdp.cme.msu.edu/classifier/}}.  After downloading the multiclassifier.jar we need to use it to classify our sequences.  Be sure to change the path names to those on your system by replacing all of the text inside quotes labeled ``$<<$path to ...$>>$'' with the actual path on your system.
+In order to assign new sequences to a group in the reference database, it is necessary to first classify the sequences.  We can use the functions \Rfunction{LearnTaxa} and \Rfunction{IdTaxa} to assign groups to the query sequences.  See the ``Classify Sequences'' vignette for a more detailed description of this process.
 
 <<expr1,eval=FALSE>>=
-output.file <- tempfile()
-command <- paste("java -Xmx1g -jar '",
-"<<path to multiclassifier.jar>>",
-"' --hier_outfile=/dev/null --conf=0 --assign_outfile='",
-output.file,
-"' '",
-"<<path to FASTA file>>",
-"'",
-sep="")
-cat("\n\n", command, "\n\n", sep="")
-@
-\code{java -jar '/multiclassifier.jar' --hier_outfile=/dev/null --conf=0 --assign_outfile='/tmp/file1' '/seqs.fas'}
+ids <- dbGetQuery(dbRef, "select identifier, origin from Seqs")
+ids <- paste(ids$origin, ids$identifier, sep=";")
 
-<<expr2,eval=FALSE>>=
-system(command)
+dna <- SearchDB(dbRef, type="DNAStringSet", remove="all")
+
+trainingSet <- LearnTaxa(dna, ids)
 @
 
-\subsubsection{Determining Reference Groups}
+\subsubsection{Creating a Query Sequence Database}
 
-Next we need to determine which groups are present in the reference database and the number of sequences present in each group.
+Chimera finding requires two database tables, one for the reference sequences and one for the query sequences.  Now that we have finished creating the chimera-free reference sequence database and training a classifer to its taxonomy, it is not time to make the query sequence database.  This can be accomplished by specifying a new table within the reference sequence database or creating a new database file for the query sequences, as shown here.
 
 <<expr3,eval=FALSE>>=
-dbRef <- dbConnect(SQLite(), '<<path to reference database>>')
-t <- dbGetQuery(dbRef, "select distinct rank, identifier from Seqs group by rank")
-y <- dbGetQuery(dbRef, paste("select distinct identifier,
-	count(*) as count from Seqs", "where chimera is null group by identifier"))
-
-t$count <- 0
-for (i in 1:dim(t)[1])
-t$count[i] <- y$count[which(y$identifier==t$identifier[i])]
+dbConn <- dbConnect(SQLite(), '<<path to query database>>')
+Seqs2DB('<<path to query sequences>>', 'FASTA', dbConn, '')
 @
 
-\subsubsection{Assign to Groups}
+\subsubsection{Assigning to Groups}
 
-We can now assign each of the classified sequences to a group in the reference database.
+We can now classify each of the query sequences and assign them to the corresponding group in the reference database.  Note that the query sequences need to be in the same orientation as sequences in the reference sequence database.
 
 <<expr4,eval=FALSE>>=
-r <- readLines(output.file)
-
-z <- data.frame(identifier=I(character(length(r))),
-	row.names=1:length(r))
-confidence <- .51
-for (i in 1:length(r)) {
-	u <- unlist(strsplit(r[i], "\t"))
-	
-	confidenceLevel <- 0
-	for (k in seq(5, length(u), 3)) {
-		if (as.numeric(u[k]) < confidence) {
-			confidenceLevel <- k
-			break
-		}
-	}
-	
-	if (confidenceLevel == 0) { # full confidence
-		r[i] <- paste(u[seq(3, length(u), 3)],
-			collapse="; ")
-	} else { # unclassified at some level
-		r[i] <- paste(u[seq(3, (confidenceLevel - 3), 3)],
-			collapse="; ")
-		r[i] <- paste(r[i],
-			"unclassified",
-			sep="; ")
-	}
-	
-	index <- grep(r[i],
-		t$rank,
-		fixed=TRUE)
-	
-	if (length(index) == 0)
-		z$identifier[i] <- "unknown_lineage"
-	else
-		z$identifier[i] <- as.character(t$identifier[index[1]])
-}
-@
-
-At this point we should have the group assignment for each sequence.
-\begin{Schunk}
-\begin{Sinput}
-> head(z)
-           identifier
-1      Lysinibacillus
-2      Staphylococcus
-3      Staphylococcus
-4   Carnobacteriaceae
-5      Peptococcaceae
-6 Erysipelotrichaceae
-\end{Sinput}
-\end{Schunk}
-
-\subsection{Forming the Sequence Database}
-
-\subsubsection{Importing Sequences}
-
-Next, we need to load the sequences into a sequence database (\Rfunarg{dbFile}).  This database will be used directly by the \Rfunction{FindChimeras} function.  Here we can either set \code{dbConn} to a file location to write the database, or if there is enough memory simply create the database in memory.
-
-<<expr5,eval=FALSE>>=
-# specify a path for where to write the sequence database
-dbConn <- "<<path to write sequence database>>"
-# OR create the sequence database in memory
-dbConn <- dbConnect(SQLite(), ":memory:")
-Seqs2DB("<<path to FASTA file>>", "FASTA", dbConn, "unknown")
-@
-
-\begin{Schunk}
-\begin{Sinput}
-Reading FASTA file from line 0 to 99999 
-
-175 total sequences in database.
-Time difference of 0.2 secs
-
-[1] 175
-\end{Sinput}
-\end{Schunk}
-
-\subsubsection{Adding Group Names}
-
-At this point we can add the group names that we determined previously to the sequence database we just created.
-
-<<expr6,eval=FALSE>>=
-Add2DB(z, dbConn)
+query <- SearchDB(dbConn, remove="all")
+groups <- IdTaxa(query, trainingSet, strand="top", threshold=0, processors=1)
+groups <- sapply(groups, function(x) tail(x$taxon, n=1))
+groups <- data.frame(identifier=groups, row.names=seq_along(groups), stringsAsFactors=FALSE)
+Add2DB(groups, dbConn)
 @
 
 \subsection{Finding Chimeras}
 
-Finally, we can use the \Rfunction{FindChimeras} function to search for chimeras in our sequences.  Two sets of parameters are available for 16S sequences.  The defaults apply to sequences longer than 1,000 nucleotides, while the second command applies to sequences that are shorter in length.
+Finally, we can use the \Rfunction{FindChimeras} function to search for chimeras in our sequences.
 
 <<expr7,eval=FALSE>>=
-# exclude some identifiers from searches
-exclude <- c("unclassified_Bacteria",
-             "unclassified_Root",
-             "unclassified_Archaea")
 # full-length sequences
-chimeras <- FindChimeras(dbConn, dbFileReference=dbRef, add2tbl=TRUE,
-	maxGroupSize=1e4, excludeIDs=exclude)
-# OR for short-length sequences
-chimeras <- FindChimeras(dbConn, dbFileReference=dbRef, minLength=40,
-	minSuspectFragments=2, add2tbl=TRUE, maxGroupSize=1e4,
-        excludeIDs=exclude)
+chimeras <- FindChimeras(dbConn, dbFileReference=dbRef, add2tbl=TRUE)
 @
 
 \begin{Schunk}
@@ -325,8 +232,8 @@ Searching Other Groups:
   |===============================================================| 100%
 
 Found 19 possible chimeras.
-Added to table DNA:  "chimera".
-Time difference of 1665.8 secs
+Added to table Seqs:  "chimera".
+Time difference of 981.21 secs
 \end{Sinput}
 \end{Schunk}
 
@@ -337,15 +244,15 @@ If any chimeras were found then they are stored in the \code{chimeras data.frame
 > # outputs the number of chimeras that were found
 > cat("Number of chimeras =", dim(chimeras)[1])
 Number of chimeras = 19 
-> # get the ordering of chimeric sequences in the set
-> row.names(chimeras)
- [1] "147" "89"  "87"  "90"  "88"  "132" "139" "97"  "5"   "120" "123" "13" 
-[13] "118" "114" "173" "174" "175" "18"  "124"
+> # get the indices of chimeric sequences in the set
+> as.numeric(row.names(chimeras))
+ [1] 147 89  87  90  88  132 139 97  5  120 123 13 
+[13] 118 114 173 174 175 18 124
 > # allows viewing the chimera results in a web browser
 > BrowseDB(dbConn)
 [1] TRUE
 > # returns the FASTA description of the chimeric sequences
-> dbGetQuery(dbConn, "select description from DNA where chimera is not null")
+> dbGetQuery(dbConn, "select description from Seqs where chimera is not null")
 1       uncultured bacterium; Fin_CL-100633_OTU-22.
 2       uncultured bacterium; Fin_CL-030731_OTU-12.
 3        uncultured bacterium; Fin_CL-050647_OTU-9.
@@ -374,7 +281,6 @@ Number of chimeras = 19
 [1] TRUE
 > dbDisconnect(dbConn)
 [1] TRUE
-> unlink(output.file)
 \end{Sinput}
 \end{Schunk}
 

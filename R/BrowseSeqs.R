@@ -274,9 +274,15 @@ BrowseSeqs <- function(myXStringSet,
 	}
 	
 	# create a legend that gives position
-	counter <- 20
-	if (counter > maxW)
-		counter <- maxW
+	if (maxW < 20) {
+		if (maxW < 10) {
+			counter <- maxW
+		} else {
+			counter <- 10
+		}
+	} else {
+		counter <- 20
+	}
 	offset <- (counter - 1) - nchar(maxW)
 	if (offset < 0)
 		offset <- 0

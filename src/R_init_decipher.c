@@ -107,6 +107,10 @@ static const R_CallMethodDef callMethods[] = { // method call, pointer, num args
 	{"predictDBN", (DL_FUNC) &predictDBN, 13},
 	{"informationContent", (DL_FUNC) &informationContent, 3},
 	{"informationContentAA", (DL_FUNC) &informationContentAA, 3},
+	{"vectorSum", (DL_FUNC) &vectorSum, 4},
+	{"parallelMatch", (DL_FUNC) &parallelMatch, 7},
+	{"groupMax", (DL_FUNC) &groupMax, 3},
+	{"removeGaps", (DL_FUNC) &removeGaps, 3},
 	{NULL, NULL, 0}
 };
 

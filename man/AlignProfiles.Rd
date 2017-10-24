@@ -17,7 +17,7 @@ AlignProfiles(pattern,
               misMatch = 0,
               gapOpening = -13,
               gapExtension = -1,
-              gapPower = -1,
+              gapPower = -0.5,
               terminalGap = -5,
               restrict = c(-1000, 2, 10),
               anchor = 0.7,
@@ -73,7 +73,7 @@ Numeric giving the fraction of sequences with identical k-mers required to becom
 Numeric giving the exponent that controls the degree of normalization applied to scores by column occupancy.  If two numerics are provided, the first controls the normalization power of terminal gaps, while the second controls that of internal gaps.  A \code{normPower} of \code{0} does not normalize the scores, which results in all columns of the profiles being weighted equally, and is the optimal value for aligning fragmentary sequences.  A \code{normPower} of \code{1} normalizes the score for aligning two positions by their column occupancy (1 - fraction of gaps).  A \code{normPower} greater than \code{1} more strongly discourages aligning with ``gappy'' regions of the alignment.  (See details section below.)
 }
   \item{substitutionMatrix}{
-Either a substitution matrix representing the substitution scores for an alignment or the name of the amino acid substitution matrix to use in alignment.  The latter may be one of the following:  ``BLOSUM45'', ``BLOSUM50'', ``BLOSUM62'', ``BLOSUM80'', ``BLOSUM100'', ``PAM30'', ``PAM40'', ``PAM70'', ``PAM120'', ``PAM250'', or ``MIQS''.  The default (NULL) will use the \code{perfectMatch} and \code{misMatch} penalties for DNA/RNA or ``MIQS'' for AA.  (See examples section below.)
+Either a substitution matrix representing the substitution scores for an alignment or the name of the amino acid substitution matrix to use in alignment.  The latter may be one of the following:  ``BLOSUM45'', ``BLOSUM50'', ``BLOSUM62'', ``BLOSUM80'', ``BLOSUM100'', ``PAM30'', ``PAM40'', ``PAM70'', ``PAM120'', ``PAM250'', or ``MIQS''.  The default (NULL) will use the \code{perfectMatch} and \code{misMatch} penalties for DNA/RNA or \code{PFASUM50} for AA.  (See examples section below.)
 }
   \item{structureMatrix}{
 A structure matrix if \code{p.struct} and \code{s.struct} are supplied, or \code{NULL} otherwise.
@@ -115,7 +115,7 @@ Yu, Y.-K., et al. (2015). Log-odds sequence logos. Bioinformatics, 31(3), 324-33
 Erik Wright \email{eswright@pitt.edu}
 }
 \seealso{
-\code{\link{AlignDB}}, \code{\link{AlignSeqs}}, \code{\link{AlignSynteny}}, \code{\link{AlignTranslation}}, \code{\link{MIQS}}
+\code{\link{AlignDB}}, \code{\link{AlignSeqs}}, \code{\link{AlignSynteny}}, \code{\link{AlignTranslation}}, \code{\link{PFASUM}}, \code{\link{MIQS}}
 }
 \examples{
 # align two sets of sequences

@@ -73,6 +73,8 @@ IdConsensus              Create Consensus Sequences by Groups
 IdentifyByRank           Identify By Taxonomic Rank
 IdLengths                Determine the Number of Bases, Nonbases, and Width
                          of Each Sequence
+IdTaxa                   Assign Sequences a Taxonomic Classification
+LearnTaxa                Train a Classifier for Assigning Taxonomy
 MaskAlignment            Mask Highly Variable Regions of An Alignment
 MeltDNA                  Simulate Melting of DNA
 MIQS                     MIQS Amino Acid Substitution Matrix
@@ -80,18 +82,23 @@ MODELS                   Available Models of DNA Evolution
 NNLS                     Sequential Coordinate-wise Algorithm for the
                          Non-negative Least Squares Problem
 OrientNucleotides        Orient Nucleotide Sequences
+PFASUM                   PFASUM Amino Acid Substitution Matrices
 PredictDBN               Predict RNA Secondary Structure in Dot-Bracket
                          Notation
 PredictHEC               Predict Protein Secondary Structure as Helix,
                          Beta-Sheet, or Coil
 Read Dendrogram          Read a Dendrogram from a Newick Formatted File
+RemoveGaps               Remove Gap Characters in Sequences
 RESTRICTION_ENZYMES      Common Restriction Enzyme's Cut Sites
 SearchDB                 Obtain Specific Sequences from a Database
 Seqs2DB                  Add Sequences from Text File to Database
 StaggerAlignment         Produce a Staggered Alignment
 Synteny-class            Synteny blocks and hits
+Taxa-class               Taxa training and testing objects
 TerminalChar             Determine the Number of Terminal Characters
 TileSeqs                 Form a Set of Tiles for Each Group of Sequences
+TrainingSet_16S          Training Set for Classification of 16S rRNA Gene
+                         Sequences
 TrimDNA                  Trims DNA Sequences to the High Quality Region
                          Between Patterns
 WriteDendrogram          Write a Dendrogram to Newick Format

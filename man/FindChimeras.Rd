@@ -16,14 +16,14 @@ FindChimeras(dbFile,
              minNumFragments = 20000,
              tb.width = 5,
              multiplier = 20,
-             minLength = 70,
+             minLength = 30,
              minCoverage = 0.6,
              overlap = 100,
-             minSuspectFragments = 6,
+             minSuspectFragments = 4,
              showPercentCoverage = FALSE,
              add2tbl = FALSE,
              maxGroupSize = -1,
-             minGroupSize = 100,
+             minGroupSize = 25,
              excludeIDs = NULL,
              processors = 1,
              verbose = TRUE)
@@ -78,7 +78,7 @@ Logical or a character string specifying the table name in which to add the resu
 Maximum number of sequences searched in a group.  A value of less than 0 means the search is unlimited.
 }
   \item{minGroupSize}{
-The minimum number of sequences in a group to be considered as part of the search for chimeras.  May need to be set to a small value for reference database with mostly small groups.
+The minimum number of sequences in a group to be considered as part of the search for chimeras.  May need to be set to a small value for reference databases with mostly small groups.
 }
   \item{excludeIDs}{
 Optional character vector of \code{identifier}(s) to exclude from database searches, or \code{NULL} (the default) to not exclude any.

@@ -69,37 +69,70 @@ Erik Wright \email{eswright@pitt.edu}
 \code{\link{BrowseDB}}, \code{\link{ConsensusSequence}}
 }
 \examples{
+# load the example DNA sequences
 db <- system.file("extdata", "Bacteria_175seqs.sqlite", package="DECIPHER")
-dna <- SearchDB(db) # non-coding RNA sequences
-BrowseSeqs(dna)
+dna <- SearchDB(db) # non-coding ribosomal RNA gene sequences
+
+# example of using the defaults with DNA sequences
+BrowseSeqs(dna) # view the XStringSet
+
+# color only "ACTG" and "CSC" patterns (where S is C or G)
+BrowseSeqs(dna, patterns=DNAStringSet(c("ACTG", "CSC")))
+
+# highlight (i.e., only fully-color) the first sequence
+BrowseSeqs(dna, highlight=1) # other sequences are dots where matching
+
+# highlight the consensus sequence at the bottom
+BrowseSeqs(dna, highlight=0) # other sequences are dots where matching
+
+# split the wide view into multiple vertical pages (i.e., for printing)
 BrowseSeqs(dna, colWidth=100, highlight=1)
-dbn <- PredictDBN(dna, type="structures")
-BrowseSeqs(dna, patterns=dbn) # color according to base-pairing
 
-# color amino acid sequences
-fas <- system.file("extdata", "50S_ribosomal_protein_L2.fas", package="DECIPHER")
-dna <- readDNAStringSet(fas)
-aa <- unique(translate(dna)) # the unique amino acid sequences
-AA <- AlignSeqs(aa)
-hec <- PredictHEC(AA, type="probabilities")
-BrowseSeqs(AA, patterns=hec) # color according to secondary structure
+# specify an alternative color scheme for -, A, C, G, T
+BrowseSeqs(dna, colors=c("#1E90FF", "#32CD32", "#9400D3", "black", "#EE3300"))
 
-# color bases in alternating groups with a different color scheme
-BrowseSeqs(dna[1:5],
-	colorPatterns=seq(1, width(dna)[1], 10),
-	patterns=c("A", "C", "G", "T", "-"),
-	colors=c("#1E90FF", "#32CD32", "#9400D3", "#000000", "#EE3300"))
+# only color the positions within certain positional ranges (100-200 & 250-500)
+BrowseSeqs(dna, colorPatterns=c(100, 200, 250, 500))
+
+# color according to base-pairing by supplying the fraction RGB for every position
+dbn <- PredictDBN(dna, type="structures") # calculate the secondary structures
+# dbn now contains the scores for whether a base is paired (left/right) or unpaired
+dbn[[1]][, 1] # the scores for the first position in the first sequence
+dbn[[2]][, 10] # the scores for the tenth position in the second sequence
+# these positional scores can be used as shades of red, green, and blue:
+BrowseSeqs(dna, patterns=dbn) # red = unpaired, green = left-pairing, blue = right
+# positions in black are not part of the consensus secondary structure
 
 # color all restriction sites
-data(RESTRICTION_ENZYMES)
+data(RESTRICTION_ENZYMES) # load dataset containing restriction enzyme sequences
 sites <- RESTRICTION_ENZYMES
 sites <- gsub("[^A-Z]", "", sites) # remove non-letters
-sites <- DNAStringSet(sites)
-rc_sites <- DNAStringSet(sites)
-w <- which(sites != rc_sites)
-sites <- c(sites, rc_sites[w])
+sites <- DNAStringSet(sites) # convert the character vector to a DNAStringSet
+rc_sites <- reverseComplement(DNAStringSet(sites))
+w <- which(sites != rc_sites) # find non-palindromic restriction sites
+sites <- c(sites, rc_sites[w]) # append their reverse complement
 sites <- sites[order(nchar(sites))] # match shorter sites first
-
-dna <- SearchDB(db, remove="all") # unaligned sequences
 BrowseSeqs(dna, patterns=sites)
+
+# load the example protein coding sequences
+fas <- system.file("extdata", "50S_ribosomal_protein_L2.fas", package="DECIPHER")
+dna <- readDNAStringSet(fas)
+
+# example of using the defaults with amino acid sequences
+aa <- unique(translate(dna)) # the unique amino acid sequences
+BrowseSeqs(aa)
+
+# example of highlighting the consensus amino acid sequence
+AA <- AlignSeqs(aa)
+BrowseSeqs(AA, highlight=0)
+
+# example of highlighting positions that differ from the majority consensus
+BrowseSeqs(AA, highlight=0, threshold=0.5)
+
+# color amino acids according to their predicted secondary structure
+hec <- PredictHEC(AA, type="probabilities") # calculate the secondary structures
+# hec now contains the probability that a base is in an alpha-helix or beta-sheet
+hec[[3]][, 18] # the 18th position in sequence 3 is likely part of a beta-sheet (E)
+# the positional probabilities can be used as shades of red, green, and blue:
+BrowseSeqs(AA, patterns=hec) # red = alpha-helix, green = beta-sheet, blue = coil
 }

@@ -115,10 +115,11 @@ SEXP enumerateSequence(SEXP x, SEXP wordSize)
 		}
 		
 		SET_VECTOR_ELT(ret_list, i, ans);
+		UNPROTECT(1);
 		R_CheckUserInterrupt();
 	}
 	
-	UNPROTECT(1 + x_length);
+	UNPROTECT(1);
 	
 	return ret_list;
 }
@@ -251,10 +252,11 @@ SEXP enumerateSequenceAA(SEXP x, SEXP wordSize)
 		}
 		
 		SET_VECTOR_ELT(ret_list, i, ans);
+		UNPROTECT(1);
 		R_CheckUserInterrupt();
 	}
 	
-	UNPROTECT(1 + x_length);
+	UNPROTECT(1);
 	
 	return ret_list;
 }
@@ -381,10 +383,11 @@ SEXP enumerateGappedSequence(SEXP x, SEXP wordSize, SEXP ordering)
 		
 		SET_VECTOR_ELT(ret_list, 2*i, ans);
 		SET_VECTOR_ELT(ret_list, 2*i + 1, pos);
+		UNPROTECT(2);
 		R_CheckUserInterrupt();
 	}
 	
-	UNPROTECT(1 + 2*l);
+	UNPROTECT(1);
 	
 	return ret_list;
 }
@@ -503,10 +506,11 @@ SEXP enumerateGappedSequenceAA(SEXP x, SEXP wordSize, SEXP ordering)
 		
 		SET_VECTOR_ELT(ret_list, 2*i, ans);
 		SET_VECTOR_ELT(ret_list, 2*i + 1, pos);
+		UNPROTECT(2);
 		R_CheckUserInterrupt();
 	}
 	
-	UNPROTECT(1 + 2*l);
+	UNPROTECT(1);
 	
 	return ret_list;
 }
@@ -647,10 +651,11 @@ SEXP enumerateSequenceReducedAA(SEXP x, SEXP wordSize, SEXP alphabet)
 		}
 		
 		SET_VECTOR_ELT(ret_list, i, ans);
+		UNPROTECT(1);
 		R_CheckUserInterrupt();
 	}
 	
-	UNPROTECT(1 + x_length);
+	UNPROTECT(1);
 	
 	return ret_list;
 }

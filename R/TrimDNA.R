@@ -230,6 +230,7 @@ TrimDNA <- function(myDNAStringSet,
 		rights[w] <- 0L
 	}
 	
+	ns <- names(myDNAStringSet)
 	w <- which(lefts <= rights)
 	if (length(w) > 0) {
 		myDNAStringSet <- dna[w]
@@ -253,7 +254,7 @@ TrimDNA <- function(myDNAStringSet,
 	if (type==1 || type==3)
 		ranges <- IRanges(start=lefts,
 			end=rights,
-			names=names(myDNAStringSet))
+			names=ns)
 	
 	if (verbose) {
 		cat("\n")

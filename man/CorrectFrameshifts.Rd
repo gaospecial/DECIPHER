@@ -17,7 +17,7 @@ CorrectFrameshifts(myXStringSet,
                    gapExtension = -1,
                    frameShift = -15,
                    geneticCode = GENETIC_CODE,
-                   substitutionMatrix = "MIQS",
+                   substitutionMatrix = "PFASUM50",
                    verbose = TRUE,
                    processors = 1)
 }
@@ -53,7 +53,7 @@ Numeric giving the cost for shifting between frames of the query sequence.
 Named character vector in the same format as \code{GENETIC_CODE} (the default), which represents the standard genetic code.
 }
   \item{substitutionMatrix}{
-Either a substitution matrix representing the substitution scores for matching two amino acids or the name of the amino acid substitution matrix.  The latter may be one of the following:  ``BLOSUM45'', ``BLOSUM50'', ``BLOSUM62'', ``BLOSUM80'', ``BLOSUM100'', ``PAM30'', ``PAM40'', ``PAM70'', ``PAM120'', ``PAM250'', or ``MIQS'' (the default).
+Either a substitution matrix representing the substitution scores for matching two amino acids or the name of the amino acid substitution matrix.  The latter may be one of the following:  ``BLOSUM45'', ``BLOSUM50'', ``BLOSUM62'', ``BLOSUM80'', ``BLOSUM100'', ``PAM30'', ``PAM40'', ``PAM70'', ``PAM120'', ``PAM250'', ``PFASUM50'' (the default), or ``MIQS''.
 }
   \item{verbose}{
 Logical indicating whether to display progress.
@@ -71,16 +71,16 @@ Multiple inputs control the time required for frameshift correction.  The number
 }
 \value{
 If \code{type} is \code{"indels"} then the returned object is a list with the same length as \code{myXStringSet}.  Each element is a list with four components:
-  \item{insertions}{
+  \item{"insertions"}{
 Approximate positions of inserted nucleotides, which could be removed to correct the reading frame, or excess nucleotides at the 3'-end that make the length longer than a multiple of three.
 }
-  \item{deletions}{
+  \item{"deletions"}{
 Approximate positions of deleted nucleotides, which could be added back to correct the reading frame.
 }
-  \item{distance}{
+  \item{"distance"}{
 The amino acid distance from the nearest reference sequence, between 0 and 1.
 }
-  \item{index}{
+  \item{"index"}{
 The integer index of the reference sequence that was used for frame correction, or \code{0} if no reference sequence was within \code{rejectDistance}.
 }
 Note that positions in \code{insertions} and \code{deletions} are sometimes repeated to indicate that the same position needs to be shifted successively more than once to correct the reading frame.
@@ -98,7 +98,7 @@ Wang, Q., et al. (2013). Ecological Patterns of nifH Genes in Four Terrestrial C
 Erik Wright \email{eswright@pitt.edu}
 }
 \seealso{
-\code{\link{AlignTranslation}}, \code{\link{OrientNucleotides}}
+\code{\link{AlignTranslation}}, \code{\link{OrientNucleotides}}, \code{\link{PFASUM}}
 }
 \examples{
 fas <- system.file("extdata", "50S_ribosomal_protein_L2.fas", package="DECIPHER")

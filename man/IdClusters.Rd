@@ -38,7 +38,7 @@ Character string indicating the type of output desired.  This should be (an abbr
 If \code{method} is \code{"ML"}, the \code{DNAStringSet} or \code{RNAStringSet} used in the creation of \code{myDistMatrix}.  If \code{method} is \code{"inexact"}, the \code{DNAStringSet}, \code{RNAStringSet}, or \code{AAStringSet} to cluster.  Not applicable for other methods.
 }
   \item{collapse}{
-Numeric controlling which edges of the tree are removed by collapsing their nodes.  If \code{collapse} is zero (the default) then nodes at the same height will be collapsed to a single node, resulting in a multifurcating tree.  When \code{collapse} is greater than zero, nodes that are within \code{collapse} difference in height are made into a single node.  A value of \code{collapse} less than zero will ensure that the \code{dendrogram} is purely bifurcating.  Note that \code{collapse} has no effect on cluster numbers or \code{cutoff}.
+Numeric controlling which internal edges of the tree are removed by collapsing their nodes.  If \code{collapse} is zero (the default) then nodes at the same height will be collapsed to a single node, resulting in a multifurcating tree.  When \code{collapse} is greater than zero, nodes that are within \code{collapse} difference in height are made into a single node.  A value of \code{collapse} less than zero will ensure that the \code{dendrogram} is purely bifurcating.  Note that \code{collapse} has no effect on cluster numbers or \code{cutoff}.
 }
   \item{model}{
 One or more of the available \code{MODELS} of DNA evolution.  Only applicable if \code{method} is \code{"ML"}.

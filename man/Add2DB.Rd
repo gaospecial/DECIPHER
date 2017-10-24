@@ -59,5 +59,18 @@ Add2DB(l, dbConn)
 
 # View the added lengths
 BrowseDB(dbConn)
+
+# Change the value of existing columns
+ids <- data.frame(identifier=rep("Bacteroidetes", 18), stringsAsFactors=FALSE)
+rownames(ids) <- 10:27
+Add2DB(ids, dbConn)
+BrowseDB(dbConn)
+
+# Add data to a subset of rows using a clause
+ids[[1]][] <- "Changed"
+nrow(ids) # 18 rows
+Add2DB(ids, dbConn, clause="accession like 'EU808318\%'")
+BrowseDB(dbConn) # only 1 row effected
+
 dbDisconnect(dbConn)
 }

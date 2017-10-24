@@ -20,7 +20,7 @@ DistanceMatrix(myXStringSet,
 An \code{XStringSet} object of aligned sequences (\code{DNAStringSet}, \code{RNAStringSet}, or \code{AAStringSet}).
 }
   \item{includeTerminalGaps}{
-Logical specifying whether or not to include terminal gaps ("-" characters on each end of the sequence) into the calculation of distance.
+Logical specifying whether or not to include terminal gaps ("-" or "." characters on each end of the sequence) into the calculation of distance.
 }
   \item{penalizeGapLetterMatches}{
 Logical specifying whether or not to consider gap-to-letter matches as mismatches.  If \code{FALSE}, then gap-to-letter matches are not included in the total length used to calculate distance.

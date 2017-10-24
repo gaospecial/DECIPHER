@@ -38,7 +38,7 @@
 // in-place fills missing sequence in the input
 SEXP fillOverlaps(SEXP m, SEXP n)
 {	
-	if (NAMED(m)==2)
+	if (MAYBE_SHARED(m))
 		error(".Call function 'fillOverlaps' called in incorrect context.");
 	
 	int i;

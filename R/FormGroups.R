@@ -1,8 +1,8 @@
 FormGroups <- function(dbFile,
 	tblName="Seqs",
-	goalSize=1000,
-	minGroupSize=500,
-	maxGroupSize=10000,
+	goalSize=50,
+	minGroupSize=25,
+	maxGroupSize=500,
 	add2tbl=FALSE,
 	verbose=TRUE) {
 	
@@ -40,18 +40,32 @@ FormGroups <- function(dbFile,
 			tblName))))
 		stop("No rank column in table.")
 	
-	searchExpression <- paste("select distinct rank, count(rank) as count from",
-		tblName,
-		"group by rank")
+	searchExpression <- paste("select rank from",
+		tblName)
 	rs <- dbSendQuery(dbConn, searchExpression)
-	searchResult <- dbFetch(rs, n=-1, row.names=FALSE)
+	allranks <- dbFetch(rs, n=-1, row.names=FALSE)$rank
 	dbClearResult(rs)
 	
-	searchResult <- searchResult[order(searchResult$count,
-		decreasing=FALSE),]
+	taxonomy <- unlist(lapply(strsplit(allranks,
+			"\n",
+			fixed=TRUE),
+		function (x) {
+			paste(x[-1], collapse=" ")
+		}))
+	rank <- sort(table(taxonomy))
 	
-	searchResult$origin <- ""
-	searchResult$identifier <- ""
+	searchResult <- data.frame(rank=names(rank),
+		count=as.integer(-rank),
+		origin="",
+		identifier="",
+		stringsAsFactors=FALSE)
+	
+	rank <- names(rank)
+	lineages <- strsplit(as.character(rank),
+		" *; *")
+	rank <- unlist(lapply(lineages,
+		paste,
+		collapse=";"))
 	
 	if (verbose)
 		pBar <- txtProgressBar(style=3)
@@ -64,39 +78,56 @@ FormGroups <- function(dbFile,
 		return(id)
 	}
 	
-	rank <- unlist(lapply(strsplit(searchResult$rank,
-			"\n",
-			fixed=TRUE),
-		function (x) {
-			x <- paste(x[-1], collapse=" ")
-		}))
-	for (i in seq_along(rank)) {		if (searchResult$identifier[i]=="") {			lineage <- unlist(strsplit(as.character(rank[i]),				";",				fixed=TRUE))
-			for (j in length(lineage):1) {				w <- which(grepl(paste(lineage[1:j], collapse=";"),
-					rank,
-					fixed=TRUE))				counts <- sum(abs(searchResult$count[w]))				
-				if (counts > goalSize) {					if (counts > maxGroupSize && j < length(lineage)) {						j <- j + 1 # go down one rank						w <- which(grepl(paste(lineage[1:j], collapse=";"),
-							rank,
-							fixed=TRUE))
-						counts <- sum(abs(searchResult$count[w]))					}
+	o <- order(lengths(lineages),
+		searchResult$count,
+		decreasing=TRUE)
+	for (i in seq_along(o)) {		if (searchResult$identifier[o[i]]=="") {			lineage <- lineages[[o[i]]]
+			for (j in rev(seq_along(lineage))) {
+				w <- startsWith(rank,
+					paste(lineage[1:j],
+						collapse=";"))
+				w <- which(w)
+				w <- w[searchResult$count[w] < 0]
+				counts <- sum(abs(searchResult$count[w]))				
+				if (counts >= goalSize) {					if (counts > maxGroupSize &&
+						j < length(lineage)) {						j <- j + 1 # go down one rank						w <- startsWith(rank,
+							paste(lineage[1:j],
+								collapse=";"))
+						w <- which(w)
+						w <- w[searchResult$count[w] < 0]
+						counts <- sum(abs(searchResult$count[w]))					} else {
+						searchResult$count[w] <- abs(searchResult$count[w])
+					}
 					
 					if (j > 1) {
-						origin <- paste(lineage[1:j], collapse=";")
+						origin <- paste(lineage[1:(j - 1)], collapse=";")
 					} else {
 						origin <- ""
 					}
-										if (counts < minGroupSize) { # mark for later inclusion						searchResult$count[w] <- -abs(searchResult$count[w])					} else if (j > 1) { # try to include a little more						w2 <- which(searchResult$count < 0)						if (length(w2) > 0) {							w3 <- which(origin==searchResult$origin[w2])							if (length(w3) > 0) {
-								if ((counts - sum(searchResult$count[w2[w3]])) <= maxGroupSize) {
-									searchResult$count[w2[w3]] <- -abs(searchResult$count[w2[w3]])									w <- c(w, w2[w3])
-								}							}
-						}					}
-										searchResult$origin[w] <- origin					searchResult$identifier[w] <- .change(lineage[j])
-					break				} else if (j==1 && counts < goalSize) {
-					searchResult$origin[i] <- ""
-					searchResult$identifier[i] <- .change(lineage[j])
+										if (counts < minGroupSize) { # mark for later inclusion						searchResult$count[w] <- -abs(searchResult$count[w])					}
+										searchResult$origin[w] <- origin
+					id <- .change(lineage[j])
+					if (id %in% searchResult$identifier[-w])
+						id <- paste(id, o[i], sep="_")
+					searchResult$identifier[w] <- id
+					break				} else if (j==1) { # create singleton group
+					searchResult$origin[o[i]] <- ""
+					id <- .change(lineage[j])
+					if (id %in% searchResult$identifier[-o[i]])
+						id <- paste(id, o[i], sep="_")
+					searchResult$identifier[o[i]] <- id
 				}
 			}		}
 		if (verbose)
-			setTxtProgressBar(pBar, i/length(rank))	}
+			setTxtProgressBar(pBar, i/length(o))	}
+	
+	w <- which(!duplicated(allranks))
+	allranks <- allranks[w]
+	taxonomy <- taxonomy[w]
+	m <- match(taxonomy, rank)
+	searchResult <- searchResult[m,]
+	searchResult$rank <- allranks
+	searchResult$count <- NULL
 	
 	if (is.character(add2tbl) || add2tbl) {		dbWriteTable(dbConn, "taxa", searchResult)		
 		if (verbose)
@@ -105,13 +136,15 @@ FormGroups <- function(dbFile,
 			" set identifier = (select identifier from taxa where ",
 			ifelse(is.character(add2tbl), add2tbl, tblName),
 			".rank = taxa.rank)",
-			sep="")		dbGetQuery(dbConn, searchExpression)		
+			sep="")		rs <- dbSendStatement(dbConn, searchExpression)		dbClearResult(rs)
+		
 		if (is.na(match("origin",
 			dbListFields(dbConn,
 				ifelse(is.character(add2tbl), add2tbl, tblName))))) {			searchExpression <- paste("alter table ",
 				ifelse(is.character(add2tbl), add2tbl, tblName),
 				" add column origin",
-				sep="")			dbGetQuery(dbConn, searchExpression)		}
+				sep="")			rs <- dbSendStatement(dbConn, searchExpression)
+			dbClearResult(rs)		}
 		
 		if (verbose)
 			cat("\nUpdating column: \"origin\"...")		searchExpression <- paste("update ",
@@ -119,7 +152,9 @@ FormGroups <- function(dbFile,
 			" set origin = (select origin from taxa where ",
 			ifelse(is.character(add2tbl), add2tbl, tblName),
 			".rank = taxa.rank)",
-			sep="")		dbGetQuery(dbConn, searchExpression)				searchExpression <- "drop table taxa"		dbGetQuery(dbConn, searchExpression)	}
+			sep="")		rs <- dbSendStatement(dbConn, searchExpression)
+		dbClearResult(rs)				searchExpression <- "drop table taxa"		rs <- dbSendStatement(dbConn, searchExpression)
+		dbClearResult(rs)	}
 	
 	if (verbose) {
 		cat("\nFormed",
@@ -128,7 +163,7 @@ FormGroups <- function(dbFile,
 		if (is.character(add2tbl) || add2tbl)
 			cat("\nAdded to table ",
 				ifelse(is.character(add2tbl), add2tbl, tblName),
-				": \"identifier\", \"origin\".",
+				": \"identifier\", \"origin\".\n",
 				sep="")
 		
 		cat("\n")
@@ -139,8 +174,6 @@ FormGroups <- function(dbFile,
 			digits=2))
 		cat("\n")
 	}
-	
-	searchResult$count <- abs(searchResult$count)
 	
 	return(searchResult)
 }

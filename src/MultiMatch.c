@@ -855,3 +855,33 @@ SEXP intMatchOnce(SEXP x, SEXP y, SEXP o1, SEXP o2)
 	
 	return ans;
 }
+
+// index of first maxes in x by z groups in y
+SEXP groupMax(SEXP x, SEXP y, SEXP z)
+{
+	double *v = REAL(x); // values
+	int *w = INTEGER(y); // groups
+	int *u = INTEGER(z); // unique groups
+	int l = length(x); // number of values
+	int n = length(z); // number of groups
+	
+	SEXP ans;
+	PROTECT(ans = allocVector(INTSXP, n));
+	int *rans = INTEGER(ans);
+	
+	int curr = 0;
+	for (int i = 0; i < n; i++) {
+		double max = -1e53;
+		while (curr < l && w[curr]==u[i]) {
+			if (v[curr] > max) {
+				rans[i] = curr + 1; // index starting at 1
+				max = v[curr];
+			}
+			curr++;
+		}
+	}
+	
+	UNPROTECT(1);
+	
+	return ans;
+}

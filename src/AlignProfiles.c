@@ -36,7 +36,7 @@
 SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SEXP pm, SEXP mm, SEXP go, SEXP ge, SEXP exp, SEXP power, SEXP endGapPenaltyLeft, SEXP endGapPenaltyRight, SEXP boundary, SEXP nThreads)
 {
 	int i, j, k, start, end, *rans, count, z;
-	double *pprofile, *sprofile, gp, gs, S, M, GP, GS;
+	double *pprofile, *sprofile, gp, gs, lGp, lGs, S, M, GP, GS;
 	double max, tot;
 	SEXP ans1, ans2, ans3, ans4, dims;
 	
@@ -64,7 +64,7 @@ SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SE
 		do_subM = 1;
 		subM = REAL(subMatrix);
 	}
-	int NTHREADS, nthreads = asInteger(nThreads);
+	int nthreads = asInteger(nThreads);
 	
 	double *dbnM = REAL(dbnMatrix);
 	int do_DBN, d, size = 8;
@@ -180,6 +180,12 @@ SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SE
 	float *m = Calloc((lp+1)*(ls+1), float); // initialized to zero
 	int *o = Calloc(lp*ls, int); // initialized to zero
 	
+	// initialize arrays for recording the last gap that existed
+	float *scoreLastGp = Calloc(lp, float); // initialized to zero
+	float *scoreLastGs = Calloc(ls, float); // initialized to zero
+	int *posLastGp = Calloc(lp, int); // initialized to zero
+	int *posLastGs = Calloc(ls, int); // initialized to zero
+
 	// zipfian distribution for gap cost
 	if (lp > ls) {
 		j = lp;
@@ -346,12 +352,7 @@ SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SE
 		}
 		//Rprintf("\nk %d START %d END %d start %d end %d top %d left %d", k, START, END, start, end, top, left);
 		max = -1e53;
-		if (END - START > 2000) {
-			NTHREADS = nthreads;
-		} else {
-			NTHREADS = 1;
-		}
-		#pragma omp parallel for private(i,j,gp,gs,S,M,GP,GS,tot) num_threads(NTHREADS)
+		#pragma omp parallel for private(i,j,gp,gs,S,M,GP,GS,tot,lGp,lGs) num_threads(nthreads)
 		for (i = START; i <= END; i++) {
 			// determine column index
 			if (k >= lp) {
@@ -367,30 +368,39 @@ SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SE
 			int SIZEI = size*i;
 			int SIZEJ = size*j;
 			
-			// apply end-gap penalties at corners of matrix
-			if (i==0 && j==0) {
+			// calculate gap penalties
+			if (i==0 && j==0) { // terminal
 				gp = egpL*sstarts[0];
 				gs = egpL*pstarts[0];
-			} else if (i==(lp - 1) && j==(ls - 1)) {
+			} else if (i==(lp - 1) && j==(ls - 1)) { // terminal
 				gp = egpR*sstops[ls - 1];
 				gs = egpR*pstops[lp - 1];
 			} else {
+				if (posLastGp[i] != 0) // cost of extending last gap
+					lGp = GE*(1 - 0.3*sprofile[4 + SIZEJ])*zip[posLastGp[i]] + 0.5*GO*(sprofile[6 + size*(j - 1)] - sprofile[6 + SIZEJ]);
+				if (posLastGs[j] != 0) // cost of extending last gap
+					lGs = GE*(1 - 0.3*pprofile[4 + SIZEI])*zip[posLastGs[j]] + 0.5*GO*(pprofile[6 + size*(i - 1)] - pprofile[6 + SIZEI]);
+				
 				// determine insertion penalty (gap extension or gap opening)
-				if (j > 0 && *(o + i*ls + j - 1) > 0) {
+				if (j > 0 && *(o + i*ls + j - 1) > 0) { // extending gap
 					gp = GE*(1 - 0.3*sprofile[4 + SIZEJ])*zip[*(o + i*ls + j - 1)] + 0.5*GO*(sprofile[6 + size*(j - 1)] - sprofile[6 + SIZEJ]);
-				} else {
-					gp = GO*(2 - 0.5*sprofile[5 + SIZEJ] - 0.5*sprofile[6 + SIZEJ]);
+				} else { // new gap
+					gp = GO*(2 - 0.5*(sprofile[5 + SIZEJ] + sprofile[6 + SIZEJ])); // GO*(1 - fraction gap events in subject)
 				}
-				if (i > 0 && *(o + (i - 1)*ls + j) < 0) {
+				if (i > 0 && *(o + (i - 1)*ls + j) < 0) { // extending gap
 					gs = GE*(1 - 0.3*pprofile[4 + SIZEI])*zip[*(o + (i - 1)*ls + j)*-1] + 0.5*GO*(pprofile[6 + size*(i - 1)] - pprofile[6 + SIZEI]);
-				} else {
-					gs = GO*(2 - 0.5*pprofile[5 + SIZEI] - 0.5*pprofile[6 + SIZEI]);
+				} else { // new gap
+					gs = GO*(2 - 0.5*(pprofile[5 + SIZEI] + pprofile[6 + SIZEI])); // GO*(1 - fraction gap events in pattern)
 				}
 			}
 			
 			tot = (1 - pprofile[4 + SIZEI])*(1 - sprofile[4 + SIZEJ]); // max of dot-product
 			GS = gs*tot;
 			GP = gp*tot;
+			if (posLastGp[i] != 0)
+				lGp *= tot;
+			if (posLastGs[j] != 0)
+				lGs *= tot;
 			
 			if (pnorm[i] > 0 && snorm[j] > 0) {
 				tot = sqrt(pnorm[i]*snorm[j]); // normalization factor
@@ -455,8 +465,29 @@ SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SE
 			M *= tot;
 			GP *= tot;
 			GS *= tot;
+			if (posLastGp[i] != 0) {
+				scoreLastGp[i] += lGp*tot;
+				posLastGp[i]++;
+			}
+			if (posLastGs[j] != 0) {
+				scoreLastGs[j] += lGs*tot;
+				posLastGs[j]++;
+			}
+			M += *(m + i*(ls + 1) + j);
+			GP += *(m + (i + 1)*(ls + 1) + j);
+			GS += *(m + i*(ls + 1) + j + 1);
 			
-			if (((GS + *(m + i*(ls + 1) + j + 1)) > (M + *(m + i*(ls + 1) + j))) && ((GS + *(m + i*(ls + 1) + j + 1)) > (GP + *(m + (i + 1)*(ls + 1) + j))) && sprofile[4 + SIZEJ] != 1) {
+			if (posLastGs[j] != 0 && scoreLastGs[j] > M && scoreLastGs[j] > GS && scoreLastGs[j] > GP && (!(posLastGp[i] != 0 && scoreLastGp[i] > scoreLastGs[j])) && posLastGs[j] < i) {
+				// revert to the last gap
+				*(o + i*ls + j) = posLastGs[j]*-1;
+				*(m + (i + 1)*(ls + 1) + j + 1) = scoreLastGs[j];
+				posLastGs[j] = 0;
+			} else if (posLastGp[i] != 0 && scoreLastGp[i] > M && scoreLastGp[i] > GS && scoreLastGp[i] > GP && posLastGp[i] < j) {
+				// revert to the last gap
+				*(o + i*ls + j) = posLastGp[i];
+				*(m + (i + 1)*(ls + 1) + j + 1) = scoreLastGp[i];
+				posLastGp[i] = 0;
+			} else if (GS > M && GS > GP && sprofile[4 + SIZEJ] != 1) {
 				if (i > 0) {
 					if (*(o + (i - 1)*ls + j) < 0) {
 						*(o + i*ls + j) = *(o + (i - 1)*ls + j) - 1;
@@ -467,8 +498,13 @@ SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SE
 					*(o + i*ls + j) = -1;
 				}
 				
-				*(m + (i + 1)*(ls + 1) + j + 1) = GS + *(m + i*(ls + 1) + j + 1);
-			} else if ((GP + *(m + (i + 1)*(ls + 1) + j)) > (M + *(m + i*(ls + 1) + j)) && pprofile[4 + SIZEI] != 1) {
+				*(m + (i + 1)*(ls + 1) + j + 1) = GS;
+				
+				if (j > 0 && *(o + i*ls + j - 1) > 0 && i > 0) { // set the last gap
+					posLastGp[i] = *(o + i*ls + j - 1) + 1;
+					scoreLastGp[i] = GP;
+				}
+			} else if (GP > M && pprofile[4 + SIZEI] != 1) {
 				if (j > 0) {
 					if (*(o + i*ls + j - 1) > 0) {
 						*(o + i*ls + j) = *(o + i*ls + j - 1) + 1;
@@ -479,10 +515,24 @@ SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SE
 					*(o + i*ls + j) = 1;
 				}
 				
-				*(m + (i + 1)*(ls + 1) + j + 1) = GP + *(m + (i + 1)*(ls + 1) + j);
-			} else {
-				*(m + (i + 1)*(ls + 1) + j + 1) = M + *(m + i*(ls + 1) + j);
+				*(m + (i + 1)*(ls + 1) + j + 1) = GP;
+				
+				if (i > 0 && *(o + (i - 1)*ls + j) < 0 && j > 0) { // set the last gap
+					posLastGs[j] = (*(o + (i - 1)*ls + j) - 1)*-1;
+					scoreLastGs[j] = GS;
+				}
+			} else { // no gap
+				*(m + (i + 1)*(ls + 1) + j + 1) = M;
 				*(o + i*ls + j) = 0;
+				
+				if (j > 0 && *(o + i*ls + j - 1) > 0 && i > 0) { // set the last gap
+					posLastGp[i] = *(o + i*ls + j - 1) + 1;
+					scoreLastGp[i] = GP;
+				}
+				if (i > 0 && *(o + (i - 1)*ls + j) < 0 && j > 0) { // set the last gap
+					posLastGs[j] = (*(o + (i - 1)*ls + j) - 1)*-1;
+					scoreLastGs[j] = GS;
+				}
 			}
 			
 			//#pragma omp critical // not necessary because will only underestimate max
@@ -536,6 +586,10 @@ SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SE
 	
 	Free(pnorm);
 	Free(snorm);
+	Free(posLastGp);
+	Free(posLastGs);
+	Free(scoreLastGp);
+	Free(scoreLastGs);
 	
 	// find the max scoring alignment
 	int maxp = 0;
@@ -587,10 +641,14 @@ SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SE
 		z = *(o + i*ls + j);
 		//*(o + i*ls + j) = 0;
 		//*(m + (i + 1)*(ls + 1) + j + 1) = 0;
-		if (z <= 0)
+		if (z==0) {
 			i--;
-		if (z >= 0)
 			j--;
+		} else if (z < 0) {
+			i += z;
+		} else { // z > 0
+			j -= z;
+		}
 		count--;
 	}
 	int minp = i + 2;
@@ -623,26 +681,28 @@ SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SE
 	k = count + 1;
 	while (k < l) {
 		value = *(t + k);
-		for (count = k + 1; count < l; count++) {
-			if (*(t + count)!=value)
-				break;
-		}
-		z = count - k;
 		if (value==0) {
+			for (count = k + 1; count < l; count++) {
+				if (*(t + count)!=value)
+					break;
+			}
+			z = count - k;
 			i += z;
 			j += z;
+			k = count;
 		} else if (value > 0) {
-			p_ins[p_count] = z;
+			p_ins[p_count] = value;
 			p_ats[p_count] = i;
-			j += z;
+			j += value;
 			p_count++;
+			k++;
 		} else { // value < 0
-			s_ins[s_count] = z;
+			s_ins[s_count] = -1*value;
 			s_ats[s_count] = j;
-			i += z;
+			i -= value;
 			s_count++;
+			k++;
 		}
-		k = count;
 	}
 	
 	if (ls > maxs) {
@@ -700,7 +760,7 @@ SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SE
 SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SEXP ge, SEXP exp, SEXP power, SEXP endGapPenaltyLeft, SEXP endGapPenaltyRight, SEXP boundary, SEXP nThreads)
 {
 	int i, j, k, pos, start, end, *rans, count, z;
-	double *pprofile, *sprofile, gp, gs, M, GP, GS, R;
+	double *pprofile, *sprofile, gp, gs, lGp, lGs, M, GP, GS, R;
 	double max, tot, freq;
 	SEXP ans1, ans2, ans3, ans4, dims;
 	
@@ -717,7 +777,7 @@ SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SE
 	double egpL = asReal(endGapPenaltyLeft);
 	double egpR = asReal(endGapPenaltyRight);
 	double *subM = REAL(subMatrix);
-	int NTHREADS, nthreads = asInteger(nThreads);
+	int nthreads = asInteger(nThreads);
 	
 	double *hecM = REAL(hecMatrix);
 	int do_HEC, d, size = 29;
@@ -781,9 +841,9 @@ SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SE
 	// A, R, N, D, C, Q, E, G, H, I, L, K, M, F, P, S, T, W, Y, V:
 	double GC[20] = {-0.05,-0.354,0.486,0.016,-0.014,0.611,0.037,0.642,0.107,-1.229,-0.788,0.178,-1.346,-0.718,1.03,1.265,0.441,-0.916,-1.127,-0.728};
 	
-	// gap modulation factor based on +/- positions of gap
+	// gap modulation factor based on left/right positions to gap
 	// half of log-odds because added twice (gap open and close)
-	// units in third-bits - may not scale with all substitution matrices
+	// units in third-bits (may not scale with all substitution matrices)
 	double GM[320] = { // gap modulate position -8 to +8
 		0.1,0.171,0.129,0.094,0.082,0.094,0.085,-0.285,-0.255,-0.102,-0.095,-0.065,-0.013,-0.019,0.014,0.036, // A
 		0.078,0.04,0.095,-0.013,0.108,0.064,-0.052,0.073,-0.023,-0.115,-0.165,-0.129,-0.164,-0.143,-0.087,-0.088, // R
@@ -924,6 +984,12 @@ SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SE
 	
 	float *m = Calloc((lp+1)*(ls+1), float); // initialized to zero
 	int *o = Calloc(lp*ls, int); // initialized to zero
+	
+	// initialize arrays for recording the last gap that existed
+	float *scoreLastGp = Calloc(lp, float); // initialized to zero
+	float *scoreLastGs = Calloc(ls, float); // initialized to zero
+	int *posLastGp = Calloc(lp, int); // initialized to zero
+	int *posLastGs = Calloc(ls, int); // initialized to zero
 	
 	// zipfian distribution for gap cost
 	if (lp > ls) {
@@ -1098,12 +1164,7 @@ SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SE
 		}
 		
 		max = -1e53;
-		if (END - START > 2000) {
-			NTHREADS = nthreads;
-		} else {
-			NTHREADS = 1;
-		}
-		#pragma omp parallel for private(i,j,gp,gs,M,GP,GS,tot) num_threads(NTHREADS)
+		#pragma omp parallel for private(i,j,gp,gs,M,GP,GS,tot,lGp,lGs) num_threads(nthreads)
 		for (i = START; i <= END; i++) {
 			// determine column index
 			if (k >= lp) {
@@ -1121,35 +1182,44 @@ SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SE
 			int SIZE20I = 20*i;
 			int SIZE20J = 20*j;
 			
-			// apply end-gap penalties at corners of matrix
-			if (i==0 && j==0) {
+			// calculate gap penalties
+			if (i==0 && j==0) { // terminal
 				gp = egpL*sstarts[0];
 				gs = egpL*pstarts[0];
-			} else if (i==(lp - 1) && j==(ls - 1)) {
+			} else if (i==(lp - 1) && j==(ls - 1)) { // terminal
 				gp = egpR*sstops[ls - 1];
 				gs = egpR*pstops[lp - 1];
 			} else {
-				// determine insertion penalty (gap extension or gap opening)
-				if (j > 0 && *(o + i*ls + j - 1) > 0) {
-					gp = GE*(1 - 0.3*sprofile[23 + SIZEJ])*zip[*(o + i*ls + j - 1)] + 0.5*GOp[i]*(sprofile[25 + size*(j - 1)] - sprofile[25 + SIZEJ]);
-				} else {
-					gp = (GOp[i] + GRs[j])*(2 - 0.5*(sprofile[24 + SIZEJ] + sprofile[25 + SIZEJ]));
-				}
-				if (i > 0 && *(o + (i - 1)*ls + j) < 0) {
-					gs = GE*(1 - 0.3*pprofile[23 + SIZEI])*zip[*(o + (i - 1)*ls + j)*-1] + 0.5*GOs[j]*(pprofile[25 + size*(i - 1)] - pprofile[25 + SIZEI]);
-				} else {
-					gs = (GOs[j] + GRp[i])*(2 - 0.5*(pprofile[24 + SIZEI] + pprofile[25 + SIZEI]));
-				}
-				
-				// add modulation factor for center gap region
+				// modulation factor for center gap region
 				// amount is based on the opposing sequence
-				gp += GCs[j]*(1 - sprofile[23 + SIZEJ]);
-				gs += GCp[i]*(1 - pprofile[23 + SIZEI]);
+				gp = GCs[j]*(1 - sprofile[23 + SIZEJ]);
+				gs = GCp[i]*(1 - pprofile[23 + SIZEI]);
+				
+				if (posLastGp[i] != 0) // add cost of extending last gap
+					lGp = gp + GE*(1 - 0.3*sprofile[23 + SIZEJ])*zip[posLastGp[i]] + 0.5*GOp[i]*(sprofile[25 + size*(j - 1)] - sprofile[25 + SIZEJ]);
+				if (posLastGs[j] != 0) // add cost of extending last gap
+					lGs = gs + GE*(1 - 0.3*pprofile[23 + SIZEI])*zip[posLastGs[j]] + 0.5*GOs[j]*(pprofile[25 + size*(i - 1)] - pprofile[25 + SIZEI]);
+				
+				// determine insertion penalty (gap extension or gap opening)
+				if (j > 0 && *(o + i*ls + j - 1) > 0) { // extending gap
+					gp += GE*(1 - 0.3*sprofile[23 + SIZEJ])*zip[*(o + i*ls + j - 1)] + 0.5*GOp[i]*(sprofile[25 + size*(j - 1)] - sprofile[25 + SIZEJ]);
+				} else { // new gap
+					gp += (GOp[i] + GRs[j])*(2 - 0.5*(sprofile[24 + SIZEJ] + sprofile[25 + SIZEJ])); // (GO + GR)*(1 - fraction gap events in subject)
+				}
+				if (i > 0 && *(o + (i - 1)*ls + j) < 0) { // extending gap
+					gs += GE*(1 - 0.3*pprofile[23 + SIZEI])*zip[*(o + (i - 1)*ls + j)*-1] + 0.5*GOs[j]*(pprofile[25 + size*(i - 1)] - pprofile[25 + SIZEI]);
+				} else { // new gap
+					gs += (GOs[j] + GRp[i])*(2 - 0.5*(pprofile[24 + SIZEI] + pprofile[25 + SIZEI])); // (GO + GR)*(1 - fraction gap events in pattern)
+				}
 			}
 			
 			tot = (1 - pprofile[23 + SIZEI])*(1 - sprofile[23 + SIZEJ]); // max of dot-product
 			GS = gs*tot;
 			GP = gp*tot;
+			if (posLastGp[i] != 0)
+				lGp *= tot;
+			if (posLastGs[j] != 0)
+				lGs *= tot;
 			
 			if (pnorm[i] > 0 && snorm[j] > 0) {
 				tot = sqrt(pnorm[i]*snorm[j]); // normalization factor
@@ -1206,8 +1276,29 @@ SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SE
 			M *= tot;
 			GP *= tot;
 			GS *= tot;
+			if (posLastGp[i] != 0) {
+				scoreLastGp[i] += lGp*tot;
+				posLastGp[i]++;
+			}
+			if (posLastGs[j] != 0) {
+				scoreLastGs[j] += lGs*tot;
+				posLastGs[j]++;
+			}
+			M += *(m + i*(ls + 1) + j);
+			GP += *(m + (i + 1)*(ls + 1) + j);
+			GS += *(m + i*(ls + 1) + j + 1);
 			
-			if ((GS + *(m + i*(ls + 1) + j + 1) > M + *(m + i*(ls + 1) + j)) && (GS + *(m + i*(ls + 1) + j + 1) > GP + *(m + (i + 1)*(ls + 1) + j)) && sprofile[23 + SIZEJ] != 1) {
+			if (posLastGs[j] != 0 && scoreLastGs[j] > M && scoreLastGs[j] > GS && scoreLastGs[j] > GP && (!(posLastGp[i] != 0 && scoreLastGp[i] > scoreLastGs[j])) && posLastGs[j] < i) {
+				// revert to the last gap
+				*(o + i*ls + j) = posLastGs[j]*-1;
+				*(m + (i + 1)*(ls + 1) + j + 1) = scoreLastGs[j];
+				posLastGs[j] = 0;
+			} else if (posLastGp[i] != 0 && scoreLastGp[i] > M && scoreLastGp[i] > GS && scoreLastGp[i] > GP && posLastGp[i] < j) {
+				// revert to the last gap
+				*(o + i*ls + j) = posLastGp[i];
+				*(m + (i + 1)*(ls + 1) + j + 1) = scoreLastGp[i];
+				posLastGp[i] = 0;
+			} else if (GS > M && GS > GP && sprofile[23 + SIZEJ] != 1) {
 				if (i > 0) {
 					if (*(o + (i - 1)*ls + j) < 0) {
 						*(o + i*ls + j) = *(o + (i - 1)*ls + j) - 1;
@@ -1218,8 +1309,13 @@ SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SE
 					*(o + i*ls + j) = -1;
 				}
 				
-				*(m + (i + 1)*(ls + 1) + j + 1) = GS + *(m + i*(ls + 1) + j + 1);
-			} else if (GP + *(m + (i + 1)*(ls + 1) + j) > M + *(m + i*(ls + 1) + j) && pprofile[23 + SIZEI] != 1) {
+				*(m + (i + 1)*(ls + 1) + j + 1) = GS;
+				
+				if (j > 0 && *(o + i*ls + j - 1) > 0 && i > 0) { // set the last gap
+					posLastGp[i] = *(o + i*ls + j - 1) + 1;
+					scoreLastGp[i] = GP;
+				}
+			} else if (GP > M && pprofile[23 + SIZEI] != 1) {
 				if (j > 0) {
 					if (*(o + i*ls + j - 1) > 0) {
 						*(o + i*ls + j) = *(o + i*ls + j - 1) + 1;
@@ -1230,10 +1326,24 @@ SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SE
 					*(o + i*ls + j) = 1;
 				}
 				
-				*(m + (i + 1)*(ls + 1) + j + 1) = GP + *(m + (i + 1)*(ls + 1) + j);
-			} else {
-				*(m + (i + 1)*(ls + 1) + j + 1) = M + *(m + i*(ls + 1) + j);
+				*(m + (i + 1)*(ls + 1) + j + 1) = GP;
+				
+				if (i > 0 && *(o + (i - 1)*ls + j) < 0 && j > 0) { // set the last gap
+					posLastGs[j] = (*(o + (i - 1)*ls + j) - 1)*-1;
+					scoreLastGs[j] = GS;
+				}
+			} else { // no gap
+				*(m + (i + 1)*(ls + 1) + j + 1) = M;
 				*(o + i*ls + j) = 0;
+				
+				if (j > 0 && *(o + i*ls + j - 1) > 0 && i > 0) { // set the last gap
+					posLastGp[i] = *(o + i*ls + j - 1) + 1;
+					scoreLastGp[i] = GP;
+				}
+				if (i > 0 && *(o + (i - 1)*ls + j) < 0 && j > 0) { // set the last gap
+					posLastGs[j] = (*(o + (i - 1)*ls + j) - 1)*-1;
+					scoreLastGs[j] = GS;
+				}
 			}
 			
 			//#pragma omp critical // not necessary because will only underestimate max
@@ -1280,6 +1390,10 @@ SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SE
 	
 	Free(pnorm);
 	Free(snorm);
+	Free(posLastGp);
+	Free(posLastGs);
+	Free(scoreLastGp);
+	Free(scoreLastGs);
 	
 	// find the max scoring alignment
 	int maxp = 0;
@@ -1339,10 +1453,14 @@ SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SE
 		z = *(o + i*ls + j);
 		//*(o + i*ls + j) = 0;
 		//*(m + (i + 1)*(ls + 1) + j + 1) = 0;
-		if (z <= 0)
+		if (z==0) {
 			i--;
-		if (z >= 0)
 			j--;
+		} else if (z < 0) {
+			i += z;
+		} else { // z > 0
+			j -= z;
+		}
 		count--;
 	}
 	int minp = i + 2;
@@ -1375,26 +1493,28 @@ SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SE
 	k = count + 1;
 	while (k < l) {
 		value = *(t + k);
-		for (count = k + 1; count < l; count++) {
-			if (*(t + count)!=value)
-				break;
-		}
-		z = count - k;
 		if (value==0) {
+			for (count = k + 1; count < l; count++) {
+				if (*(t + count)!=value)
+					break;
+			}
+			z = count - k;
 			i += z;
 			j += z;
+			k = count;
 		} else if (value > 0) {
-			p_ins[p_count] = z;
+			p_ins[p_count] = value;
 			p_ats[p_count] = i;
-			j += z;
+			j += value;
 			p_count++;
+			k++;
 		} else { // value < 0
-			s_ins[s_count] = z;
+			s_ins[s_count] = -1*value;
 			s_ats[s_count] = j;
-			i += z;
+			i -= value;
 			s_count++;
+			k++;
 		}
-		k = count;
 	}
 	
 	if (ls > maxs) {

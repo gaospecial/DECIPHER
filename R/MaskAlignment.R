@@ -20,21 +20,33 @@
 }
 
 MaskAlignment <- function(myXStringSet,
+	type="sequences",
 	windowSize=5,
 	threshold=1.0,
 	maxFractionGaps=0.2,
+	includeTerminalGaps=FALSE,
 	correction=FALSE,
 	showPlot=FALSE) {
 	
 	# error checking
 	if (!is(myXStringSet, "DNAStringSet") && !is(myXStringSet, "RNAStringSet") && !is(myXStringSet, "AAStringSet"))
 		stop("myXStringSet must be an AAStringSet, DNAStringSet, or RNAStringSet.")
+	TYPES <- c("sequences", "ranges", "values")
+	type <- pmatch(type[1], TYPES)
+	if (is.na(type))
+		stop("Invalid type.")
+	if (type == -1)
+		stop("Ambiguous type.")
 	if (!is.numeric(windowSize))
 		stop("windowSize must be a numeric.")
 	if (floor(windowSize)!=windowSize)
 		stop("windowSize must be a whole number.")
 	if (windowSize < 1)
 		stop("windowSize must be greater than zero.")
+	if (!is.numeric(threshold))
+		stop("threshold must be a numeric.")
+	if (threshold < 0)
+		stop("threshold must be at least zero.")
 	u <- unique(width(myXStringSet))
 	if (length(u) > 1)
 		stop("myXStringSet must be aligned.")
@@ -42,8 +54,12 @@ MaskAlignment <- function(myXStringSet,
 		stop("maxFractionGaps must be a numeric.")
 	if (maxFractionGaps > 1 || maxFractionGaps < 0)
 		stop("maxFractionGaps must be between 0 and 1 inclusive.")
+	if (!is.logical(includeTerminalGaps))
+		stop("includeTerminalGaps must be a logical.")
 	if (!is.logical(correction))
 		stop("correction must be a logical.")
+	if (!is.logical(showPlot))
+		stop("showPlot must be a logical.")
 	
 	if (is(myXStringSet, "AAStringSet")) {
 		MAX <- 4.321928 # log(20, 2)
@@ -53,6 +69,12 @@ MaskAlignment <- function(myXStringSet,
 			NULL,
 			PACKAGE="DECIPHER")
 		cm <- pwm[24,]
+		if (includeTerminalGaps) {
+			w <- which(pwm[27,] > 0)
+			if (length(w) > 0)
+				cm[w] <- cm[w]*pwm[27, w]
+			cm <- cm + 1 - pwm[27,]
+		}
 		a <- .Call("informationContentAA",
 			pwm,
 			length(myXStringSet),
@@ -66,6 +88,12 @@ MaskAlignment <- function(myXStringSet,
 			NULL,
 			PACKAGE="DECIPHER")
 		cm <- pwm[5,]
+		if (includeTerminalGaps) {
+			w <- which(pwm[8,] > 0)
+			if (length(w) > 0)
+				cm[w] <- cm[w]*pwm[8, w]
+			cm <- cm + 1 - pwm[8,]
+		}
 		a <- .Call("informationContent",
 			pwm,
 			length(myXStringSet),
@@ -87,93 +115,89 @@ MaskAlignment <- function(myXStringSet,
 	}
 	
 	W <- which(c < threshold)
-	if (length(W) > 0) {
-		if (length(W) > 1) {
-			w <- which((W[2:length(W)] - 1) != W[1:(length(W) - 1)])
+	if (type==3L) { # "values"
+		mask <- logical(length(a))
+		if (length(W) > 0) {
+			if (length(gaps) > 0) {
+				mask[gaps] <- TRUE
+				mask[-gaps][W] <- TRUE
+			} else {
+				mask[W] <- TRUE
+			}
 		} else {
-			w <- integer()
+			mask[gaps] <- TRUE
 		}
-		index <- W[c(1, w + 1)]
-		
-		indicies <- list()
-		below_threshold <- as.integer(a2 < threshold)
-		rev_below_threshold <- rev(below_threshold)
-		for (i in 1:length(index)) {
-			rights <- .Call("multiMatch",
-				below_threshold,
-				1L,
-				index[i])
-			lefts <- length(below_threshold) - .Call("multiMatch",
-				rev_below_threshold,
-				1L,
-				length(below_threshold) - index[i] + 1L) + 1
-			indicies[[i]] <- c(lefts, rights)
-		}
-		
-		W <- c(W, unlist(indicies))
-		
-		if (length(gaps) > 0) {
-			W <- ((1:length(a))[-gaps])[W]
-		}
-		W <- c(W, gaps)
-		W <- unique(sort(W))
-		
-		if (length(W) > 1) {
-			w <- which((W[2:length(W)] - 1) != W[1:(length(W) - 1)])
-		} else {
-			w <- integer()
-		}
-		starts <- W[c(1, w + 1)]
-		ends <- W[c(w, length(W))]
-		
-		if (is(myXStringSet, "DNAStringSet")) {
-			myXStringSet <- DNAMultipleAlignment(myXStringSet,
-				rowmask=as(IRanges(), "NormalIRanges"),
-				colmask=as(IRanges(starts, ends), "NormalIRanges"))
-		} else if (is(myXStringSet, "RNAStringSet")) {
-			myXStringSet <- RNAMultipleAlignment(myXStringSet,
-				rowmask=as(IRanges(), "NormalIRanges"),
-				colmask=as(IRanges(starts, ends), "NormalIRanges"))
-		} else { # AAStringSet
-			myXStringSet <- AAMultipleAlignment(myXStringSet,
-				rowmask=as(IRanges(), "NormalIRanges"),
-				colmask=as(IRanges(starts, ends), "NormalIRanges"))
-		}
-	} else if (length(gaps) > 0) {
-		if (length(gaps) > 1) {
-			w <- which((gaps[2:length(gaps)] - 1) != gaps[1:(length(gaps) - 1)])
-		} else {
-			w <- integer()
-		}
-		starts <- gaps[c(1, w + 1)]
-		ends <- gaps[c(w, length(gaps))]
-		
-		if (is(myXStringSet, "DNAStringSet")) {
-			myXStringSet <- DNAMultipleAlignment(myXStringSet,
-				rowmask=as(IRanges(), "NormalIRanges"),
-				colmask=as(IRanges(starts, ends), "NormalIRanges"))
-		} else if (is(myXStringSet, "RNAStringSet")) {
-			myXStringSet <- RNAMultipleAlignment(myXStringSet,
-				rowmask=as(IRanges(), "NormalIRanges"),
-				colmask=as(IRanges(starts, ends), "NormalIRanges"))
-		} else { # AAStringSet
-			myXStringSet <- AAMultipleAlignment(myXStringSet,
-				rowmask=as(IRanges(), "NormalIRanges"),
-				colmask=as(IRanges(starts, ends), "NormalIRanges"))
-		}
+		result <- data.frame(entropy=a,
+			gaps=cm,
+			mask=mask)
 	} else {
-		if (is(myXStringSet, "DNAStringSet")) {
-			myXStringSet <- DNAMultipleAlignment(myXStringSet,
-				rowmask=as(IRanges(), "NormalIRanges"),
-				colmask=as(IRanges(), "NormalIRanges"))
-		} else if (is(myXStringSet, "RNAStringSet")) {
-			myXStringSet <- RNAMultipleAlignment(myXStringSet,
-				rowmask=as(IRanges(), "NormalIRanges"),
-				colmask=as(IRanges(), "NormalIRanges"))
-		} else { # AAStringSet
-			myXStringSet <- AAMultipleAlignment(myXStringSet,
-				rowmask=as(IRanges(), "NormalIRanges"),
-				colmask=as(IRanges(), "NormalIRanges"))
+		if (length(W) > 0) {
+			if (length(W) > 1) {
+				w <- which((W[2:length(W)] - 1) != W[1:(length(W) - 1)])
+			} else {
+				w <- integer()
+			}
+			index <- W[c(1, w + 1)]
+			
+			indicies <- list()
+			below_threshold <- as.integer(a2 < threshold)
+			rev_below_threshold <- rev(below_threshold)
+			for (i in 1:length(index)) {
+				rights <- .Call("multiMatch",
+					below_threshold,
+					1L,
+					index[i])
+				lefts <- length(below_threshold) - .Call("multiMatch",
+					rev_below_threshold,
+					1L,
+					length(below_threshold) - index[i] + 1L) + 1
+				indicies[[i]] <- c(lefts, rights)
+			}
+			
+			W <- c(W, unlist(indicies))
+			
+			if (length(gaps) > 0) {
+				W <- ((1:length(a))[-gaps])[W]
+			}
+			W <- c(W, gaps)
+			W <- unique(sort(W))
+			
+			if (length(W) > 1) {
+				w <- which((W[2:length(W)] - 1) != W[1:(length(W) - 1)])
+			} else {
+				w <- integer()
+			}
+			starts <- W[c(1, w + 1)]
+			ends <- W[c(w, length(W))]
+		} else if (length(gaps) > 0) {
+			if (length(gaps) > 1) {
+				w <- which((gaps[2:length(gaps)] - 1) != gaps[1:(length(gaps) - 1)])
+			} else {
+				w <- integer()
+			}
+			starts <- gaps[c(1, w + 1)]
+			ends <- gaps[c(w, length(gaps))]
+		} else {
+			starts <- NULL
+			ends <- NULL
+		}
+		
+		if (type==1L) {
+			if (is(myXStringSet, "DNAStringSet")) {
+				result <- DNAMultipleAlignment(myXStringSet,
+					rowmask=as(IRanges(), "NormalIRanges"),
+					colmask=as(IRanges(starts, ends), "NormalIRanges"))
+			} else if (is(myXStringSet, "RNAStringSet")) {
+				result <- RNAMultipleAlignment(myXStringSet,
+					rowmask=as(IRanges(), "NormalIRanges"),
+					colmask=as(IRanges(starts, ends), "NormalIRanges"))
+			} else { # AAStringSet
+				result <- AAMultipleAlignment(myXStringSet,
+					rowmask=as(IRanges(), "NormalIRanges"),
+					colmask=as(IRanges(starts, ends), "NormalIRanges"))
+			}
+		} else if (type==2L) {
+			result <- IRanges(starts, ends)
 		}
 	}
 	
@@ -190,6 +214,7 @@ MaskAlignment <- function(myXStringSet,
 		plot(x,
 			c,
 			type="l",
+			xlim=c(1, u),
 			ylim=c(0, MAX),
 			ylab="Information Content (bits)",
 			xlab="Column Position in Alignment")
@@ -249,5 +274,5 @@ MaskAlignment <- function(myXStringSet,
 			xpd=TRUE)
 	}
 	
-	return(myXStringSet)
+	return(result)
 }

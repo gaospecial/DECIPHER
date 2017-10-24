@@ -156,3 +156,98 @@ SEXP removeCommonGaps(SEXP x, SEXP type, SEXP nThreads)
 	UNPROTECT(2);
 	return ans;
 }
+
+//ans_start <- .Call("removeGaps", sequences, type, processors, PACKAGE="DECIPHER")
+SEXP removeGaps(SEXP x, SEXP type, SEXP nThreads)
+{
+	int i, j, x_length, p, sum;
+	SEXP ans_width, ans;
+	int t = asInteger(type);
+	int nthreads = asInteger(nThreads);
+	
+	// determine the element type of the XStringSet
+	const char *ans_element_type;
+	ans_element_type = get_XStringSet_xsbaseclassname(x);
+	
+	// determine the length of the XStringSet
+	Chars_holder x_i, ans_elt_holder;
+	XStringSet_holder x_set, ans_holder;
+	x_set = hold_XStringSet(x);
+	x_length = get_length_from_XStringSet_holder(&x_set);
+	
+	// count the sequence lengths
+	PROTECT(ans_width = NEW_INTEGER(x_length));
+	int *width = INTEGER(ans_width);
+	#pragma omp parallel for private(i,j,x_i) schedule(guided) num_threads(nthreads)
+	for (i = 0; i < x_length; i++) {
+		x_i = get_elt_from_XStringSet_holder(&x_set, i);
+		width[i] = x_i.length;
+		if (t==3) { // AAStringSet
+			for (j = 0; j < x_i.length; j++) {
+				if (!(x_i.ptr[j] ^ 0x2D) || !(x_i.ptr[j] ^ 0x2E)) { // position is a gap
+					width[i]--;
+				}
+			}
+		} else { // DNAStringSet or RNAStringSet
+			for (j = 0; j < x_i.length; j++) {
+				if (x_i.ptr[j] & 0x10 || x_i.ptr[j] & 0x40) { // position is a gap
+					width[i]--;
+				}
+			}
+		}
+	}
+	
+	// set the class of the XStringSet
+	char ans_classname[40];
+	if (t==1) {
+		strcpy(ans_classname, "DNAStringSet");
+	} else if (t==2) {
+		strcpy(ans_classname, "RNAStringSet");
+	} else { // t==3
+		strcpy(ans_classname, "AAStringSet");
+	}
+	
+	// initialize a new XStringSet
+	PROTECT(ans = alloc_XRawList(ans_classname, ans_element_type, ans_width));
+	ans_holder = hold_XVectorList(ans);
+	
+	#pragma omp parallel for private(i,j,ans_elt_holder,x_i,p,sum) schedule(guided) num_threads(nthreads)
+	for (i = 0; i < x_length; i++) {
+		ans_elt_holder = get_elt_from_XStringSet_holder(&ans_holder, i);
+		x_i = get_elt_from_XStringSet_holder(&x_set, i);
+		sum = 0; // number of positions to copy
+		p = 0; // position in ans_elt_holder
+		if (t==3) { // AAStringSet
+			for (j = 0; j < x_i.length; j++) {
+				if (!(x_i.ptr[j] ^ 0x2D) || !(x_i.ptr[j] ^ 0x2E)) { // position is a gap
+					if (sum > 0) {
+						memcpy((char *) ans_elt_holder.ptr + p, x_i.ptr + j - sum, sum * sizeof(char));
+						p += sum;
+						sum = 0;
+					}
+				} else {
+					sum++;
+				}
+			}
+			if (sum > 0)
+				memcpy((char *) ans_elt_holder.ptr + p, x_i.ptr + j - sum, sum * sizeof(char));
+		} else { // DNAStringSet or RNAStringSet
+			for (j = 0; j < x_i.length; j++) {
+				if (x_i.ptr[j] & 0x10 || x_i.ptr[j] & 0x40) { // position is a gap
+					if (sum > 0) {
+						memcpy((char *) ans_elt_holder.ptr + p, x_i.ptr + j - sum, sum * sizeof(char));
+						p += sum;
+						sum = 0;
+					}
+				} else {
+					sum++;
+				}
+			}
+			if (sum > 0)
+				memcpy((char *) ans_elt_holder.ptr + p, x_i.ptr + j - sum, sum * sizeof(char));
+		}
+	}
+	
+	UNPROTECT(2);
+	return ans;
+}

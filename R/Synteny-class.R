@@ -66,6 +66,8 @@ print.Synteny <- function(x,
 		quote=quote,
 		right=right,
 		...)
+	
+	invisible(x)
 }
 
 pairs.Synteny <- function(x,

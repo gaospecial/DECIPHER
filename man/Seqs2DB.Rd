@@ -39,7 +39,7 @@ Character string specifying the table in which to add the sequences.
 Number of characters to read at a time.
 }
   \item{replaceTbl}{
-Logical.  If \code{FALSE} (the default) then the sequences are appended to any already existing in the table.  If \code{TRUE} then any sequences already in the table are overwritten.
+Logical indicating whether to overwrite the entire table in the database.  If \code{FALSE} (the default) then the sequences are appended to any already existing in the \code{tblName}.  If \code{TRUE} the entire table is dropped, removing any existing sequences before adding any new sequences.
 }
   \item{fields}{
 Named character vector providing the fields to import from a \code{"GenBank"} formatted file as text columns in the database (not applicable for other \code{"type"}s).  The default is to import the \code{"ACCESSION"} field as a column named \code{"accession"} and the \code{"ORGANISM"} field as a column named \code{"rank"}.  Other uppercase fields, such as \code{"LOCUS"} or \code{"VERSION"}, can be specified in similar manner.  Note that the \code{"DEFINITION"} field is automatically imported as a column named \code{"description"} in the database.
@@ -65,6 +65,9 @@ ES Wright (2016) "Using DECIPHER v2.0 to Analyze Big Biological Sequence Data in
 }
 \author{
 Erik Wright \email{eswright@pitt.edu}
+}
+\section{Warning}{
+If \code{replaceTbl} is \code{TRUE} then any sequences already in the table are overwritten, which is equivalent to dropping the entire table.
 }
 \seealso{
 \code{\link{BrowseDB}}, \code{\link{SearchDB}}, \code{\link{DB2Seqs}}
