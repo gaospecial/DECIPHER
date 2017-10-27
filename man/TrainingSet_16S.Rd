@@ -27,7 +27,7 @@ Derived from version 16 of the RDP Training Set (\url{http://rdp.cme.msu.edu}) b
 This 16S rRNA training set is provided for illustrative purposes only.  It is highly recommended to use a more comprehensive training set when classifying real sequences.  Examples of comprehensive training sets can be found at \url{http://DECIPHER.codes/Download.html}.
 }
 \references{
-Whitman, W.B., Goodfellow, M., Kämpfer, P., Busse, H.-J., Trujillo, M.E., Ludwig, W. & Suzuki, K.-i. (eds., 2012). Bergey's Manual of Systematic Bacteriology, 2nd ed., Springer-Verlag, New York, NY.
+Whitman, W.B., Goodfellow, M., Kampfer, P., Busse, H.-J., Trujillo, M.E., Ludwig, W. & Suzuki, K.-i. (eds., 2012). Bergey's Manual of Systematic Bacteriology, 2nd ed., Springer-Verlag, New York, NY.
 }
 \examples{
 data(TrainingSet_16S)

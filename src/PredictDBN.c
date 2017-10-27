@@ -578,8 +578,11 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 			int *nucs = Calloc(width, int); // initialized to zero
 			
 			for (i = 0; i < width; i++) {
-				if (x_s.ptr[i] != 16 && x_s.ptr[i] != 32 && x_s.ptr[i] != 64)
+				if (x_s.ptr[i] != 16 && x_s.ptr[i] != 32 && x_s.ptr[i] != 64) {
 					nucs[i] = n++;
+				} else {
+					nucs[i] = -1; // no nucleotide at this alignment site
+				}
 			}
 			
 			PROTECT(ans_s = allocMatrix(REALSXP, 3, n)); // [state][pos]
@@ -588,8 +591,8 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 			for (i = 0; i < 3*n; i++)
 				rans[i] = 0;
 			
+			// record anchor positions that agree with the consensus structure
 			int *anchor = Calloc(tot, int); // initialized to zero
-			
 			for (i = 0; i < tot; i++) {
 				if (((x_s.ptr[pos[i]] & 0x1) && (x_s.ptr[pos[leftMax[i]]] & 0x8)) || // A/U
 					((x_s.ptr[pos[i]] & 0x8) && (x_s.ptr[pos[leftMax[i]]] & 0x1)) || // U/A
@@ -600,9 +603,9 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 					if (rans[3*nucs[pos[i]] + 1] < MI[i*tot + leftMax[i]])
 						rans[3*nucs[pos[i]] + 1] = MI[i*tot + leftMax[i]];
 					if (MI[i*tot + leftMax[i]] >= thresh)
-						anchor[i] = 1; // left anchor
+						anchor[i] = leftMax[i]; // left anchor
 				} else if (MI[i*tot + leftMax[i]] >= thresh) {
-					anchor[i] = -1; // missing left anchor
+					anchor[i] = -1*leftMax[i]; // missing left anchor
 				}
 				if (((x_s.ptr[pos[i]] & 0x1) && (x_s.ptr[pos[rightMax[i]]] & 0x8)) || // A/U
 					((x_s.ptr[pos[i]] & 0x8) && (x_s.ptr[pos[rightMax[i]]] & 0x1)) || // U/A
@@ -613,9 +616,9 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 					if (rans[3*nucs[pos[i]] + 2] < MI[rightMax[i]*tot + i])
 						rans[3*nucs[pos[i]] + 2] = MI[rightMax[i]*tot + i];
 					if (MI[rightMax[i]*tot + i] >= thresh)
-						anchor[i] = 2; // right anchor
+						anchor[i] = rightMax[i]; // right anchor
 				} else if (MI[rightMax[i]*tot + i] >= thresh) {
-					anchor[i] = -2; // missing right anchor
+					anchor[i] = -1*rightMax[i]; // missing right anchor
 				}
 			}
 			
@@ -629,8 +632,14 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 					last2[1] = last1[1];
 					last1[0] = i;
 					last1[1] = anchor[i];
-				} else if (anchor[i] < 0) { // unanchored
+				} else if (anchor[i] < 0) { // missing anchor
 					if (last1[1] > 0 && last2[1] < 0) { // middle anchor
+						// zero the score
+						if (last1[0] < last1[1]) { // left
+							rans[3*nucs[pos[last1[0]]] + 1] = 0;
+						} else { // right
+							rans[3*nucs[pos[last1[0]]] + 2] = 0;
+						}
 						last1[1] *= -1; // unanchor
 						anchor[last1[0]] = last1[1];
 					}
@@ -640,65 +649,29 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 					last1[0] = i;
 					last1[1] = anchor[i];
 				}
-			}
+			} // else unanchored
 			
-			// initialize an array of shifted positions
-			int *pos2 = Calloc(width, int); // initialized to zero
-			for (i = 0; i < width; i++) {
-				pos2[i] = pos[i];
-			}
 			/*
-			int previous = -1;
-			int missing = 0;
-			int matches, delta;
-			for (i = 0; i < tot; i++) {
-				if (anchor[i] > 0) { // anchored
-					if (missing > 0) { // search for missing anchors
-						// shift-in nucleotides up to missing-positions away
-						for (delta = 1; delta <= missing; delta++) {
-							matches = 0;
-							for (j = previous + 1; j < i; j++) {
-								// first check not matching in shifted nucs,
-								// then shift-in by delta-many nucleotides,
-								// now if it matches then +1 & continue to next
-							}
-							if (matches==missing)
-								break;
-							matches = 0;
-							for (j = i - 1; j > previous; j--) {
-								
-							}
-							if (matches==missing)
-								break;
-							matches = 0;
-							// repeat for -delta
-						}
-					}
-					
-					previous = i;
-					missing = 0;
-				} else if (anchor[i] < 0) { // unanchored
-					missing++;
-				}
-			}
 			if (s==92) {
 				for (i = 0; i < tot; i++) {
 					if (anchor[i] != 0)
-						Rprintf("\nnuc = %d anchor = %d", nucs[pos[i]] + 1, anchor[i]);
+						Rprintf("\ni = %d nuc = %d anchor = %d pos1 = %d pos2 = %d", i, nucs[pos[i]] + 1, anchor[i] > 0 ? nucs[pos[anchor[i]]] + 1 : -1*(nucs[pos[-1*anchor[i]]] + 1), pos[i] + 1, anchor[i] > 0 ? pos[anchor[i]] + 1 : -1*(pos[-1*anchor[i]] + 1));
 				}
 			}
 			*/
-			Free(pos2);
+			
 			Free(anchor);
 			
 			// normalize the scores
 			for (i = 0; i < tot; i++) {
-				sum = rans[3*nucs[pos[i]] + 1] + rans[3*nucs[pos[i]] + 2];
-				if (sum > 1) {
-					rans[3*nucs[pos[i]] + 1] /= sum;
-					rans[3*nucs[pos[i]] + 2] /= sum;
-				} else {
-					rans[3*nucs[pos[i]]] = 1 - sum;
+				if (nucs[pos[i]] >= 0) {
+					sum = rans[3*nucs[pos[i]] + 1] + rans[3*nucs[pos[i]] + 2];
+					if (sum > 1) {
+						rans[3*nucs[pos[i]] + 1] /= sum;
+						rans[3*nucs[pos[i]] + 2] /= sum;
+					} else {
+						rans[3*nucs[pos[i]]] = 1 - sum;
+					}
 				}
 			}
 			
