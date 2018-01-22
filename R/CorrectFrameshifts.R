@@ -264,12 +264,12 @@ CorrectFrameshifts <- function(myXStringSet,
 		
 		if (type==2L) { # sequences
 			X <- replaceAt(myXStringSet,
-				RangesList(pos),
+				as(pos, "IRangesList"),
 				val)
 		} else { # both
 			X <- list(indels=X,
 				sequences=replaceAt(myXStringSet,
-					RangesList(pos),
+					as(pos, "IRangesList"),
 					val))
 		}
 	}

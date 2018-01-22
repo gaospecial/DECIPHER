@@ -115,12 +115,12 @@ shifted <- replaceAt(dna,
 		replace=TRUE))
 n_dels <- 1 # deletions per sequence
 shifted <- replaceAt(shifted,
-	RangesList(lapply(width(shifted),
+	as(lapply(width(shifted),
 		function(x) {
 			IRanges(sample(x,
 					n_dels),
 				width=1)
-		})))
+		}), "IRangesList"))
 
 # to make frameshift correction more challenging,
 # only supply 20 reference amino acid sequences

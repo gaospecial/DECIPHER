@@ -120,7 +120,7 @@ AlignSynteny <- function(synteny,
 						e1[x])
 				})
 			seg1 <- extractAt(seq1,
-				RangesList(r1))
+				as(r1, "IRangesList"))
 			seg1 <- unlist(seg1)
 			i1 <- unlist(i1)
 			seg1 <- seg1[order(i1)]
@@ -140,7 +140,7 @@ AlignSynteny <- function(synteny,
 						e2[x])
 				})
 			seg2 <- extractAt(seq2,
-				RangesList(r2))
+				as(r2, "IRangesList"))
 			seg2 <- unlist(seg2)
 			i2 <- unlist(i2)
 			seg2 <- seg2[order(i2)]
