@@ -26,6 +26,7 @@
  */
 #include "Biostrings_interface.h"
 #include "XVector_interface.h"
+#include "S4Vectors_interface.h"
 
 // DECIPHER header file
 #include "DECIPHER.h"
@@ -38,7 +39,7 @@ SEXP basicTranslate(SEXP x, SEXP code, SEXP starts)
 	
 	// determine the element type of the XStringSet
 	const char *ans_element_type;
-	ans_element_type = get_XStringSet_xsbaseclassname(code);
+	ans_element_type = get_List_elementType(code);
 	
 	// determine the length of the XStringSet
 	XStringSet_holder x_set, code_set, ans_holder;

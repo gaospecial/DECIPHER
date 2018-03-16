@@ -28,6 +28,7 @@
  */
 #include "Biostrings_interface.h"
 #include "XVector_interface.h"
+#include "S4Vectors_interface.h"
 
 // strcpy
 #include <string.h>
@@ -53,7 +54,7 @@ SEXP insertGaps(SEXP x, SEXP positions, SEXP lengths, SEXP type, SEXP nThreads)
 	
 	// determine the element type of the XStringSet
 	const char *ans_element_type;
-	ans_element_type = get_XStringSet_xsbaseclassname(x);
+	ans_element_type = get_List_elementType(x);
 	
 	// determine the length of the XStringSet
 	XStringSet_holder x_set, ans_holder;
