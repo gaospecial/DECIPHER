@@ -4,10 +4,12 @@
 	radius=0.6,
 	angle=45,
 	init.angle=0,
+	final.angle=270,
 	col,
-	cex=1) {
+	cex=1,
+	circle=TRUE) {
 	labels <- as.graphicsAnnot(labels)
-	x <- c(0, cumsum(x)/sum(x))
+	x <- c(0, cumsum(x)/sum(x)*final.angle/360)
 	dx <- diff(x)
 	nx <- length(dx)
 	p <- par(mar=c(0, 0, 0, 0))
@@ -43,11 +45,25 @@
 	for (i in seq_len(nx)) {
 		n <- max(2, floor(edges*dx[i]))
 		P <- t2xy(seq.int(x[i], x[i + 1], length.out=n))
-		polygon(c(P$x, 0),
-			c(P$y, 0),
-			angle=angle[i], 
-			border=NULL,
-			col=col[i])
+		if (circle) {
+			polygon(c(P$x, 0),
+				c(P$y, 0),
+				angle=angle[i], 
+				border=NULL,
+				col=col[i])
+		} else {
+			polygon(c(P$x, 0),
+				c(P$y, 0),
+				angle=angle[i], 
+				border=NA,
+				col=col[i])
+			segments(c(P$x[1],
+					P$x[length(P$x)]),
+				c(P$y[1],
+					P$y[length(P$y)]),
+				0,
+				0)
+		}
 		P <- t2xy(mean(x[i + 0:1]))
 		lab <- as.character(labels[i])
 		dist <- min(abs(deltax/cos(P$an)),
@@ -81,6 +97,155 @@
 	par(p)
 }
 
+.plotIDs <- function(x, showRanks) {
+	taxa <- lapply(x,
+		function(x)
+			x[[1]][-1])
+	d <- which(!duplicated(taxa))
+	u <- taxa[d]
+	u <- unique(taxa)
+	m <- match(taxa, u)
+	tot <- table(m)
+	
+	if (all(lengths(x[d]) > 2)) {
+		rank <- lapply(x[d],
+			function(x)
+				x[[3]][-1])
+		ranks <- unlist(lapply(rank,
+				function(x)
+					c("Root", x, "")),
+			use.names=FALSE)
+		all_ranks <- unlist(ranks)
+		u_ranks <- unique(unlist(rank))
+		u_all_ranks <- c("Root", u_ranks, "")
+		l <- length(u_ranks)
+		parent <- integer(l)
+		for (i in seq_len(l)) {
+			w <- which(all_ranks==u_ranks[i])
+			m <- match(all_ranks[w - 1], u_all_ranks)
+			parent[i] <- max(m)
+		}
+		temp <- c("Root", "")
+		remaining <- seq_len(l)
+		i <- 1L
+		while (length(remaining) > 0) {
+			w <- which(temp==u_all_ranks[parent[remaining[i]]])
+			if (length(w) != 0) {
+				temp <- c(temp[1:w],
+					u_ranks[remaining[i]],
+					temp[(w + 1):length(temp)])
+				remaining <- remaining[-i]
+			} else {
+				i <- i + 1L
+			}
+			if (i > length(remaining))
+				i <- 1L
+		}
+		u_ranks <- temp[-c(1, length(temp))]
+	} else {
+		rank <- lapply(u,
+			function(x) {
+				paste("Level", seq_along(x))
+			})
+		u_ranks <- unique(unlist(rank))
+		l <- length(u_ranks)
+	}
+	
+	taxa <- mapply(function(x, y) {
+			if (length(x) < l) {
+				X <- character(l)
+				m <- match(y, u_ranks)
+				X[m] <- x
+				last <- x[1]
+				j <- 1L
+				while (j <= l) {
+					if (X[j]=="") {
+						X[j] <- last
+					} else {
+						last <- X[j]
+					}
+					j <- j + 1L
+				}
+				return(X)
+			} else {
+				return(x)
+			}
+		},
+		u,
+		rank)
+	idsTbl <- matrix(unlist(taxa),
+		nrow=l)
+	
+	# reorder alphabetically by rank/group
+	rev_order <- function(...)
+		order(..., decreasing=TRUE)
+	o <- do.call(rev_order,
+		as.data.frame(t(idsTbl)))
+	tot <- tot[o]
+	idsTbl <- idsTbl[, o, drop=FALSE]
+	
+	org_colors <- rainbow(length(o), s=0.6)
+	colors <- col2rgb(org_colors)
+	for (i in rev(seq_len(l))) {
+		groups <- idsTbl[i,]
+		counts <- tot
+		t <- tapply(counts,
+			groups,
+			sum)
+		t <- t[unique(groups)]
+		t <- t/sum(t)
+		m <- match(groups,
+			names(t))
+		cols <- character(length(t))
+		for (j in seq_along(t)) {
+			w <- which(m==j)
+			cols[j] <- rgb(weighted.mean(colors[1, w],
+					counts[w]),
+				weighted.mean(colors[2, w],
+					counts[w]),
+				weighted.mean(colors[3, w],
+					counts[w]),
+				maxColorValue=255)
+		}
+		if (i==l) { # draw outer ring
+			names(t)[t < 0.01] <- ""
+			if (showRanks) {
+				.spoke(t,
+					col=cols,
+					cex=0.8)
+			} else {
+				.spoke(t,
+					col=cols,
+					cex=0.8,
+					final.angle=360)
+				break
+			}
+		} else {
+			p <- par(new=TRUE)
+			names(t)[] <- ""
+			.spoke(t,
+				radius=0.6*i/l,
+				col=cols,
+				cex=0.8,
+				circle=FALSE)
+			p <- par(p)
+		}
+	}
+	if (showRanks) {
+		text(0,
+			0.6*(seq_len(l) - 0.5)/l,
+			u_ranks,
+			pos=4)
+		segments(0,
+			0.6*seq_len(l)/l,
+			0.02,
+			0.6*seq_len(l)/l)
+	}
+	
+	o <- order(idsTbl[nrow(idsTbl),])
+	invisible(org_colors[o])
+}
+
 `[.Taxa` <- function(x, i) {
 	ans <- NextMethod("[", x)
 	if (class(x)[1] != "Taxa") {
@@ -97,15 +262,17 @@
 }
 
 `c.Taxa` <- function(...) {
-	ans <- NextMethod("c", ...)
+	ans <- NextMethod("c", unclass(...))
 	if (class(as.list(substitute(...)))[2]=="Test")
 		class(ans) <- c("Taxa", "Test")
 	return(ans)
 }
 
-plot.Taxa <- function(x, y=NULL, ...) {
+plot.Taxa <- function(x, y=NULL, showRanks=TRUE, ...) {
 	if (class(x)[1] != "Taxa")
 		stop("x must be an object of class 'Taxa'.")
+	if (!is.logical(showRanks))
+		stop("showRanks must be a logical.")
 	if (!is.null(y)) {
 		if (class(y)[1] != "Taxa")
 			stop("y must be an object of class 'Taxa'.")
@@ -144,11 +311,7 @@ plot.Taxa <- function(x, y=NULL, ...) {
 				groups[w] <- upone[m[w]]
 			
 			# Create a pie chart
-			names(t)[t < 0.01] <- ""
-			colors <- rainbow(length(t), s=0.6)
-			.spoke(t,
-				col=colors,
-				cex=0.8)
+			colors <- .plotIDs(test, showRanks)
 			
 			# Create a taxonomic tree
 			makeTree <- function(I) {
@@ -335,18 +498,8 @@ plot.Taxa <- function(x, y=NULL, ...) {
 		
 		par(p)
 	} else if (class(x)[2]=="Test") {
-		if (length(x) > 0) {
-			groups <- sapply(x,
-				function(x)
-					tail(x$taxon, n=1))
-			t <- table(groups)
-			t <- t/sum(t)
-			names(t)[t < 0.01] <- ""
-			
-			.spoke(t,
-				col=rainbow(length(t), s=0.6),
-				cex=0.8)
-		}
+		if (length(x) > 0)
+			.plotIDs(x, showRanks)
 	} else {
 		stop("x has unrecognized class: ", class(x)[2])
 	}

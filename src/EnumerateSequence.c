@@ -274,13 +274,12 @@ SEXP enumerateGappedSequence(SEXP x, SEXP wordSize, SEXP ordering)
 {
 	XStringSet_holder x_set;
 	Chars_holder x_i;
-	int x_length, i, j, k, wS, sum, ambiguous, *rans, *p;
+	int i, j, k, wS, sum, ambiguous, *rans, *p;
 	int *o = INTEGER(ordering);
 	int l = length(ordering);
 	
 	// initialize the XStringSet
 	x_set = hold_XStringSet(x);
-	x_length = get_length_from_XStringSet_holder(&x_set);
 	wS = asInteger(wordSize); // [1 to 15]
 	
 	SEXP ret_list;
@@ -397,13 +396,12 @@ SEXP enumerateGappedSequenceAA(SEXP x, SEXP wordSize, SEXP ordering)
 {
 	XStringSet_holder x_set;
 	Chars_holder x_i;
-	int x_length, i, j, k, wS, sum, ambiguous, *rans, *p;
+	int i, j, k, wS, sum, ambiguous, *rans, *p;
 	int *o = INTEGER(ordering);
 	int l = length(ordering);
 	
 	// initialize the XStringSet
 	x_set = hold_XStringSet(x);
-	x_length = get_length_from_XStringSet_holder(&x_set);
 	wS = asInteger(wordSize); // [1 to 7]
 	
 	SEXP ret_list;
@@ -658,4 +656,101 @@ SEXP enumerateSequenceReducedAA(SEXP x, SEXP wordSize, SEXP alphabet)
 	UNPROTECT(1);
 	
 	return ret_list;
+}
+
+// returns the size of a balanced alphabet with equivalent entropy
+SEXP alphabetSize(SEXP x)
+{
+	XStringSet_holder x_set;
+	Chars_holder x_i;
+	int x_length, i, j, letter, sum = 0;
+	
+	// initialize the XStringSet
+	x_set = hold_XStringSet(x);
+	x_length = get_length_from_XStringSet_holder(&x_set);
+	
+	SEXP ans;
+	PROTECT(ans = allocVector(REALSXP, 1));
+	double *rans = REAL(ans);
+	rans[0] = 0;
+	
+	int dist[4] = {0}; // distribution of nucleotides
+	for (i = 0; i < x_length; i++) {
+		x_i = get_elt_from_XStringSet_holder(&x_set, i);
+		
+		for (j = 0; j < x_i.length; j++) {
+			alphabetFrequency(&x_i, &letter, j);
+			if (letter >= 0)
+				dist[letter]++;
+		}
+	}
+	
+	for (i = 0; i < 4; i++)
+		sum += dist[i];
+	
+	double p; // proportion of each letter
+	for (i = 0; i < 4; i++) {
+		p = (double)dist[i]/sum;
+		if (p > 0)
+			rans[0] -= p*log(p); // negative entropy
+	}
+	rans[0] = exp(rans[0]);
+	
+	UNPROTECT(1);
+	
+	return ans;
+}
+
+// returns the size of a balanced alphabet with equivalent entropy
+SEXP alphabetSizeReducedAA(SEXP x, SEXP alphabet)
+{
+	XStringSet_holder x_set;
+	Chars_holder x_i;
+	int x_length, i, j, letter, sum = 0;
+	int *alpha = INTEGER(alphabet);
+	
+	// initialize the XStringSet
+	x_set = hold_XStringSet(x);
+	x_length = get_length_from_XStringSet_holder(&x_set);
+	
+	SEXP ans;
+	PROTECT(ans = allocVector(REALSXP, 1));
+	double *rans = REAL(ans);
+	rans[0] = 0;
+	
+	int m = 0; // hold max of alphabet
+	for (i = 0; i < 20; i++) {
+		if (*(alpha + i) > m)
+			m = *(alpha + i);
+	}
+	m++; // start at 1
+	
+	int dist[m]; // distribution
+	for (i = 0; i < m; i++)
+		dist[i] = 0;
+	
+	for (i = 0; i < x_length; i++) {
+		x_i = get_elt_from_XStringSet_holder(&x_set, i);
+		
+		for (j = 0; j < x_i.length; j++) {
+			alphabetFrequencyReducedAA(&x_i, &letter, j, alpha);
+			if (letter >= 0)
+				dist[letter]++;
+		}
+	}
+	
+	for (i = 0; i < m; i++)
+		sum += dist[i];
+	
+	double p; // proportion of each letter
+	for (i = 0; i < m; i++) {
+		p = (double)dist[i]/sum;
+		if (p > 0)
+			rans[0] -= p*log(p); // negative entropy
+	}
+	rans[0] = exp(rans[0]);
+	
+	UNPROTECT(1);
+	
+	return ans;
 }

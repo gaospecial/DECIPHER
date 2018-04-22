@@ -1,8 +1,7 @@
 DigestDNA <- function(sites,
 	myDNAStringSet,
 	type="fragments",
-	strand="both",
-	processors=1) {
+	strand="both") {
 	
 	# error checking
 	if (!is.character(sites))
@@ -27,13 +26,6 @@ DigestDNA <- function(sites,
 		stop("Invalid strand.")
 	if (strand == -1)
 		stop("Ambiguous strand.")
-	if (!is.null(processors) && processors < 1)
-		stop("processors must be at least 1.")
-	if (is.null(processors)) {
-		processors <- detectCores()
-	} else {
-		processors <- as.integer(processors)
-	}
 	
 	# parse sites
 	DNA_LOOKUP <- c("A", "C", "G", "T", "M", "R", "W", "S", "Y", "K", "V", "H", "D", "B", "N")

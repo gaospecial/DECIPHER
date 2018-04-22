@@ -316,7 +316,7 @@ The number of sequences required to fit into memory when aligning two sequence s
 
 \subsection{Example:  Building a Guide Tree}
 
-The \Rfunction{AlignSeqs} function uses a guide tree to decide the order in which to align pairs of sequence profiles.  The \Rfunarg{guideTree} input is a \Rclass{dendrogram} (tree) object with one leaf per input sequence.  By default this guide tree is generated directly from the input sequences using the order of shared k-mers (i.e., when the argument \Rfunarg{guideTree} is \code{NULL}).  This default guide tree performs very well, but it is necessary to specify an alternative guide tree when aligning more than 46,340 sequences, because this is the largest guide tree that can be automatically constructed by \Rpackage{DECIPHER}.
+The \Rfunction{AlignSeqs} function uses a guide tree to decide the order in which to align pairs of sequence profiles.  The \Rfunarg{guideTree} input is a \Rclass{dendrogram} (tree) object with one leaf per input sequence.  By default this guide tree is generated directly from the input sequences using the order of shared k-mers (i.e., when the argument \Rfunarg{guideTree} is \code{NULL}).  This default guide tree performs very well but requires $\mathcal{O}(n^2)$ time and memory space to construct. Therefore, it may be useful to rely on a chained guide tree when aligning hundreds of thousands of unique sequences.
 
 \begin{figure}
 \begin{center}
@@ -380,17 +380,17 @@ The functions described so far have all required collinear sequences as input.  
 
 <<expr11,eval=TRUE,echo=TRUE>>=
 db <- system.file("extdata", "Influenza.sqlite", package="DECIPHER")
-synteny <- FindSynteny(db, minScore=50, verbose=FALSE)
+synteny <- FindSynteny(db, verbose=FALSE)
 synteny # an object of class `Synteny`
 InfluenzaA <- AlignSynteny(synteny, db, verbose=FALSE)
 unlist(InfluenzaA[[1]])
 @
 
-The output is a list, which each list component containing a \code{DNAStringSetList} of pairwise alignments between two genomes.  Names of the output correspond to their sequence's \code{identifier} in the database, and the index of the syntenic block.
+The output is a list, with each list component containing a \code{DNAStringSetList} of pairwise alignments between two genomes.  Names of the output correspond to their sequence's \code{identifier} in the database, and the index of the syntenic block.
 
 \clearpage
 
-It is also possible to display the blocks of synteny between all pairs of genomes.  Figure \ref{f8} shows the different genome segments (i.e., sequences) are separated by thin horizontal and vertical lines.  The syntenic blocks are diagonal lines that are composed of many homologous ``hits'' between the genomes.
+It is also possible to display the blocks of synteny between all pairs of genomes.  Figure \ref{f8} shows the different genome segments (i.e., sequences) separated by thin horizontal and vertical lines.  The syntenic blocks are diagonal lines that are composed of many homologous ``hits'' between the genomes.
 
 \begin{centerfig}
 <<expr12,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=8.5,width=8.5>>=

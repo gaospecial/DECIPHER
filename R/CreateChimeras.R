@@ -78,7 +78,7 @@ CreateChimeras <- function(myDNAStringSet,
 	
 	# initialize a progress bar
 	if (verbose)
-		pBar <- txtProgressBar(min=0, max=100, initial=0, style=3)
+		pBar <- txtProgressBar(min=0, max=100, initial=0, style=ifelse(interactive(), 3, 1))
 	
 	# initialize variables
 	i <- 0

@@ -5,6 +5,7 @@ IdTaxa <- function(test,
 	threshold=60,
 	bootstraps=100,
 	samples=L^0.47,
+	minDescend=1,
 	processors=1,
 	verbose=TRUE) {
 	
@@ -63,6 +64,10 @@ IdTaxa <- function(test,
 		stop("bootstraps must be a whole number.")
 	if (bootstraps < 1)
 		stop("bootstraps must be at least one.")
+	if (!is.numeric(minDescend))
+		stop("minDescend must be a numeric.")
+	if (minDescend < 0.5 || minDescend > 1)
+		stop("minDescend must be between 0.5 and 1 (inclusive).")
 	sexpr <- substitute(samples)
 	if (!is.numeric(sexpr)) {
 		if (is.name(sexpr)) { # function name
@@ -110,7 +115,7 @@ IdTaxa <- function(test,
 	
 	if (verbose) {
 		time.1 <- Sys.time()
-		pBar <- txtProgressBar(style=3)
+		pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 	}
 	
 	# index and sort all unique (non-ambiguous) k-mers
@@ -236,7 +241,7 @@ IdTaxa <- function(test,
 				
 				maxes <- apply(hits, 2, max) # max hits per bootstrap replicate
 				hits <- colSums(t(hits)==maxes & maxes > 0)
-				w <- which(hits==B)
+				w <- which(hits >= minDescend*B)
 				if (length(w) != 1) { # zero or multiple groups with 100% confidence
 					w <- which(hits >= B*0.5) # require 50% confidence to use a subset of groups
 					if (length(w)==0) {

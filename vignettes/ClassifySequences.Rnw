@@ -69,7 +69,7 @@ This document describes how to perform taxonomic classification of nucleotide se
 
 \subsection{Startup}
 
-To get started we need to load the \Rpackage{DECIPHER} package, which automatically loads several other required packages.
+To get started we need to load the \Rpackage{DECIPHER} package, which automatically loads a few other required packages.
 
 <<startup,results=hide>>=
 library(DECIPHER)
@@ -133,9 +133,16 @@ The training sequences cannot contain gap (``-'' or ``.'') characters, which can
 seqs <- RemoveGaps(seqs)
 @
 
-Here, we make the assumption that each sequence is labeled in the original (FASTA) file by its taxonomy starting with ``Root;''.  For example, a sequence might be labeled ``AY193173 Root; Bacteria; SR1; \mbox{SR1_genera_incertae_sedis}'', in which case we can extract all of the text starting from ``Root;'' to obtain the sequence's ``group''.  In this context, groups are defined as the set of all possible taxonomic labels that are present in the training set.
+Note that the training sequences must all be in the same orientation.  If this is not the case, it is possible to reorient the sequences with \Rfunction{OrientNucleotides}:
 
 <<expr3,eval=FALSE>>=
+# ensure that all sequences are in the same orientation:
+seqs <- OrientNucleotides(seqs)
+@
+
+Here, we make the assumption that each sequence is labeled in the original (FASTA) file by its taxonomy starting with ``Root;''.  For example, a sequence might be labeled ``AY193173 Root; Bacteria; SR1; \mbox{SR1_genera_incertae_sedis}'', in which case we can extract all of the text starting from ``Root;'' to obtain the sequence's ``group''.  In this context, groups are defined as the set of all possible taxonomic labels that are present in the training set.
+
+<<expr4,eval=FALSE>>=
 # obtain the taxonomic assignments
 groups <- names(seqs) # sequence names
 # assume the taxonomy begins with 'Root;'
@@ -149,7 +156,7 @@ length(u_groups) # number of groups
 
 The next step is to count the number of representatives per group and, \emph{optionally}, select only a subset of sequences if the group is deemed too large.  Typically there is a diminishing return in accuracy for having more-and-more representative sequences in a group.  Limiting groups size may be advantageous if some groups contain an inordinately large number of sequences because it will speed up the classification process.  Also, larger groups oftentimes accumulate errors (that is, sequences which do not belong), and constraining the group size can help to make the classification process more robust to rare errors that may exist in the training data.  In the code below, \term{maxGroupSize} controls the maximum size of any group, and can be set to \code{Inf} (infinity) to allow for an unlimited number of sequences per group.
 
-<<expr4,eval=FALSE>>=
+<<expr5,eval=FALSE>>=
 maxGroupSize <- 10 # max sequences per label (>= 1)
 
 remove <- logical(length(seqs))
@@ -164,9 +171,9 @@ sum(remove) # number of sequences eliminated
 
 \subsection{Iteratively training the classifier}
 
-Now we must train the classifier on the training set.  One unique feature of the \emph{IDTAXA} algorithm is that during the learning process it will identify any training sequences whose assigned classification completely (with very high confidence) disagrees with their predicted classification.  These are almost always sequences that are mislabeled in the training data, and they can make the classification process slower and less accurate.  We have the option of removing these putative ``problem sequences'' by iteratively repeating the training process.  However, we may also want to be careful not to remove sequences that are the last remaining representatives of an entire group in the training data, which can happen if the entire group appears to be misplaced in the taxonomic tree.  These two training options are controlled by the \term{maxIterations} and \term{allowGroupRemoval} variables (below).  Setting \term{maxIterations} to \code{1} will simply train the classifier without removing any problem sequences, whereas values greater than \code{1} will iteratively remove problem sequences.
+Now we must train the classifier on the training set.  One unique feature of the \emph{IDTAXA} algorithm is that during the learning process it will identify any training sequences whose assigned classifications completely (with very high confidence) disagree with their predicted classification.  These are almost always sequences that are mislabeled in the training data, and they can make the classification process slower and less accurate because they introduce error in the training data.  We have the option of automatically removing these putative ``problem sequences'' by iteratively repeating the training process.  However, we may also want to be careful not to remove sequences that are the last remaining representatives of an entire group in the training data, which can happen if the entire group appears to be misplaced in the taxonomic tree.  These two training options are controlled by the \term{maxIterations} and \term{allowGroupRemoval} variables (below).  Setting \term{maxIterations} to \code{1} will simply train the classifier without removing any problem sequences, whereas values greater than \code{1} will iteratively remove problem sequences.
 
-<<expr5,eval=FALSE>>=
+<<expr6,eval=FALSE>>=
 maxIterations <- 3 # must be >= 1
 allowGroupRemoval <- FALSE
 
@@ -214,7 +221,7 @@ length(probSeqs) # number of remaining problem sequences
 
 The training process results in a training object (\code{trainingSet}) of \term{class} \code{Taxa} and subclass \code{Train} that contains all of the information required for classification.  If you want to use the pre-trained classifier for 16S rRNA sequences, then it can be loaded with the \Rfunction{data} function.  However, \textbf{if you just trained the classifier using your own training data then you should skip these next two lines of code}.
 
-<<expr6,eval=TRUE>>=
+<<expr7,eval=TRUE>>=
 data("TrainingSet_16S")
 trainingSet <- TrainingSet_16S
 @
@@ -222,20 +229,20 @@ trainingSet <- TrainingSet_16S
 
 We can view summary properties of the training set (\code{trainingSet}) by printing it:
 
-<<expr7,eval=TRUE>>=
+<<expr8,eval=TRUE>>=
 trainingSet
 @
 
-Or, as shown in Figure \ref{f1}, plot the training set (\code{trainingSet}) to view a variety of information:
+And, as shown in Figure \ref{f1}, we can plot the training set (\code{trainingSet}) to view a variety of information:
 \begin{enumerate}
 \item The first panel contains the taxonomic tree with the ``Root'' at the very top.  This training set contains different numbers of ranks for each group, which is why the leaves of the tree end at different heights.  Edges of the tree that are colored in red show putative ``problem groups'' that persist after the iterative removal of ``problem sequences'' (see above).  These red edges are problematic in that the classifier cannot descend below this edge on the tree during the initial ``tree descent'' phase of the algorithm.  This slows down the classification process for sequences belonging to a group below this edge, but does not affect the classifier's accuracy.
 \item The second panel of Fig. \ref{f1} shows the number of unique groups at each taxonomic rank, ordered from highest to lowest taxonomic rank in the dataset.  We can see that there are about 2.5 thousand genera, which is the lowest rank in this training set.
-\item The bottom left panel contains a histogram of the number of sequences per group.  Most of the groups contain a single representative sequence, while the maximum group size is 10 sequences in accordance with the \term{maxGroupSize} set above.
+\item The bottom left panel contains a histogram of the number of sequences per group.  The maximum group size is in accordance with the \term{maxGroupSize} set above.  Here, the pre-trained classified has only a single sequence per group so that it will take up minimal space.
 \item The bottom right panel displays the \emph{inverse document frequency} (IDF) weights associated with each k-mer.  We can see that there are many rare k-mers that have high weights (i.e., high information content), and a few common k-mers that have very low weights.  This highly-skewed distribution of information content among k-mers is typical among nucleotide sequence data.
 \end{enumerate}
 
 \begin{centerfig}
-<<expr8,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6>>=
+<<expr9,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6>>=
 plot(trainingSet)
 @
 \caption{\label{f1} Result of plotting the training set (\code{trainingSet}) produced by \Rfunction{LearnTaxa}.}
@@ -249,7 +256,7 @@ plot(trainingSet)
 
 Now that we have trained the classifier, the next step is to use it to assign taxonomic classifications to new sequences.  This is accomplished with the \Rfunction{IdTaxa} function, which takes in ``test'' (new) sequences along with the training set (\code{trainingSet}) object that was returned by \Rfunction{LearnTaxa}.  For the purposes of this tutorial, we are going to use some 16S rRNA gene sequences collected from organisms present in tap water.  Feel free to follow along with your own sequences, or load the FASTA file included with the tutorial.
 
-<<expr9,eval=TRUE>>=
+<<expr10,eval=TRUE>>=
 fas <- "<<path to FASTA file>>"
 # OR use the example 16S sequences:
 fas <- system.file("extdata",
@@ -261,9 +268,9 @@ test <- readDNAStringSet(fas)
 # NOTE: use readRNAStringSet for RNA sequences
 @
 
-As in training (above), the test sequences cannot contain gap (``-'' or ``.'') characters, which can easily be removed with the \Rfunction{RemoveGaps}:
+As in training (above), the test sequences cannot contain gap (``-'' or ``.'') characters, which can easily be removed with the \Rfunction{RemoveGaps} function:
 
-<<expr10,eval=TRUE>>=
+<<expr11,eval=TRUE>>=
 # if they exist, remove any gaps in the sequences:
 test <- RemoveGaps(test)
 test
@@ -271,9 +278,9 @@ test
 
 \subsection{Assigning classifications}
 
-Now, for the moment we have been waiting for:  it's time to classify some test sequences!  It's important to have read the help file for \Rfunction{IdTaxa} to acquaint yourself with the available options before performing this step.  The most important (optional) arguments are the \Rfunarg{type} of output, the \Rfunarg{strand} used in testing, the confidence \Rfunarg{threshold} of assignments, and the number of \Rfunarg{processors} to use.  Here, we are going to request the \code{"extended"} output \Rfunarg{type} that allows for plotting the results, but there is also a \code{"collapsed"} \Rfunarg{type} that might be easier to export (see section \ref{export} below).  Also, we know that the test sequences are in the same (``+'' strand) orientation as the training sequences, so we can specify to only look at the \code{"top"} strand rather than the default of \code{"both"} strands (i.e., both ``+'' and ``-'' strands).
+Now, for the moment we have been waiting for:  it's time to classify some test sequences!  It's important to have read the help file for \Rfunction{IdTaxa} to acquaint yourself with the available options before performing this step.  The most important (optional) arguments are the \Rfunarg{type} of output, the \Rfunarg{strand} used in testing, the confidence \Rfunarg{threshold} of assignments, and the number of \Rfunarg{processors} to use.  Here, we are going to request the \code{"extended"} (default) output \Rfunarg{type} that allows for plotting the results, but there is also a \code{"collapsed"} \Rfunarg{type} that might be easier to export (see section \ref{export} below).  Also, we know that all of the test sequences are in the same (``+'' strand) orientation as the training sequences, so we can specify to only look at the \code{"top"} strand rather than the default of \code{"both"} strands (i.e., both ``+'' and ``-'' strands).  This makes the classification process about twice as fast.  We could also set \term{processors} to \code{NULL} to use all available processors.
 
-<<expr11,eval=TRUE,results=hide>>=
+<<expr12,eval=TRUE,results=hide>>=
 ids <- IdTaxa(test,
 	trainingSet,
 	type="extended",
@@ -292,15 +299,27 @@ Time difference of 12.23 secs
 
 Let's look at the results by printing the object (\term{ids}) that was returned:
 
-<<expr12,eval=TRUE>>=
+<<expr13,eval=TRUE>>=
 ids
 @
 
 Note that the data has \term{class} \code{Taxa} and subclass \code{Test}, which is stored as an object of \term{type} \term{list}.  Therefore we can access a subset of the returned object (\term{ids}) with single square brackets (\code{[}) or access the contents of individual list elements with double square brackets (\code{[[}):
 
-<<expr12,eval=TRUE>>=
+<<expr14,eval=TRUE>>=
 ids[1:5] # summary results for the first 5 sequences
 ids[[1]] # results for the first sequence
+ids[c(10, 25)] # combining different sequences
+c(ids[10], ids[25]) # merge different sets
+@
+
+The output can easily be converted to a character vector with taxonomic information assigned to each sequence:
+
+<<expr15,eval=TRUE>>=
+assignment <- sapply(ids,
+	function(x)
+		paste(x$taxon,
+			collapse=";"))
+head(assignment)
 @
 
 \subsection{Plotting the results}
@@ -308,7 +327,7 @@ ids[[1]] # results for the first sequence
 We can also plot the results, as shown in Figure \ref{f2}.  This produces a pie chart showing the relative abundance of the taxonomic groups assigned to test sequences.  It also displays the training taxonomic tree, with edges colored where they match the taxonomic groups shown in the pie chart.  Note that we could also have only plotted the pie chart by omitting the \code{trainingSet}.
 
 \begin{centerfig}
-<<expr13,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6>>=
+<<expr16,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6>>=
 plot(ids, trainingSet)
 @
 \caption{\label{f2} Result of plotting the classifications (\code{ids}) made by \Rfunction{IdTaxa}.}
@@ -316,11 +335,61 @@ plot(ids, trainingSet)
 
 \clearpage
 
+\subsection{Create and plot a classification table} \label{export}
+
+When analyzing multiple samples, it is often useful to create a classification table with the number of times each taxon is observed.  Here we can choose a specific taxonomic rank to consider, or simply select the lowest (i.e., basal) taxonomic level:
+
+<<expr17,eval=TRUE>>=
+phylum <- sapply(ids,
+	function(x) {
+		w <- which(x$rank=="phylum")
+		if (length(w) != 1) {
+			"unknown"
+		} else {
+			x$taxon[w]
+		}
+	})
+table(phylum)
+
+taxon <- sapply(ids,
+	function(x)
+		x$taxon[length(x$taxon)])
+head(taxon)
+@
+
+Next, we need to know which test sequences belonged to each sample.  This must be in the form of a vector of sample names that is the same length as the number of samples.  For example, in this case the sample names are part of the sequence names.  Using this vector we can easily generate a classification table:
+
+<<expr18,eval=TRUE>>=
+# get a vector with the sample name for each sequence
+samples <- gsub(".*; (.+?)_.*", "\\1", names(test))
+taxaTbl <- table(taxon, samples)
+taxaTbl <- t(t(taxaTbl)/colSums(taxaTbl)) # normalize by sample
+head(taxaTbl)
+@
+
+We can summarize the results in a stacked \Rfunction{barplot}:
+
+\begin{centerfig}
+<<expr19,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6>>=
+include <- which(rowMeans(taxaTbl) >= 0.04)
+barplot(taxaTbl[include,],
+	legend=TRUE,
+	col=rainbow(length(include), s=0.4),
+	ylab="Relative abundance",
+	ylim=c(0, 1),
+	las=2, # vertical x-axis labels
+	args.legend=list(x="topleft", bty="n", ncol=2))
+@
+\caption{\label{f3} Barplot of taxonomic assignments by sample.}
+\end{centerfig}
+
+\clearpage
+
 \subsection{Exporting the classifications} \label{export}
 
-We can switch between outputting in \code{extended} or \code{collapsed} format by setting the \Rfunarg{type} argument in \Rfunction{IdTaxa}.  The \code{collapsed} \Rfunarg{type} of output is simply a character vector, which cannot be plotted but is easy to write to a text file with the \Rfunction{WriteLines} function.  In this tutorial we requested the \code{extended} \Rfunarg{type} of output, which is stored in a list structure that must be converted into a character vector before we can write it to a text file.  Here we may choose what we want the text output to look like, by pasting together the result for each sequence using delimiters.  For example:
+We can switch between outputting in \code{extended} or \code{collapsed} format by setting the \Rfunarg{type} argument in \Rfunction{IdTaxa}.  The \code{collapsed} \Rfunarg{type} of output is simply a character vector, which cannot be plotted but is easy to write to a text file with the \Rfunction{writeLines} function.  In this tutorial we requested the \code{extended} \Rfunarg{type} of output, which is stored in a list structure that must be converted into a character vector before we can write it to a text file.  Here we may choose what we want the text output to look like, by pasting together the result for each sequence using delimiters.  For example:
 
-<<expr14,eval=TRUE>>=
+<<expr20,eval=TRUE>>=
 output <- sapply(ids,
 	function (id) {
 		paste(id$taxon,
@@ -331,14 +400,14 @@ output <- sapply(ids,
 			collapse="; ")
 	})
 tail(output)
-#WriteLines(output, "<<path to output text file>>")
+#writeLines(output, "<<path to output text file>>")
 @
 
 \subsection{Guaranteeing repeatability}
 
-The \emph{IDTAXA} algorithm is based on bootstrapping, which involves random sampling to obtain a confidence score.  For this reason, the classifications are expected to change slightly if the classification process is repeated with the same inputs.  For some applications this randomness is undesirable, and it can easily be avoided by setting the random seed before classification.  The process of setting and then unsetting the seed in \R{} is straightforward:
+The \emph{IDTAXA} algorithm uses bootstrapping, which involves random sampling to obtain a confidence score.  For this reason, the classifications are expected to change slightly if the classification process is repeated with the same inputs.  For some applications this randomness is undesirable, and it can easily be avoided by setting the random seed before classification.  The process of setting and then unsetting the seed in \R{} is straightforward:
 
-<<expr15,eval=FALSE>>=
+<<expr21,eval=FALSE>>=
 set.seed(123) # choose a whole number as the random seed
 # then classify sequences with IdTaxa (not shown)
 set.seed(NULL) # return to the original state by unsetting the seed

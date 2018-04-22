@@ -116,7 +116,7 @@ AlignDB <- function(dbFile,
 				stop("substitutionMatrix is incomplete.")
 			subMatrix <- substitutionMatrix
 		} else {
-			subMatrix <- eval(parse(text=data(list=substitutionMatrix, envir=environment())))
+			subMatrix <- eval(parse(text=data(list=substitutionMatrix, envir=environment(), package=ifelse(substitutionMatrix=="MIQS", "DECIPHER", "Biostrings"))))
 		}
 		subMatrix <- subMatrix[AAs, AAs]
 		subMatrix <- as.numeric(subMatrix)
@@ -134,7 +134,7 @@ AlignDB <- function(dbFile,
 				stop("substitutionMatrix must be NULL or a matrix.")
 			}
 		} else if (type==2L && missing(perfectMatch) && missing(misMatch)) {
-			substitutionMatrix <- matrix(c(11, 3, 5, 4, 3, 12, 3, 6, 5, 3, 12, 3, 4, 6, 3, 10),
+			substitutionMatrix <- matrix(c(13, 4, 6, 4, 4, 14, 4, 6, 6, 4, 14, 4, 4, 6, 4, 13),
 				nrow=4,
 				ncol=4,
 				dimnames=list(bases, bases))
@@ -159,7 +159,7 @@ AlignDB <- function(dbFile,
 		stop("No sequences found in dbFile matching the specified criteria.")
 	# initialize a progress bar
 	if (verbose) {
-		pBar <- txtProgressBar(max=2*(count1 + count2), style=3)
+		pBar <- txtProgressBar(max=2*(count1 + count2), style=ifelse(interactive(), 3, 1))
 		totSeqs <- 0L
 	}
 	

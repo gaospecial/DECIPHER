@@ -103,7 +103,7 @@ DesignArray <- function(myDNAStringSet,
 	# initialize a progress bar
 	if (verbose) {
 		time.1 <- Sys.time()
-		pBar <- txtProgressBar(min=0, max=100, initial=0, style=3)
+		pBar <- txtProgressBar(min=0, max=100, initial=0, style=ifelse(interactive(), 3, 1))
 	} else {
 		pBar <- NULL
 	}

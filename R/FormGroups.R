@@ -2,7 +2,8 @@ FormGroups <- function(dbFile,
 	tblName="Seqs",
 	goalSize=50,
 	minGroupSize=25,
-	maxGroupSize=500,
+	maxGroupSize=5000,
+	includeNames=FALSE,
 	add2tbl=FALSE,
 	verbose=TRUE) {
 	
@@ -13,12 +14,22 @@ FormGroups <- function(dbFile,
 		stop("verbose must be a logical.")
 	if (!is.logical(add2tbl) && !is.character(add2tbl))
 		stop("add2tbl must be a logical or table name.")
-	if (!is.numeric(goalSize) || goalSize <= 0)
-		stop("goalSize must be a numeric greater than zero.")
+	if (!is.numeric(goalSize))
+		stop("goalSize must be a numeric.")
+	if (goalSize <= 0)
+		stop("goalSize must be greater than zero.")
 	if (!is.numeric(minGroupSize) || minGroupSize < 0)
-		stop("minGroupSize must be a numeric greater than or equal to zero.")
-	if (!is.numeric(maxGroupSize) || minGroupSize > maxGroupSize)
-		stop("maxGroupSize must be a numeric greater than or equal to minGroupSize.")
+		stop("minGroupSize must be a numeric.")
+	if (minGroupSize < 0)
+		stop("minGroupSize must be greater than or equal to zero.")
+	if (!is.numeric(maxGroupSize))
+		stop("maxGroupSize must be a numeric.")
+	if (minGroupSize > goalSize)
+		stop("goalSize must be at least minGroupSize.")
+	if (maxGroupSize < goalSize)
+		stop("maxGroupSize must be at least goalSize.")
+	if (!is.logical(includeNames))
+		stop("includeNames must be a logical.")
 	if (verbose)
 		time.1 <- Sys.time()
 	
@@ -46,65 +57,83 @@ FormGroups <- function(dbFile,
 	allranks <- dbFetch(rs, n=-1, row.names=FALSE)$rank
 	dbClearResult(rs)
 	
-	taxonomy <- unlist(lapply(strsplit(allranks,
-			"\n",
-			fixed=TRUE),
-		function (x) {
-			paste(x[-1], collapse=" ")
-		}))
+	if (includeNames) {
+		taxonomy <- unlist(lapply(strsplit(allranks,
+				"\n",
+				fixed=TRUE),
+			function (x) {
+				paste(paste(x[-1],
+						collapse=" "),
+					x[1],
+					sep=ifelse(grepl("; *$", x[length(x)]),
+						"",
+						";"))
+			}))
+	} else {
+		taxonomy <- unlist(lapply(strsplit(allranks,
+				"\n",
+				fixed=TRUE),
+			function (x) {
+				paste(x[-1], collapse=" ")
+			}))
+	}
+	taxonomy <- gsub(" *; *",
+		";",
+		taxonomy)
 	rank <- sort(table(taxonomy))
 	
 	searchResult <- data.frame(rank=names(rank),
-		count=as.integer(-rank),
+		count=as.integer(rank),
+		counts=as.integer(-rank),
 		origin="",
 		identifier="",
 		stringsAsFactors=FALSE)
 	
 	rank <- names(rank)
 	lineages <- strsplit(as.character(rank),
-		" *; *")
-	rank <- unlist(lapply(lineages,
-		paste,
-		collapse=";"))
+		";",
+		fixed=TRUE)
 	
 	if (verbose)
-		pBar <- txtProgressBar(style=3)
+		pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 	
 	.change <- function(id) {
 		id <- .Call("replaceChar", id, '"', "", PACKAGE="DECIPHER")
 		id <- .Call("replaceChar", id, "'", "", PACKAGE="DECIPHER")
-		id <- gsub("^\\s+|\\s+$", "", id)
+		id <- gsub("^\\s+|\\s+$", "", id) # trim flanking white space
 		id <- gsub("\\.+$", "", id)
 		return(id)
 	}
 	
-	o <- order(lengths(lineages),
-		searchResult$count,
+	o <- order(searchResult$count,
+		lengths(lineages),
 		decreasing=TRUE)
 	for (i in seq_along(o)) {		if (searchResult$identifier[o[i]]=="") {			lineage <- lineages[[o[i]]]
 			for (j in rev(seq_along(lineage))) {
 				w <- startsWith(rank,
-					paste(lineage[1:j],
+					paste(lineage[seq_len(j)],
 						collapse=";"))
 				w <- which(w)
-				w <- w[searchResult$count[w] < 0]
-				counts <- sum(abs(searchResult$count[w]))				
-				if (counts >= goalSize) {					if (counts > maxGroupSize &&
+				w <- w[searchResult$counts[w] < 0]
+				counts <- sum(abs(searchResult$counts[w]))				
+				if (counts >= goalSize) {
+					if (counts > maxGroupSize &&
 						j < length(lineage)) {						j <- j + 1 # go down one rank						w <- startsWith(rank,
-							paste(lineage[1:j],
+							paste(lineage[seq_len(j)],
 								collapse=";"))
 						w <- which(w)
-						w <- w[searchResult$count[w] < 0]
-						counts <- sum(abs(searchResult$count[w]))					} else {
-						searchResult$count[w] <- abs(searchResult$count[w])
+						w <- w[searchResult$counts[w] < 0]
+						counts <- sum(abs(searchResult$counts[w]))
 					}
 					
 					if (j > 1) {
-						origin <- paste(lineage[1:(j - 1)], collapse=";")
+						origin <- paste(lineage[seq_len(j - 1)], collapse=";")
 					} else {
 						origin <- ""
 					}
-										if (counts < minGroupSize) { # mark for later inclusion						searchResult$count[w] <- -abs(searchResult$count[w])					}
+										if (counts < minGroupSize) { # mark for later inclusion						searchResult$counts[w] <- -counts					} else {
+						searchResult$counts[w] <- counts
+					}
 										searchResult$origin[w] <- origin
 					id <- .change(lineage[j])
 					if (id %in% searchResult$identifier[-w])
@@ -127,7 +156,7 @@ FormGroups <- function(dbFile,
 	m <- match(taxonomy, rank)
 	searchResult <- searchResult[m,]
 	searchResult$rank <- allranks
-	searchResult$count <- NULL
+	searchResult$counts <- NULL
 	
 	if (is.character(add2tbl) || add2tbl) {		dbWriteTable(dbConn, "taxa", searchResult)		
 		if (verbose)

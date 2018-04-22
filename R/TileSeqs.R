@@ -96,7 +96,7 @@ TileSeqs <- function(dbFile,
 	}
 	
 	if (verbose) {
-		pBar <- txtProgressBar(min=0, max=100, initial=0, style=3)
+		pBar <- txtProgressBar(min=0, max=100, initial=0, style=ifelse(interactive(), 3, 1))
 		time.1 <- Sys.time()
 	}
 	count <- 0

@@ -85,7 +85,10 @@ OrientNucleotides <- function(myXStringSet,
 	result <- character(l)
 	result[reference] <- NA
 	
-	wordSize <- ceiling(log(100*mean(width(myXStringSet)), 4))
+	wordSize <- ceiling(log(100*quantile(width(myXStringSet), 0.99),
+		.Call("alphabetSize",
+			myXStringSet,
+			PACKAGE="DECIPHER")))
 	if (wordSize > 15)
 		wordSize <- 15
 	if (wordSize < 2)
@@ -113,7 +116,7 @@ OrientNucleotides <- function(myXStringSet,
 	if (verbose) {
 		pBar <- txtProgressBar(min=0,
 			max=tot*100,
-			style=3)
+			style=ifelse(interactive(), 3, 1))
 	}
 	org[-reference] <- dists(v[-reference])
 	
@@ -129,7 +132,7 @@ OrientNucleotides <- function(myXStringSet,
 		if (verbose) {
 			pBar <- txtProgressBar(min=-100,
 				max=tot*100 - 100,
-				style=3)
+				style=ifelse(interactive(), 3, 1))
 			count <- count + 1
 		}
 		v <- dists(v)
@@ -157,7 +160,7 @@ OrientNucleotides <- function(myXStringSet,
 		if (verbose) {
 			pBar <- txtProgressBar(min=-100*count,
 				max=tot*100 - 100*count,
-				style=3)
+				style=ifelse(interactive(), 3, 1))
 			count <- count + 1
 		}
 		v <- dists(v)
@@ -185,7 +188,7 @@ OrientNucleotides <- function(myXStringSet,
 		if (verbose) {
 			pBar <- txtProgressBar(min=-100*count,
 				max=tot*100 - 100*count,
-				style=3)
+				style=ifelse(interactive(), 3, 1))
 			count <- count + 1
 		}
 		v <- dists(v)

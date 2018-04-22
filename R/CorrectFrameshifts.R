@@ -93,7 +93,7 @@ CorrectFrameshifts <- function(myXStringSet,
 				ncol=21,
 				dimnames=list(AAs, AAs))
 		} else if (substitutionMatrix %in% c("BLOSUM45", "BLOSUM50", "BLOSUM62", "BLOSUM80", "BLOSUM100", "PAM30", "PAM40", "PAM70", "PAM120", "PAM250", "MIQS")) {
-			subMatrix <- eval(parse(text=data(list=substitutionMatrix, envir=environment())))
+			subMatrix <- eval(parse(text=data(list=substitutionMatrix, envir=environment(), package=ifelse(substitutionMatrix=="MIQS", "DECIPHER", "Biostrings"))))
 		} else {
 			stop("Invalid substitutionMatrix.")
 		}
@@ -151,7 +151,7 @@ CorrectFrameshifts <- function(myXStringSet,
 			cat("Finding the closest reference amino acid sequences:\n",
 				sep="")
 			flush.console()
-			pBar <- txtProgressBar(max=100, style=3)
+			pBar <- txtProgressBar(max=100, style=ifelse(interactive(), 3, 1))
 		} else {
 			pBar <- NULL
 		}
@@ -200,10 +200,10 @@ CorrectFrameshifts <- function(myXStringSet,
 	
 	if (verbose) {
 		time.1 <- Sys.time()
-		cat("\nAssessing frameshifts in nucleotide sequences:\n",
+		cat("Assessing frameshifts in nucleotide sequences:\n",
 			sep="")
 		flush.console()
-		pBar <- txtProgressBar(max=100, style=3)
+		pBar <- txtProgressBar(max=100, style=ifelse(interactive(), 3, 1))
 	}
 	
 	widths <- width(myAAStringSet)

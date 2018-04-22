@@ -4,10 +4,11 @@ MeltDNA <- function(myDNAStringSet,
 	ions=0.2) {
 	
 	# error checking
-	if (is.character(myDNAStringSet))
+	if (is.character(myDNAStringSet)) {
 		myDNAStringSet <- DNAStringSet(myDNAStringSet)
-	if (!is(myDNAStringSet, "DNAStringSet"))
+	} else if (!is(myDNAStringSet, "DNAStringSet")) {
 		stop("myDNAStringSet must be a DNAStringSet.")
+	}
 	if (min(width(myDNAStringSet)) < 3)
 		stop("All sequences in myDNAStringSet must be at least 3 nucleotides long.")
 	if (length(type)==0)

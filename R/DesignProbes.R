@@ -1102,7 +1102,7 @@ DesignProbes <- function(tiles,
 		if (verbose) {
 			cat(" (", d, "):\n", sep="")
 			flush.console()
-			pBar <- txtProgressBar(min=0, max=100, initial=0, style=3)
+			pBar <- txtProgressBar(min=0, max=100, initial=0, style=ifelse(interactive(), 3, 1))
 		}
 		
 		for (k in 1:length(ids)) {

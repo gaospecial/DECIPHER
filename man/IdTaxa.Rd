@@ -14,6 +14,7 @@ IdTaxa(test,
        threshold = 60,
        bootstraps = 100,
        samples = L^0.47,
+       minDescend = 1,
        processors = 1,
        verbose = TRUE)
 }
@@ -39,6 +40,9 @@ Integer giving the number of bootstrap replicates to perform for each sequence.
   \item{samples}{
 A function or call written as a function of `L', which will evaluate to a numeric vector the same length as `L'.  Typically of the form ``\code{A + B*L^C}'', where `A', `B', and `C' are constants.
 }
+  \item{minDescend}{
+Numeric giving the minimum fraction of \code{bootstraps} required to descend the tree during the initial tree descend phase of the algorithm.  Higher values are less likely to descend the tree, causing direct comparison against more sequences in the \code{trainingSet}.
+}
   \item{processors}{
 The number of processors to use, or \code{NULL} to automatically detect and use all available processors.
 }
@@ -47,7 +51,7 @@ Logical indicating whether to display progress.
 }
 }
 \details{
-Sequences in \code{test} are each assigned a taxonomic classification based on the \code{trainingSet} created with \code{\link{LearnTaxa}}.  Each taxonomic level is given a confidence between 0\% and 100\%, and the taxonomy is truncated where confidence drops below \code{threshold}.  If the taxonomic classification was truncated, the final group is labeled with ``unclassified_'' followed by the final taxon's name.  Note that the reported confidence is not a p-value but does directly relate to a given classification's probability of being wrong.  The default \code{threshold} of \code{60\%} is intended to minimize the rate of incorrect classifications.  Lower values of \code{threshold} may be preferred to increase the taxonomic depth of classifications (e.g., \code{50\%}).
+Sequences in \code{test} are each assigned a taxonomic classification based on the \code{trainingSet} created with \code{\link{LearnTaxa}}.  Each taxonomic level is given a confidence between 0\% and 100\%, and the taxonomy is truncated where confidence drops below \code{threshold}.  If the taxonomic classification was truncated, the last group is labeled with ``unclassified_'' followed by the final taxon's name.  Note that the reported confidence is not a p-value but does directly relate to a given classification's probability of being wrong.  The default \code{threshold} of \code{60\%} is intended to minimize the rate of incorrect classifications.  Lower values of \code{threshold} (e.g., \code{50\%}) may be preferred to increase the taxonomic depth of classifications.
 }
 \value{
 If \code{type} is \code{"extended"} (the default) then an object of class \code{Taxa} and subclass {Train} is returned.  This is stored as a list with elements corresponding to their respective sequence in \code{test}.  Each list element contains components:
@@ -55,10 +59,10 @@ If \code{type} is \code{"extended"} (the default) then an object of class \code{
 A character vector containing the taxa to which the sequence was assigned.
 }
   \item{confidence}{
-A numeric vector giving the corresponding percent confidence for every taxon.
+A numeric vector giving the corresponding percent confidence for each taxon.
 }
   \item{rank}{
-If the classified was trained with a set of \code{rank}s, a character vector containing the rank name of each taxon.
+If the classifier was trained with a set of \code{rank}s, a character vector containing the rank name of each taxon.
 }
 
 If \code{type} is \code{"collapsed"} then a character vector is returned with the taxonomic assignment for each sequence.  This takes the repeating form ``Taxon name [rank, confidence\%]; ...'' if \code{rank}s were supplied during training, or ``Taxon name [confidence\%]; ...'' otherwise.

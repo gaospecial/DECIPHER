@@ -39,7 +39,7 @@ CalculateEfficiencyPCR <- function(primer,
 	if (!is.logical(taqEfficiency))
 		stop("taqEfficiency must be a logical.")
 	
-	RT <- .0019871*(273.15 + temp) # [kcal/mol]
+	RT <- 0.0019871*(273.15 + temp) # [kcal/mol]
 	l <- length(primer)
 	
 	if (l==0)

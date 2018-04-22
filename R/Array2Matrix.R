@@ -4,7 +4,7 @@ Array2Matrix <- function(probes,
 	if (!is.logical(verbose))
 		stop("verbose must be a logical.")
 	if (verbose) {
-		pBar <- txtProgressBar(style=3)
+		pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 		time.1 <- Sys.time()
 	}
 	

@@ -5,7 +5,7 @@ PredictDBN <- function(myXStringSet,
 	avgProdCorr=1,
 	slope=2,
 	shift=1.3,
-	threshold=0.5,
+	threshold=0.7,
 	pseudoknots=1,
 	weight=1,
 	processors=1,
@@ -21,7 +21,7 @@ PredictDBN <- function(myXStringSet,
 	u <- unique(width(myXStringSet))
 	if (length(u)!=1)
 		stop("Sequences in myXStringSet must be the same width (aligned).")
-	TYPES <- c("states", "pairs", "scores", "structures")
+	TYPES <- c("states", "pairs", "scores", "structures", "search")
 	if (length(type)==0)
 		stop("No type specified.")
 	type <- pmatch(type, TYPES)
@@ -98,7 +98,7 @@ PredictDBN <- function(myXStringSet,
 	
 	# initialize a progress bar
 	if (verbose) {
-		pBar <- txtProgressBar(min=0, max=100, initial=0, style=3)
+		pBar <- txtProgressBar(min=0, max=100, initial=0, style=ifelse(interactive(), 3, 1))
 		time.1 <- Sys.time()
 	} else {
 		pBar <- NULL

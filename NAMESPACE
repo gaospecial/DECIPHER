@@ -9,9 +9,9 @@ import(RSQLite)
 import(DBI)
 import(parallel)
 
-importFrom("grDevices", "colorRampPalette", "colors", "dev.flush", "dev.hold", "dev.size", "rainbow", "rgb", "as.graphicsAnnot")
+importFrom("grDevices", "colorRampPalette", "colors", "dev.flush", "dev.hold", "dev.size", "rainbow", "rgb", "as.graphicsAnnot", "col2rgb")
 importFrom("graphics", "abline", "axis", "box", "legend", "mtext", "par", "plot", "points", "rect", "segments", "strheight", "strwidth", "text", "axTicks", "hist", "layout", "lines", "polygon")
-importFrom("stats", "dendrapply", "dist", "is.leaf", "nlminb", "optimize", "order.dendrogram", "pbinom", "reorder", "setNames", "step", "uniroot")
+importFrom("stats", "dendrapply", "dist", "is.leaf", "nlminb", "optimize", "order.dendrogram", "pbinom", "reorder", "setNames", "step", "uniroot", "weighted.mean")
 importFrom("utils", "browseURL", "data", "flush.console", "object.size", "setTxtProgressBar", "txtProgressBar")
 
 export(
@@ -40,7 +40,7 @@ CorrectFrameshifts, OrientNucleotides, PredictDBN, PredictHEC, RemoveGaps, TrimD
 # multiple alignment:
 AdjustAlignment, AlignDB, AlignProfiles, AlignSeqs, AlignTranslation, MaskAlignment, StaggerAlignment,
 # synteny:
-AlignSynteny, FindSynteny,
+AA_REDUCED, AlignSynteny, FindSynteny,
 # taxonomic classification:
 LearnTaxa, IdTaxa
 )

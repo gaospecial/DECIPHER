@@ -22,7 +22,7 @@ SEXP shiftGapsAA(SEXP x, SEXP subMatrix, SEXP go, SEXP ge, SEXP gl, SEXP sc, SEX
 
 // DistanceMatrix.c
 
-SEXP distMatrix(SEXP x, SEXP t, SEXP terminalGaps, SEXP penalizeGapGaps, SEXP penalizeGapLetters, SEXP fullMatrix, SEXP verbose, SEXP pBar, SEXP nThreads);
+SEXP distMatrix(SEXP x, SEXP t, SEXP terminalGaps, SEXP penalizeGapGaps, SEXP penalizeGapLetters, SEXP fullMatrix, SEXP output, SEXP verbose, SEXP pBar, SEXP nThreads);
 
 SEXP gaps(SEXP x, SEXP t);
 
@@ -32,19 +32,17 @@ SEXP firstSeqsGapsEqual(SEXP x, SEXP y, SEXP start_x, SEXP end_x, SEXP start_y, 
 
 SEXP firstSeqsPosEqual(SEXP x, SEXP y, SEXP start_x, SEXP end_x, SEXP start_y, SEXP end_y, SEXP t, SEXP first_x, SEXP first_y);
 
-// ClusterNJ.c
+// Cluster.c
+
+SEXP cluster(SEXP x, SEXP cutoff, SEXP method, SEXP l, SEXP verbose, SEXP pBar, SEXP nThreads);
+
+SEXP reclusterUPGMA(SEXP x, SEXP cutoff);
 
 SEXP clusterNJ(SEXP x, SEXP cutoff, SEXP verbose, SEXP pBar, SEXP nThreads);
 
 SEXP reclusterNJ(SEXP x, SEXP cutoff);
 
 SEXP adjustHeights(SEXP x);
-
-// ClusterUPGMA.c
-
-SEXP clusterUPGMA(SEXP x, SEXP cutoff, SEXP method, SEXP verbose, SEXP pBar, SEXP nThreads);
-
-SEXP reclusterUPGMA(SEXP x, SEXP cutoff);
 
 // ClusterML.c
 
@@ -127,6 +125,10 @@ SEXP enumerateGappedSequence(SEXP x, SEXP wordSize, SEXP ordering);
 SEXP enumerateGappedSequenceAA(SEXP x, SEXP wordSize, SEXP ordering);
 
 SEXP enumerateSequenceReducedAA(SEXP x, SEXP wordSize, SEXP alphabet);
+
+SEXP alphabetSizeReducedAA(SEXP x, SEXP alphabet);
+
+SEXP alphabetSize(SEXP x);
 
 // Compositions.c
 

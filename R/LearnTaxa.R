@@ -1,7 +1,7 @@
 LearnTaxa <- function(train,
 	taxonomy,
 	rank=NULL,
-	K=floor(log(100*max(width(train)), 4)),
+	K=floor(log(100*quantile(width(train), 0.99), 4)),
 	minFraction=0.01,
 	maxFraction=0.06,
 	maxIterations=10,
@@ -69,7 +69,7 @@ LearnTaxa <- function(train,
 	if (verbose) {
 		num <- 0L
 		time.1 <- Sys.time()
-		pBar <- txtProgressBar(style=3)
+		pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 	}
 	
 	# set default values
@@ -352,11 +352,18 @@ LearnTaxa <- function(train,
 	
 	# record problematic taxonomic groups and sequences
 	w <- which(incorrect | is.na(incorrect))
-	problemSequences <- data.frame(Index=w,
-		Expected=classes[w],
-		Predicted=predicted[w],
-		#row.names=names(train)[w],
-		stringsAsFactors=FALSE)
+	if (length(w) > 0) {
+		problemSequences <- data.frame(Index=w,
+			Expected=paste("Root;", classes[w], sep=""),
+			Predicted=predicted[w],
+			#row.names=names(train)[w],
+			stringsAsFactors=FALSE)
+	} else {
+		problemSequences <- data.frame(Index=w,
+			Expected=character(),
+			Predicted=predicted[w],
+			stringsAsFactors=FALSE)
+	}
 	
 	w <- which(is.na(fraction))
 	if (length(w) > 0) {

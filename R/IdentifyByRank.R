@@ -43,7 +43,7 @@ IdentifyByRank <- function(dbFile,
 	.change <- function(id) {
 		id <- .Call("replaceChar", id, '"', "", PACKAGE="DECIPHER")
 		id <- .Call("replaceChar", id, "'", "", PACKAGE="DECIPHER")
-		id <- gsub("^\\s+|\\s+$", "", id)
+		id <- gsub("^\\s+|\\s+$", "", id) # trim flanking white space
 		id <- gsub("\\.+$", "", id)
 		return(id)
 	}

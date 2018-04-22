@@ -10,7 +10,7 @@ Trains a classifier based on a reference taxonomy containing sequence representa
 LearnTaxa(train,
           taxonomy,
           rank = NULL,
-          K = floor(log(100 * max(width(train)), 4)),
+          K = floor(log(100*quantile(width(train), 0.99), 4)),
           minFraction = 0.01,
           maxFraction = 0.06,
           maxIterations = 10,
@@ -49,15 +49,15 @@ Logical indicating whether to display progress.
 \details{
 Learning about the training data is a two part process consisting of (i) forming a taxonomic tree and then (ii) ensuring that the \code{train}ing sequences can be correctly reclassified.  The latter step relies on reclassifying the sequences in \code{train} by descending the taxonomic tree, a process termed ``tree descent''.  Ultimately, the goal of tree descent is to quickly and accurately narrow the selection of groups where a sequence may belong.  During the learning process, tree descent is tuned so that it performs well when classifying new sequences.
 
-The process of training the classifier first involves learning the taxonomic tree spanning all of the reference sequences in \code{train}.  Typically, reference taxonomic classifications are provided by an authoritative source, oftentimes in a ``taxid'' file containing taxonomic \code{rank} information.  The taxonomic tree may contain any number of levels (e.g., Root, Phylum, Class, Order, Family, Genus) as long as they are hierarchically nested and always begin with ``Root''.
+The process of training the classifier first involves learning the taxonomic tree spanning all of the reference sequences in \code{train}.  Typically, reference taxonomic classifications are provided by an authoritative source, oftentimes along with a ``taxid'' file containing taxonomic \code{rank} information.  The taxonomic tree may contain any number of levels (e.g., Root, Phylum, Class, Order, Family, Genus) as long as they are hierarchically nested and always begin with ``Root''.
 
-The second phase of training the classifier, tree descent, involves learning the optimal set of k-mers for discriminating between the different sub-groups under each edge.  Here a fraction of the k-mers with the greatest discriminatory power are matched to a training sequence, and this process is repeated with 100 random subsamples to decide on the set of possible taxonomic groups to which a training sequence may belong.
+The second phase of training the classifier, tree descent, involves learning the optimal set of k-mers for discerning between the different sub-groups under each edge.  Here a fraction of the k-mers with the greatest discerning power are matched to a training sequence, and this process is repeated with 100 random subsamples to decide on the set of possible taxonomic groups to which a training sequence may belong.
 
-The learning process works by attempting to correctly re-classify each training sequence in the taxonomy.  Initially, \code{maxFraction} of informative k-mers are repeatedly sampled at each edge during tree descent.  Training sequences that are incorrectly classified at an edge will lower the fraction of k-mers that are sampled by an amount that is proportional to \code{multiplier}.  As the fraction of sampled k-mers decreases, the tree descent process becomes less efficient but more accurate.
+The learning process works by attempting to correctly re-classify each training sequence in the taxonomy.  Initially, \code{maxFraction} of informative k-mers are repeatedly sampled at each edge during tree descent.  Training sequences that are incorrectly classified at an edge will lower the fraction of k-mers that are sampled by an amount that is proportional to \code{multiplier}.  As the fraction of sampled k-mers decreases, the tree descent process terminates at higher rank levels.
 
 A major advantage of tree descent is that it both speeds up the classification process and indicates where the training set likely contains mislabeled sequences or incorrectly-placed taxonomic groups.  Training sequences that are not correctly classified within \code{maxIterations} are marked as ``problem sequences'', because it is likely that they are mislabeled.  If enough sequences have difficulty being correctly classified at an edge that the fraction drops below \code{minFraction}, then the edge is recorded as a ``problem group''.
 
-The final result is an object that can be used for classification with \code{\link{IdTaxa}}, as well as information about the taxonomic tree that could be used to help correct any errors in the taxonomy.
+The final result is an object that can be used for classification with \code{\link{IdTaxa}}, as well as information about \code{train} that could be used to help correct any errors in the taxonomy.
 }
 \value{
 An object of class \code{Taxa} and subclass {Train}, which is stored as a list with components:

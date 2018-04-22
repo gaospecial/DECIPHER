@@ -227,15 +227,17 @@ static int endTerminalGapsAA(const Chars_holder *P)
 	return gaps;
 }
 
-SEXP distMatrix(SEXP x, SEXP t, SEXP terminalGaps, SEXP penalizeGapGaps, SEXP penalizeGapLetters, SEXP fullMatrix, SEXP verbose, SEXP pBar, SEXP nThreads)
+SEXP distMatrix(SEXP x, SEXP t, SEXP terminalGaps, SEXP penalizeGapGaps, SEXP penalizeGapLetters, SEXP fullMatrix, SEXP output, SEXP verbose, SEXP pBar, SEXP nThreads)
 {
 	XStringSet_holder x_set;
 	Chars_holder x_i, x_j;
-	int x_length, start, end, i, j, seqLength_i, seqLength_j, last;
+	int start, end, seqLength_i, seqLength_j;
+	R_xlen_t x_length, i, j, last;
 	int pGapLetters, pGapsGaps, tGaps, fM = asLogical(fullMatrix);
 	int before, v, *rPercentComplete;
 	double *rans, soFar;
 	int nthreads = asInteger(nThreads);
+	int o = asInteger(output);
 	SEXP ans, percentComplete, utilsPackage;
 	v = asLogical(verbose);
 	if (v) { // percent complete variables
@@ -254,12 +256,17 @@ SEXP distMatrix(SEXP x, SEXP t, SEXP terminalGaps, SEXP penalizeGapGaps, SEXP pe
 	if (x_length < 2) { // there is only one sequence
 		PROTECT(ans = NEW_INTEGER(0));
 	} else {
-		if (fM) {
+		if (o==1) { // type is "matrix"
+			if (fM) {
+				last = x_length - 1;
+				PROTECT(ans = allocMatrix(REALSXP, x_length, x_length));
+			} else {
+				last = 1;
+				PROTECT(ans = allocMatrix(REALSXP, 1, x_length));
+			}
+		} else { // type is "dist"
 			last = x_length - 1;
-			PROTECT(ans = allocMatrix(REALSXP, x_length, x_length));
-		} else {
-			last = 1;
-			PROTECT(ans = allocMatrix(REALSXP, 1, x_length));
+			PROTECT(ans = allocVector(REALSXP, x_length*(x_length - 1)/2));
 		}
 		rans = REAL(ans);
 		
@@ -300,9 +307,17 @@ SEXP distMatrix(SEXP x, SEXP t, SEXP terminalGaps, SEXP penalizeGapGaps, SEXP pe
 					gapLengths[i][0] >= (seqLength_j - gapLengths[j][1])) {
 					// no overlap between sequences
 					if (tGaps) { // include terminal gaps
-						rans[j + x_length*i] = 1;
+						if (o==1) { // matrix
+							rans[j + x_length*i] = 1;
+						} else { // dist
+							rans[x_length*i - i*(i + 1)/2 + j - i - 1] = 1;
+						}
 					} else {
-						rans[j + x_length*i] = NA_REAL;
+						if (o==1) { // matrix
+							rans[j + x_length*i] = NA_REAL;
+						} else { // dist
+							rans[x_length*i - i*(i + 1)/2 + j - i - 1] = NA_REAL;
+						}
 					}
 				} else {
 					if (!tGaps) { // don't include terminal gaps
@@ -324,18 +339,26 @@ SEXP distMatrix(SEXP x, SEXP t, SEXP terminalGaps, SEXP penalizeGapGaps, SEXP pe
 						end = 0;
 					}
 					if (asInteger(t)==3) { // AAStringSet
-						rans[j + x_length*i] = distanceAA(&x_i, &x_j, start, end, pGapsGaps, pGapLetters);
+						if (o==1) { // matrix
+							rans[j + x_length*i] = distanceAA(&x_i, &x_j, start, end, pGapsGaps, pGapLetters);
+						} else { // dist
+							rans[x_length*i - i*(i + 1)/2 + j - i - 1] = distanceAA(&x_i, &x_j, start, end, pGapsGaps, pGapLetters);
+						}
 					} else {
-						rans[j + x_length*i] = distance(&x_i, &x_j, start, end, pGapsGaps, pGapLetters);
+						if (o==1) { // matrix
+							rans[j + x_length*i] = distance(&x_i, &x_j, start, end, pGapsGaps, pGapLetters);
+						} else { // dist
+							rans[x_length*i - i*(i + 1)/2 + j - i - 1] = distance(&x_i, &x_j, start, end, pGapsGaps, pGapLetters);
+						}
 					}
 				}
 			}
-			if (fM) // make the matrix symetrical
+			if (fM && o==1) // make the matrix symetrical
 				for (j = (i+1); j < x_length; j++)
 					rans[i + x_length*j] = rans[j + x_length*i];
 			
-			// set the matrix diagonal to zero distance
-			rans[i*x_length+i] = 0;
+			if (o==1) // set the matrix diagonal to zero distance
+				rans[i*x_length+i] = 0;
 			
 			if (v) { // print the percent completed so far
 				soFar = (2*last - i)*(i + 1);
@@ -349,7 +372,7 @@ SEXP distMatrix(SEXP x, SEXP t, SEXP terminalGaps, SEXP penalizeGapGaps, SEXP pe
 				R_CheckUserInterrupt();
 			}
 		}
-		if (fM) // set the last element of the diagonal to zero
+		if (fM && o==1) // set the last element of the diagonal to zero
 			rans[(x_length - 1)*x_length+(x_length - 1)] = 0;
 	}
 	

@@ -144,7 +144,7 @@ DB2Seqs <- function(file,
 			orderBy)
 	
 	if (verbose)
-		pBar <- txtProgressBar(style=3)
+		pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 	s <- seq(1, count, chunkSize)
 	for (i in 1:length(s)) {
 		# build the search expression

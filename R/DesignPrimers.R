@@ -636,7 +636,7 @@ DesignPrimers <- function(tiles,
 		if (verbose) {
 			cat(" (", d, "):\n", sep="")
 			flush.console()
-			pBar <- txtProgressBar(min=0, max=100, initial=0, style=3)
+			pBar <- txtProgressBar(min=0, max=100, initial=0, style=ifelse(interactive(), 3, 1))
 		}
 		
 		if (induceMismatch) {
@@ -1009,7 +1009,7 @@ DesignPrimers <- function(tiles,
 					cat("Determining Best Primer Pair:\n")
 				}
 				flush.console()
-				pBar <- txtProgressBar(min=0, max=100, initial=0, style=3)
+				pBar <- txtProgressBar(min=0, max=100, initial=0, style=ifelse(interactive(), 3, 1))
 			}
 			
 			# order primers by score

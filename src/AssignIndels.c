@@ -19,7 +19,7 @@
 // DECIPHER header file
 #include "DECIPHER.h"
 
-// clears "ins" attribute in-place within a nested list
+// clears "ins" attribute within a nested list
 SEXP clearIns(SEXP x)
 {
 	SEXP ans;

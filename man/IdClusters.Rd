@@ -4,7 +4,7 @@
 Cluster Sequences By Distance or Sequence
 }
 \description{
-Groups the sequences represented by a distance matrix into clusters of similarity.
+Groups the sequences into clusters of similarity or creates a tree from a set of sequences.
 }
 \usage{
 IdClusters(myDistMatrix = NULL,
@@ -20,7 +20,7 @@ IdClusters(myDistMatrix = NULL,
 }
 \arguments{
   \item{myDistMatrix}{
-A symmetric \eqn{N} x \eqn{N} distance matrix with the values of dissimilarity between \eqn{N} sequences, or \code{NULL} if \code{method} is \code{"inexact"}.
+A symmetric \eqn{N} x \eqn{N} distance matrix with the values of dissimilarity between \eqn{N} sequences, an object of class \code{'dist'}, or \code{NULL} if \code{method} is \code{"inexact"}.
 }
   \item{method}{
 An agglomeration method to be used.  This should be (an abbreviation of) one of \code{"complete"}, \code{"single"}, \code{"UPGMA"}, \code{"WPGMA"}, \code{"NJ"}, \code{"ML"}, or \code{"inexact"}.  (See details section below.)
@@ -51,19 +51,19 @@ Logical indicating whether to display progress.
 }
 }
 \details{
-\code{IdClusters} groups the input sequences into clusters using a set dissimilarities representing the distance between \eqn{N} sequences.  Initially a phylogenetic tree is formed using the specified \code{method}.  Then each leaf (sequence) of the tree is assigned to a cluster based on its edge lengths to the other sequences.  The available clustering methods are described as follows:
+\code{IdClusters} groups the input sequences into clusters using a set of dissimilarities representing the distance between \eqn{N} sequences.  In most cases, a phylogenetic tree is formed using the specified \code{method}.  Then each leaf (sequence) of the tree is assigned to a cluster based on its edge lengths to the other sequences.  The available clustering methods are described as follows:
 
-Ultrametric methods:  The method \code{complete} assigns clusters using complete-linkage so that sequences in the same cluster are no more than \code{cutoff} percent apart.  The method \code{single} assigns clusters using single-linkage so that sequences in the same cluster are within \code{cutoff} of at least one other sequence in the same cluster.  \code{UPGMA} (the default) or \code{WPGMA} assign clusters using average-linkage which is a compromise between the sensitivity of complete-linkage clustering to outliers and the tendency of single-linkage clustering to connect distant relatives that do not appear to be closely related.  \code{UPGMA} produces an unweighted tree, where each leaf contributes equally to the average edge lengths, whereas \code{WPGMA} produces a weighted result.
+Ultrametric methods:  The method \code{complete} assigns clusters using complete-linkage so that sequences in the same cluster are no more than \code{cutoff} distance apart.  The method \code{single} assigns clusters using single-linkage so that sequences in the same cluster are within \code{cutoff} of at least one other sequence in the same cluster.  \code{UPGMA} (the default) or \code{WPGMA} assign clusters using average-linkage which is a compromise between the sensitivity of complete-linkage clustering to outliers and the tendency of single-linkage clustering to connect distant relatives that do not appear to be closely related.  \code{UPGMA} produces an unweighted tree, where each leaf contributes equally to the average edge lengths, whereas \code{WPGMA} produces a weighted result.
 
 Additive methods:  \code{NJ} uses the Neighbor-Joining method proposed by Saitou and Nei that does not assume lineages evolve at the same rate (the molecular clock hypothesis).  The \code{NJ} method is typically the most phylogenetically accurate of the above distance-based methods.  \code{ML} creates a neighbor-joining tree and then iteratively maximizes the likelihood of the tree given the aligned sequences (\code{myXStringSet}).  This is accomplished through a combination of optimizing edge lengths with Brent's method and improving tree topology with nearest-neighbor interchanges (NNIs).  When \code{method="ML"}, one or more \code{MODELS} of DNA evolution must be specified.  Model parameters are iteratively optimized to maximize likelihood, except base frequencies which are empirically determined.  If multiple \code{model}s are given, the best \code{model} is automatically chosen based on BIC calculated from the likelihood and the sample size (defined as the number of variable sites in the DNA sequence).
 
 Sequence-only method:  \code{inexact} uses a heuristic algorithm to directly assign sequences to clusters without a distance matrix.  First the sequences are ordered by length and the longest sequence becomes the first cluster seed.  If the second sequence is less than \code{cutoff} percent distance then it is added to the cluster, otherwise it becomes a new cluster representative.  The remaining sequences are matched to cluster representatives based on their k-mer distribution and then aligned to find the closest sequence.  This approach is repeated until all sequences belong to a cluster.  In the vast majority of cases, this process results in clusters with members separated by less than \code{cutoff} distance, where distance is defined as the percent dissimilarity between the overlapping region of a ``glocal'' alignment.
 
-Multiple cutoffs may be provided if they are in increasing or decreasing order.  If \code{cutoff}s are provided in \emph{descending} order then clustering at each new value of \code{cutoff} is continued within the prior \code{cutoff}'s clusters.  In this way clusters at lower values of \code{cutoff} are completely contained within their umbrella clusters at higher values of \code{cutoff}.  This is useful for defining taxonomy, where lower level groups (e.g., genera) are expected not to straddle multiple higher level groups (e.g., families).  If multiple cutoffs are provided in \emph{ascending} order then clustering at each level of \code{cutoff} is independent of the prior level.  This may result in fewer high-level clusters for \code{NJ} and \code{ML} methods, but will have no impact on ultrametric methods.  Providing \code{cutoff}s in descending order makes \code{inexact} clustering faster, but has negligible impact on the other \code{method}s.
+For all \code{method}s, multiple cutoffs may be provided in sorted order.  If the \code{cutoff}s are provided in \emph{descending} order then clustering at each new value of \code{cutoff} is continued within the prior \code{cutoff}'s clusters.  In this way clusters at lower values of \code{cutoff} are completely contained within their umbrella clusters at higher values of \code{cutoff}.  This is useful for defining taxonomy, where groups need to be hierarchically nested.  If multiple cutoffs are provided in \emph{ascending} order then clustering at each level of \code{cutoff} is independent of the prior level.  This may result in fewer high-level clusters for \code{NJ} and \code{ML} methods, but will have no impact on ultrametric methods.
 }
 \value{
 If \code{type} is \code{"clusters"} (the default), then a data.frame is returned with a column for each cutoff specified.  This data.frame has dimensions \eqn{N*M}, where each one of \eqn{N} sequences is assigned to a cluster at the \eqn{M}-level of cutoff.  The row.names of the data.frame correspond to the dimnames of \code{myDistMatrix}.
-If \code{type} is \code{"dendrogram"}, then an object of class \code{dendrogram} is returned that can be used for plotting.  Leaves of the dendrogram are colored by cluster number.
+If \code{type} is \code{"dendrogram"}, then an object of class \code{dendrogram} is returned that can be used for plotting.  Leaves of the dendrogram are colored by cluster number, but the same color may be repeated for different clusters.  Note that the cophenetic distance between leaves of the tree is equal to the sum of branch lengths separating the leaves.  This is different than trees produced by \code{hclust} where leaves are merged at a height equal to their cophenetic distance.
 If \code{type} is \code{"both"} then a list is returned containing both the \code{"clusters"} and \code{"dendrogram"} outputs.
 }
 \references{
@@ -81,7 +81,7 @@ Erik Wright \email{eswright@pitt.edu}
 }
 \examples{
 # using the matrix from the original paper by Saitou and Nei
-m <- matrix(0,8,8)
+m <- matrix(0,8,8) # only the lower triangle is used
 m[2:8,1] <- c(7, 8, 11, 13, 16, 13, 17)
 m[3:8,2] <- c(5, 8, 10, 13, 10, 14)
 m[4:8,3] <- c(5, 7, 10, 7, 11)
@@ -94,11 +94,21 @@ m[8,7] <- c(8)
 tree <- IdClusters(m, cutoff=10, method="NJ", showPlot=TRUE, type="dendrogram")
 
 # example of specifying multiple cutoffs
-clusters <- IdClusters(m, cutoff=c(2,6,10,20)) # returns a data frame
+clusters <- IdClusters(m, type="clusters", cutoff=c(2,6,10,20)) # returns a data frame
 head(clusters)
+
+# example of creating a complete-linkage tree from an alignment
+fas <- system.file("extdata", "Bacteria_175seqs.fas", package="DECIPHER")
+dna <- readDNAStringSet(fas)
+dna # input alignment
+d <- DistanceMatrix(dna, type="dist") # returns an object of class 'dist'
+IdClusters(d, method="complete", cutoff=0.05, showPlot=TRUE, type="dendrogram")
 
 # example of 'inexact' clustering
 fas <- system.file("extdata", "50S_ribosomal_protein_L2.fas", package="DECIPHER")
 dna <- readDNAStringSet(fas)
-IdClusters(myXStringSet=dna, method="inexact", cutoff=0.05)
+aa <- translate(dna)
+inexact <- IdClusters(myXStringSet=aa, method="inexact", cutoff=seq(0.7, 0.1, -0.1))
+head(inexact)
+apply(inexact, 2, max) # number of clusters per cutoff
 }

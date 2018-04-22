@@ -67,7 +67,7 @@ AlignSynteny <- function(synteny,
 	
 	if (verbose) {
 		time.1 <- Sys.time()
-		pBar <- txtProgressBar(style=3)
+		pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 	}
 	
 	o <- order(index)

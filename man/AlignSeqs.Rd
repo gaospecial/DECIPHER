@@ -17,6 +17,7 @@ AlignSeqs(myXStringSet,
          structures = NULL,
          FUN = AdjustAlignment,
          levels = c(0.9, 0.7, 0.7, 0.4, 10, 5, 5, 2),
+         alphabet = AA_REDUCED[[1]],
          processors = 1,
          verbose = TRUE,
          \dots)
@@ -51,6 +52,9 @@ A function to be applied after each profile-to-profile alignment.  (See details 
 }
   \item{levels}{
 Numeric with eight elements specifying the levels at which to trigger events.  (See details section below.)
+}
+  \item{alphabet}{
+Character vector of amino acid groupings used to reduce the 20 standard amino acids into smaller groups.  Alphabet reduction helps to find more distant homologies between sequences.  A non-reduced amino acid alphabet can be used by setting \code{alphabet} equal to \code{AA_STANDARD}.  Only applicable if \code{myXStringSet} is an \code{AAStringSet}.
 }
   \item{processors}{
 The number of processors to use, or \code{NULL} to automatically detect and use all available processors.

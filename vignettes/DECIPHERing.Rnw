@@ -161,7 +161,7 @@ The functions of DECIPHER can be grouped into several categories based on intend
 \begin{Schunk}
 \begin{Sinput}
 > source("https://bioconductor.org/biocLite.R")
-> biocLite("DECIPHER")
+> biocLite("BiocUpgrade")
 \end{Sinput}
 \end{Schunk}
 \end{enumerate}

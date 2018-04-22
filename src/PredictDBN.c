@@ -93,6 +93,47 @@ void Traceback(double *MI, int tot, int *unpaired, int *pos, char *states, char 
 	}
 }
 
+double Choose(double N, double K) {
+	double result = 1;
+	for (int i = 1; i <= K; i++) {
+		result *= N - K + i;
+		result /= i;
+	}
+	return result;
+}
+
+double pNoRun(double N, double K, double p) {
+	double prob1 = 0, prob2 = 0;
+	double i = 0;
+	double top, c;
+	while (1) {
+		top = N - (i + 1)*K;
+		if (top < i)
+			break;
+		c = Choose(top, i);
+		prob1 += c*pow(-1*(1 - p)*pow(p, K), i);
+		i++;
+	}
+	prob1 = prob1*pow(p, K);
+	
+	i = 1;
+	while (1) {
+		top = N - i*K;
+		if (top < i)
+			break;
+		c = Choose(top, i);
+		prob2 += c*pow(-1*(1 - p)*pow(p, K), i);
+		i++;
+	}
+	
+	prob1 = 1 - prob1 + prob2;
+	if (isnan(prob1) || prob1 > 1 || prob1 < 0) {
+		return 0;
+	} else {
+		return prob1;
+	}
+}
+
 SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgProdCorr, SEXP slope, SEXP shift, SEXP weights, SEXP pseudoknots, SEXP threshold, SEXP verbose, SEXP pBar, SEXP nThreads)
 {
 	int i, j, k, p, s, d, l;
@@ -102,6 +143,7 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 	// 2 = pairs
 	// 3 = scores
 	// 4 = structures
+	// 5 = search
 	int o = asInteger(output);
 	double minO = asReal(minOccupancy);
 	double *coef = REAL(impact);
@@ -555,7 +597,29 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 				rans[3*pos[i]] = 1 - sum;
 			}
 		}
-	} else { // structures
+	} else { // structures or search
+		// initialize constants for output type "structures"
+		int minLoop = 3;
+		double pMatch = 0.3535533905932737863687; // sqrt(32/256)
+		double NN[256] = { // absolute value of nearest neighbor base pairing free energies
+			0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.93, // AA
+			0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 2.11, 0.00, // AC
+			0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 2.35, 0.00, 1.27, // AG
+			0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 1.33, 0.00, 1.00, 0.00, // AU
+			0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 2.24, 0.00, 0.00, 0.00, 0.00, // CA
+			0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 3.26, 0.00, 0.00, 0.00, 0.00, 0.00, // CC
+			0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 3.42, 0.00, 2.51, 0.00, 0.00, 0.00, 0.00, // CG
+			0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 2.35, 0.00, 1.53, 0.00, 0.00, 0.00, 0.00, 0.00, // CU
+			0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 2.08, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.55, // GA
+			0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 2.36, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 1.41, 0.00, // GC
+			0.00, 0.00, 0.00, 0.00, 0.00, 3.26, 0.00, 2.11, 0.00, 0.00, 0.00, 0.00, 0.00, 1.53, 0.00, 0.00, // GG
+			0.00, 0.00, 0.00, 0.00, 2.11, 0.00, 1.41, 0.00, 0.00, 0.00, 0.00, 0.00, 1.00, 0.00, 0.00, 0.00, // GU
+			0.00, 0.00, 0.00, 1.10, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 1.36, 0.00, 0.00, 0.00, 0.00, // UA
+			0.00, 0.00, 2.08, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 2.11, 0.00, 0.00, 0.00, 0.00, 0.00, // UC
+			0.00, 2.24, 0.00, 1.36, 0.00, 0.00, 0.00, 0.00, 0.00, 2.51, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, // UG
+			0.93, 0.00, 0.55, 0.00, 0.00, 0.00, 0.00, 0.00, 1.27, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00 // UU
+		};
+		
 		leftMax = Calloc(tot, int); // initialized to zero
 		rightMax = Calloc(tot, int); // initialized to zero
 		
@@ -572,13 +636,22 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 		PROTECT(ans = allocVector(VECSXP, x_length));
 		
 		for (s = 0; s < x_length; s++) {
+			//Rprintf("\n\nSEQUENCE = %d", s);
 			x_s = get_elt_from_XStringSet_holder(&x_set, s);
 			
 			n = 0;
 			int *nucs = Calloc(width, int); // initialized to zero
+			int *nogaps = Calloc(width, int); // initialized to zero
 			
 			for (i = 0; i < width; i++) {
 				if (x_s.ptr[i] != 16 && x_s.ptr[i] != 32 && x_s.ptr[i] != 64) {
+					if (x_s.ptr[i] & 0x2) { // C
+						nogaps[n] = 1;
+					} else if (x_s.ptr[i] & 0x4) { // G
+						nogaps[n] = 2;
+					} else if (x_s.ptr[i] & 0x8) { // U
+						nogaps[n] = 3;
+					} // else leave as A
 					nucs[i] = n++;
 				} else {
 					nucs[i] = -1; // no nucleotide at this alignment site
@@ -622,60 +695,307 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 				}
 			}
 			
-			// eliminate single anchors between two unanchored positions
-			int last1[2] = {-1};
-			int last2[2] = {-1};
-			for (i = 0; i < tot; i++) {
-				if (anchor[i] > 0) { // anchored
-					// shift previous
-					last2[0] = last1[0];
-					last2[1] = last1[1];
-					last1[0] = i;
-					last1[1] = anchor[i];
-				} else if (anchor[i] < 0) { // missing anchor
-					if (last1[1] > 0 && last2[1] < 0) { // middle anchor
-						// zero the score
-						if (last1[0] < last1[1]) { // left
-							rans[3*nucs[pos[last1[0]]] + 1] = 0;
-						} else { // right
-							rans[3*nucs[pos[last1[0]]] + 2] = 0;
-						}
-						last1[1] *= -1; // unanchor
-						anchor[last1[0]] = last1[1];
-					}
-					// shift previous
-					last2[0] = last1[0];
-					last2[1] = last1[1];
-					last1[0] = i;
-					last1[1] = anchor[i];
-				}
-			} // else unanchored
-			
-			/*
-			if (s==92) {
+			if (o==5) { // search
+				// eliminate single anchors between two unanchored positions
+				int last1[2] = {-1};
+				int last2[2] = {-1};
 				for (i = 0; i < tot; i++) {
-					if (anchor[i] != 0)
-						Rprintf("\ni = %d nuc = %d anchor = %d pos1 = %d pos2 = %d", i, nucs[pos[i]] + 1, anchor[i] > 0 ? nucs[pos[anchor[i]]] + 1 : -1*(nucs[pos[-1*anchor[i]]] + 1), pos[i] + 1, anchor[i] > 0 ? pos[anchor[i]] + 1 : -1*(pos[-1*anchor[i]] + 1));
+					if (anchor[i] > 0) { // anchored
+						// shift previous
+						last2[0] = last1[0];
+						last2[1] = last1[1];
+						last1[0] = i;
+						last1[1] = anchor[i];
+					} else if (anchor[i] < 0) { // missing anchor
+						if (last1[1] > 0 && last2[1] < 0) { // middle anchor
+							// zero the score
+							if (last1[0] < last1[1]) { // left
+								rans[3*nucs[pos[last1[0]]] + 1] = 0;
+							} else { // right
+								rans[3*nucs[pos[last1[0]]] + 2] = 0;
+							}
+							last1[1] *= -1; // unanchor
+							anchor[last1[0]] = last1[1];
+						}
+						// shift previous
+						last2[0] = last1[0];
+						last2[1] = last1[1];
+						last1[0] = i;
+						last1[1] = anchor[i];
+					} // else unanchored
 				}
-			}
-			*/
-			
-			Free(anchor);
-			
-			// normalize the scores
-			for (i = 0; i < tot; i++) {
-				if (nucs[pos[i]] >= 0) {
-					sum = rans[3*nucs[pos[i]] + 1] + rans[3*nucs[pos[i]] + 2];
-					if (sum > 1) {
-						rans[3*nucs[pos[i]] + 1] /= sum;
-						rans[3*nucs[pos[i]] + 2] /= sum;
-					} else {
-						rans[3*nucs[pos[i]]] = 1 - sum;
+				
+				// flag regions between anchors to trigger search
+				last1[0] = -1; // last left anchor
+				last1[1] = -1; // last right anchor
+				for (i = 0; i < tot; i++) {
+					if (anchor[i] > 0) {
+						if (i < anchor[i]) { // left anchored
+							if (last1[0] < last1[1]) { // right anchored previously
+								if (i - 2 > last1[1]) // space between anchors
+									anchor[last1[1] + 1] = -1*(i - 1); // mark as missing anchor
+								last1[1] = -1; // reset last right anchor
+							}
+							last1[0] = i;
+						} else { // right anchored
+							last1[1] = i;
+						}
+					} else if (anchor[i]==0) { // unanchored
+						if (last1[0] >= 0) {
+							anchor[i] = -1*(anchor[last1[0]] - 1); // mark as missing anchor
+							last1[0] = -1; // reset last left anchor
+							last1[1] = -1; // reset last right anchor
+						}
+					} else { // already a missing anchor
+						last1[0] = -1; // reset last left anchor
+						last1[1] = -1; // reset last right anchor
+					}
+				}
+				
+				// normalize the scores
+				for (i = 0; i < tot; i++) {
+					if (nucs[pos[i]] >= 0) {
+						sum = rans[3*nucs[pos[i]] + 1] + rans[3*nucs[pos[i]] + 2];
+						if (sum > 1) {
+							rans[3*nucs[pos[i]] + 1] /= sum;
+							rans[3*nucs[pos[i]] + 2] /= sum;
+						} else {
+							rans[3*nucs[pos[i]]] = 1 - sum;
+						}
+					}
+				}
+				
+				// fold regions containing missing anchors
+				int range1[2] = {0};
+				int range2[2] = {0};
+				for (i = 0; i < tot; i++) {
+					//Rprintf("\ni = %d anchor = %d nuc = %d nucanchor = %d pos1 = %d pos2 = %d", i, anchor[i], nucs[pos[i]], anchor[i] > 0 ? nucs[pos[anchor[i]]] : 0, pos[i], anchor[i] > 0 ? pos[anchor[i]] : (anchor[i] < 0 ? pos[-1*anchor[i]] : 0));
+					if (anchor[i] > 0) { // anchored
+						range1[0] = i;
+						range2[1] = -1; // flag as new anchor
+					} else if (anchor[i] < 0 && i < -1*anchor[i] && range2[1]==-1) { // new missing left anchor(s)
+						// set right boundary in alignment
+						range2[1] = pos[-1*anchor[i]];
+						range2[0] = range2[1];
+						
+						// commence search for anchor boundaries
+						for (i = i + 1; i < tot; i++) {
+							//Rprintf("\ni = %d anchor = %d nuc = %d nucanchor = %d pos1 = %d pos2 = %d", i, anchor[i], nucs[pos[i]], anchor[i] > 0 ? nucs[pos[anchor[i]]] : 0, pos[i], anchor[i] > 0 ? pos[anchor[i]] : (anchor[i] < 0 ? pos[-1*anchor[i]] : 0));
+							if (anchor[i] > 0) { // anchored
+								range1[1] = i;
+								
+								// search for right boundaries in the sequence
+								int prev, next = 0;
+								for (j = range1[0]; j < tot; j++) {
+									// find the anchor closest to the left-side of the right boundaries
+									if (anchor[j] > 0 && pos[j] < range2[0]) { // anchor before range2[0]
+										prev = j;
+									} else if (pos[j] >= range2[0]) {
+										break;
+									}
+								}
+								for (; j < tot; j++) {
+									// find the anchor closest to the right-side of the right boundaries
+									if (anchor[j] > 0) {
+										if (pos[j] > range2[1])
+											next = j;
+										break;
+									}
+								}
+								if (next==0) // pairing within the right boundaries
+									break;
+								
+								range1[0] = nucs[pos[range1[0]]] + 1;
+								range1[1] = nucs[pos[range1[1]]] - 1;
+								range2[0] = nucs[pos[prev]] + 1;
+								range2[1] = nucs[pos[next]] - 1;
+								//Rprintf("\nBounds left: %d - %d right %d - %d", range1[0], range1[1], range2[0], range2[1]);
+								
+								// find stem loops in the region between range1 and range2
+								int l1 = range1[1] - range1[0];
+								int l2 = range2[1] - range2[0];
+								if (l1 <= 0 || l2 <= 0)
+									break;
+								
+								int *s1 = Calloc(l1, int); // initialized to zero
+								for (j = 0; j < l1; j++)
+									s1[j] = 4*nogaps[range1[0] + j] + nogaps[range1[0] + j + 1];
+								int *s2 = Calloc(l2, int); // initialized to zero
+								for (j = 0; j < l2; j++)
+									s2[j] = nogaps[range2[0] + j] + 4*nogaps[range2[0] + j + 1];
+								
+								double *foldm = Calloc(l1*l2, double); // initialized to zero
+								int *foldn = Calloc(l1*l2, int); // initialized to zero
+								
+								int maxd = 0; // longest possible diagonal traceback
+								int first, pi, pj;
+								double gapN, gapL, gapR; // no gap, gap in range1, gap in range2
+								for (pi = l1 - 1; pi >= 0; pi--) {
+									first = 1;
+									for (pj = 0; pj < l2; pj++) {
+										if (range1[0] + pi + minLoop + 1 < range2[0] + pj) { // require >= minLoop length loops
+											if (first) {
+												int di = l1 - pi;
+												int dj = l2 - pj;
+												if (di < dj) {
+													if (dj > maxd)
+														maxd = dj;
+												} else {
+													if (di > maxd)
+														maxd = di;
+												}
+												first = 0;
+											}
+											
+											if (pi < l1 - 1 && pj > 0) {
+												gapN = foldm[l1*(pj - 1) + pi + 1] + NN[16*s2[pj] + s1[pi]];
+											} else {
+												gapN = NN[16*s2[pj] + s1[pi]];
+											}
+											if (pi < l1 - 1) { // i is unpaired
+												gapL = foldm[l1*pj + pi + 1];
+											} else {
+												gapL = 0;
+											}
+											if (pj > 0) { // j is unpaired
+												gapR = foldm[l1*(pj - 1) + pi];
+											} else {
+												gapR = 0;
+											}
+											
+											if (gapL > gapN && gapL > gapR) {
+												foldm[l1*pj + pi] = gapL;
+												foldn[l1*pj + pi] = -2;
+											} else if (gapR > gapN) {
+												foldm[l1*pj + pi] = gapR;
+												foldn[l1*pj + pi] = -1;
+											} else {
+												if (NN[16*s2[pj] + s1[pi]]==0) {
+													foldn[l1*pj + pi] = -3;
+												} else if (pi < l1 - 1 && pj > 0 && foldn[l1*(pj - 1) + pi + 1] > 0) {
+													foldn[l1*pj + pi] = foldn[l1*(pj - 1) + pi + 1] + 1;
+												} else {
+													foldn[l1*pj + pi] = 1;
+												}
+												foldm[l1*pj + pi] = gapN;
+											}
+										}
+									}
+								}
+								
+								int maxpos[2];
+								maxpos[0] = 0;
+								maxpos[1] = l2 - 1;
+								for (pi = 1; pi < l1; pi++) {
+									if (foldm[l1*maxpos[1] + pi] >= foldm[l1*maxpos[1] + maxpos[0]])
+										maxpos[0] = pi;
+								}
+								for (pj = l2 - 2; pj >= 0; pj--) {
+									if (foldm[l1*pj + maxpos[0]] >= foldm[l1*maxpos[1] + maxpos[0]])
+										maxpos[1] = pj;
+								}
+								pi = maxpos[0];
+								pj = maxpos[1];
+								//Rprintf("\nmyMax = %d %d", pi, pj);
+								
+								double *prob = Calloc(maxd, double); // initialized to zero
+								for (j = 0; j < maxd; j++)
+									prob[j] = -1;
+								
+								while(range2[0] + pj > range1[0] + pi + minLoop + 1 && pi < l1 && pj >= 0) {
+									if (foldn[l1*pj + pi]==-3) { // unpaired
+										if (pi + 1 >= l1 || pj - 1 < 0) {
+											break;
+										} else if (foldn[l1*(pj - 1) + pi + 1] < 0) {
+											pi += 2;
+											pj -= 2;
+										} else {
+											pi++;
+											pj--;
+										}
+									} else if (foldn[l1*pj + pi] > 0) { // paired
+										int val = foldn[l1*pj + pi];
+										if (prob[val - 1] < 0)
+											prob[val - 1] = pNoRun((double)(maxd + 1), (double)(val + 1), pMatch);
+										
+										for (j = 0; j < val + 1; j++) { // add new pairs
+											if (prob[val - 1] > rans[3*(range1[0] + pi + j) + 1]) { // new left pair
+												rans[3*(range1[0] + pi + j) + 1] = prob[val - 1];
+												sum = rans[3*(range1[0] + pi + j) + 1] + rans[3*(range1[0] + pi + j) + 2];
+												if (sum > 1) {
+													rans[3*(range1[0] + pi + j) + 1] /= sum;
+													rans[3*(range1[0] + pi + j) + 2] /= sum;
+												} else if (sum > 0) {
+													rans[3*(range1[0] + pi + j)] = 1 - sum;
+												}
+											}
+											
+											if (prob[val - 1] > rans[3*(range2[0] + pj + 1 - j) + 2]) { // new right pair
+												rans[3*(range2[0] + pj + 1 - j) + 2] = prob[val - 1];
+												sum = rans[3*(range2[0] + pj + 1 - j) + 1] + rans[3*(range2[0] + pj + 1 - j) + 2];
+												if (sum > 1) {
+													rans[3*(range2[0] + pj + 1 - j) + 1] /= sum;
+													rans[3*(range2[0] + pj + 1 - j) + 2] /= sum;
+												} else if (sum > 0) {
+													rans[3*(range2[0] + pj + 1 - j)] = 1 - sum;
+												}
+											}
+										}
+										
+										//Rprintf("\npairing: L %d R %d pos %d", range1[0] + pi, range2[0] + pj + 1, val + 1);
+										//Rprintf(" score = %1.2f", prob[val - 1]);
+										
+										if (pi + val >= l1 || pj - val < 0) {
+											break;
+										} else if (foldn[l1*(pj - val) + pi + val] < 0) {
+											pi = pi + val + 1;
+											pj = pj - val - 1;
+										} else {
+											pi += val;
+											pj -= val;
+										}
+									} else if (foldn[l1*pj + pi]==-2) { // gap in L
+										pi++;
+									} else { // gap in R
+										pj--;
+									}
+								}
+								
+								Free(s1);
+								Free(s2);
+								Free(foldm);
+								Free(foldn);
+								Free(prob);
+								
+								i--; // allow current anchor to be reused
+								break;
+							} else if (anchor[i] < 0) { // missing left anchor
+								//if (pos[-1*anchor[i]] > range2[0])
+								//	break; // inconsistent pairings
+								if (pos[-1*anchor[i]] < range2[0]) // consistent pairing
+									range2[0] = pos[-1*anchor[i]]; // right boundary in alignment
+							}
+						}
+					} // else unanchored
+				}
+				
+				Free(anchor);
+				Free(nucs);
+				Free(nogaps);
+			} else {
+				// normalize the scores
+				for (i = 0; i < tot; i++) {
+					if (nucs[pos[i]] >= 0) {
+						sum = rans[3*nucs[pos[i]] + 1] + rans[3*nucs[pos[i]] + 2];
+						if (sum > 1) {
+							rans[3*nucs[pos[i]] + 1] /= sum;
+							rans[3*nucs[pos[i]] + 2] /= sum;
+						} else {
+							rans[3*nucs[pos[i]]] = 1 - sum;
+						}
 					}
 				}
 			}
-			
-			Free(nucs);
 			
 			SET_VECTOR_ELT(ans, s, ans_s);
 			UNPROTECT(1); // ans_s

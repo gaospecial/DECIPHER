@@ -8,6 +8,7 @@ AlignSeqs <- function(myXStringSet,
 	structures=NULL,
 	FUN=AdjustAlignment,
 	levels=c(0.9, 0.7, 0.7, 0.4, 10, 5, 5, 2),
+	alphabet=AA_REDUCED[[1]],
 	processors=1,
 	verbose=TRUE,
 	...) {
@@ -20,7 +21,7 @@ AlignSeqs <- function(myXStringSet,
 		stop("pattern must be an AAStringSet, DNAStringSet, or RNAStringSet."))
 	l <- length(myXStringSet)
 	if (l < 2)
-		stop("At least two sequences are required.")
+		stop("At least two sequences are required in myXStringSet.")
 	if (!is.null(guideTree)) {
 		if (class(guideTree)=="dendrogram") {
 			if (attr(guideTree, "height") > 0.501)
@@ -96,6 +97,8 @@ AlignSeqs <- function(myXStringSet,
 		stop("levels[7] must be at least zero.")
 	if (levels[8] <= 0)
 		stop("levels[8] must be at least zero.")
+	if (any(alphabet==""))
+		stop("No elements of alphabet can be empty.")
 	if (!is.null(processors) && !is.numeric(processors))
 		stop("processors must be a numeric.")
 	if (!is.null(processors) && floor(processors)!=processors)
@@ -210,7 +213,7 @@ AlignSeqs <- function(myXStringSet,
 					if (dim(structureMatrix)[1] != 3)
 						stop("structureMatrix must be 3 x 3 when structures is NULL.")
 				} else { # use the default structureMatrix
-					structureMatrix <- matrix(c(0, 1, 1, 1, 10, -5, 1, -5, 10),
+					structureMatrix <- matrix(c(4, 2, 2, 2, 24, 0, 2, 0, 24),
 						nrow=3) # order is ., (, )
 				}
 				replace <- FALSE
@@ -230,6 +233,33 @@ AlignSeqs <- function(myXStringSet,
 	
 	# prepare substitution matrix
 	if (type==3L) {
+		r <- strsplit(alphabet, "", fixed=TRUE)
+		alphabet <- setNames(rep(0L, 20),
+			AA_STANDARD)
+		for (i in seq_along(r)) {
+			w <- which(!(r[[i]] %in% AA_STANDARD))
+			if (length(w) > 0)
+				stop("Unrecognized letter(s) found in alphabet:  ",
+					paste(r[[i]][w], collapse=", "),
+					".")
+			w <- which(alphabet[r[[i]]] != 0L)
+			if (length(w) > 0)
+				stop("Repeated amino acids found in alphabet:  ",
+					paste(r[[i]][w], collapse=", "),
+					".")
+			alphabet[r[[i]]] <- i
+		}
+		w <- which(alphabet==0L)
+		if (length(w) > 0)
+			stop("Standard amino acids missing from alphabet:  ",
+				paste(names(w), collapse=", "),
+				".")
+		sizeAA <- max(alphabet)
+		if (sizeAA==1)
+			stop("More than one grouping of amino acids is required in the alphabet.")
+		sizeAA <- as.integer(floor(log(4294967295, sizeAA)))
+		alphabet <- alphabet - 1L
+		
 		subM <- TRUE
 		w <- which(m=="substitutionMatrix")
 		AAs <- c("A", "R", "N", "D", "C", "Q", "E", "G", "H", "I",
@@ -248,7 +278,7 @@ AlignSeqs <- function(myXStringSet,
 					any(!(AAs %in% dimnames(sM)[[2]])))
 					stop("substitutionMatrix is incomplete.")
 			} else {
-				sM <- eval(parse(text=data(list=sM, envir=environment())))
+				sM <- eval(parse(text=data(list=sM, envir=environment(), package=ifelse(substitutionMatrix=="MIQS", "DECIPHER", "Biostrings"))))
 			}
 			sM <- sM[AAs, AAs]
 			sM <- sM + 0 # convert to numeric matrix
@@ -284,11 +314,11 @@ AlignSeqs <- function(myXStringSet,
 			!("misMatch" %in% m) &&
 			!("perfectMatch" %in% m)) {
 			subM <- TRUE
-			sM <- matrix(c(11, 3, 5, 4, 3, 12, 3, 6, 5, 3, 12, 3, 4, 6, 3, 10),
+			sM <- matrix(c(13, 4, 6, 4, 4, 14, 4, 6, 6, 4, 14, 4, 4, 6, 4, 13),
 				nrow=4,
 				ncol=4,
 				dimnames=list(bases, bases))
-			sM2 <- matrix(c(11, 3, 5, 4, 3, 12, 3, 6, 5, 3, 12, 3, 4, 6, 3, 10),
+			sM2 <- matrix(c(13, 4, 6, 4, 4, 14, 4, 6, 6, 4, 14, 4, 4, 6, 4, 13),
 				nrow=4,
 				ncol=4,
 				dimnames=list(DNA_BASES, DNA_BASES))
@@ -326,17 +356,24 @@ AlignSeqs <- function(myXStringSet,
 	
 	w.x <- width(myXStringSet)
 	if (type==3L) {
-		wordSize <- ceiling(log(100*mean(w.x), 9)) - 1
-		if (wordSize > 10)
-			wordSize <- 10
+		wordSize <- ceiling(log(100*quantile(w.x, 0.99),
+			.Call("alphabetSizeReducedAA",
+				myXStringSet,
+				alphabet,
+				PACKAGE="DECIPHER")))
+		if (wordSize > sizeAA)
+			wordSize <- sizeAA
 		if (wordSize < 1)
 			wordSize <- 1
 	} else {
-		wordSize <- ceiling(log(100*mean(w.x), 4)) - 1
+		wordSize <- ceiling(log(100*quantile(w.x, 0.99),
+			.Call("alphabetSize",
+				myXStringSet,
+				PACKAGE="DECIPHER")))
 		if (wordSize > 15)
 			wordSize <- 15
-		if (wordSize < 5)
-			wordSize <- 5
+		if (wordSize < 2)
+			wordSize <- 2
 	}
 	
 	if (is.null(guideTree)) {
@@ -346,7 +383,7 @@ AlignSeqs <- function(myXStringSet,
 				"-mers:\n",
 				sep="")
 			flush.console()
-			pBar <- txtProgressBar(max=100, style=3)
+			pBar <- txtProgressBar(max=100, style=ifelse(interactive(), 3, 1))
 		} else {
 			pBar <- NULL
 		}
@@ -355,9 +392,7 @@ AlignSeqs <- function(myXStringSet,
 			v <- .Call("enumerateSequenceReducedAA",
 				myXStringSet,
 				wordSize,
-				c(A=2L, R=7L, N=6L, D=8L, C=3L, Q=4L, E=8L,
-					G=5L, H=4L, I=1L, L=1L, K=7L, M=0L, F=0L,
-					P=4L, S=6L, T=6L, W=4L, Y=4L, V=1L),
+				alphabet,
 				PACKAGE="DECIPHER")
 		} else { # DNAStringSet or RNAStringSet
 			v <- .Call("enumerateSequence",
@@ -372,6 +407,10 @@ AlignSeqs <- function(myXStringSet,
 			pBar,
 			processors,
 			PACKAGE="DECIPHER")
+		attr(d, "Size") <- l
+		attr(d, "Diag") <- TRUE
+		attr(d, "Upper") <- TRUE
+		class(d) <- "dist"
 		
 		if (verbose) {
 			setTxtProgressBar(pBar, 100)
@@ -400,7 +439,7 @@ AlignSeqs <- function(myXStringSet,
 		time.1 <- Sys.time()
 		cat("Aligning Sequences:\n")
 		flush.console()
-		pBar <- txtProgressBar(style=3, max=100)
+		pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1), max=100)
 		before <- steps <- 0L
 		nsteps <- l - 1L
 	}
@@ -756,13 +795,13 @@ AlignSeqs <- function(myXStringSet,
 		weights <- weights/mean(weights)
 		
 		if (replace) {
-			structureMatrix <- matrix(c(0, 1, 1, 1, 10, -5, 1, -5, 10),
+			structureMatrix <- matrix(c(4, 2, 2, 2, 24, 0, 2, 0, 24),
 				nrow=3) # order is ., (, )
 			replace <- FALSE
 		}
 		
 		PredictDBN(seqs,
-			type="structures",
+			type="search",
 			weight=weights,
 			processors=processors,
 			verbose=verbose)
@@ -904,6 +943,7 @@ AlignSeqs <- function(myXStringSet,
 		}
 		
 		d <- DistanceMatrix(seqs,
+			type="dist",
 			verbose=verbose,
 			processors=processors,
 			includeTerminalGaps=TRUE)
@@ -926,7 +966,7 @@ AlignSeqs <- function(myXStringSet,
 			time.1 <- Sys.time()
 			cat("Realigning Sequences:\n")
 			flush.console()
-			pBar <- txtProgressBar(style=3, max=100)
+			pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1), max=100)
 			before <- steps <- 0L
 			nsteps <- l - 1L
 		}
@@ -1016,7 +1056,7 @@ AlignSeqs <- function(myXStringSet,
 				time.1 <- Sys.time()
 				cat("Refining the alignment:\n")
 				flush.console()
-				pBar <- txtProgressBar(style=3)
+				pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 			}
 			
 			score <- colScores(myXStringSet, structures, weights)

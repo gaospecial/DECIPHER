@@ -1526,13 +1526,17 @@ IdClusters <- function(myDistMatrix=NULL,
 	} else {
 		processors <- as.integer(processors)
 	}
-	if (method != 7 && !is(myDistMatrix, "matrix")) {
-		stop(paste("myDistMatrix must be a matrix for method '", METHODS[method], "'.", sep=""))
-	} else if (method != 7) {
-		dim <- dim(myDistMatrix)
-		if (dim[2]!=dim[1])
-			stop("myDistMatrix is not square.")
-		dim <- dim[1]
+	if (method != 7) {
+		if (is(myDistMatrix, "matrix")) {
+			dim <- dim(myDistMatrix)
+			if (dim[2]!=dim[1])
+				stop("myDistMatrix is not square.")
+			dim <- dim[1]
+		} else if (is(myDistMatrix, "dist")) {
+			dim <- attr(myDistMatrix, "Size")
+		} else {
+			stop(paste("myDistMatrix must be a matrix for method '", METHODS[method], "'.", sep=""))
+		}
 		if (dim < 2)
 			stop("myDistMatrix is too small.")
 		if (typeof(myDistMatrix)=="integer")
@@ -1541,13 +1545,13 @@ IdClusters <- function(myDistMatrix=NULL,
 	if (method == 3) {
 		if (!is(myXStringSet, "DNAStringSet") && !is(myXStringSet, "RNAStringSet"))
 			stop("myXStringSet must be a DNAStringSet or RNAStringSet.")
-		if (length(myXStringSet)!=dim(myDistMatrix)[1])
+		if (length(myXStringSet)!=dim)
 			stop("myDistMatrix must have as many rows as the number of sequences.")
 		if (length(unique(width(myXStringSet))) != 1)
 			stop("All sequences in myXStringSet must be the same width (aligned).")
 		if (!is.null(attr(myDistMatrix, "correction")) &&
 			attr(myDistMatrix, "correction") == "none")
-			stop('myDistMatrix must have a correction with method="ML".')
+			stop('myDistMatrix must have a correction for method="ML".')
 	}
 	
 	if (method == 7) {
@@ -1570,17 +1574,24 @@ IdClusters <- function(myDistMatrix=NULL,
 		
 		if (verbose) {
 			lastValue <- 0
-			pBar <- txtProgressBar(style=3)
+			pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 		}
 		if (typeX==3L) { # AAStringSet
-			wordSize <- ceiling(log(100*mean(width(myXStringSet)), 20))
+			wordSize <- ceiling(log(100*quantile(width(myXStringSet), 0.99),
+				.Call("alphabetSizeReducedAA",
+					myXStringSet,
+					0:19,
+					PACKAGE="DECIPHER")))
 			if (wordSize > 7)
 				wordSize <- 7
 			if (wordSize < 1)
 				wordSize <- 1
 			words <- 20^wordSize
 		} else { # DNAStringSet or RNAStringSet
-			wordSize <- ceiling(log(100*mean(width(myXStringSet)), 4))
+			wordSize <- ceiling(log(100*quantile(width(myXStringSet), 0.99),
+				.Call("alphabetSize",
+					myXStringSet,
+					PACKAGE="DECIPHER")))
 			if (wordSize > 15)
 				wordSize <- 15
 			if (wordSize < 1)
@@ -1625,6 +1636,9 @@ IdClusters <- function(myDistMatrix=NULL,
 		t <- tabulate(x, length(x))[u]
 		
 		cutoff <- cutoff/2 # cluster radius is half the diameter
+		# probability of chance match is (1 - cutoff)^N
+		# N is wordSize - 1 to correct for chance matches
+		threshold <- (1 - cutoff)^(wordSize - 1)
 		for (i in seq_len(lc)) {
 			if (!ASC && i > 1) {
 				o <- u[order(c[u, i - 1],
@@ -1661,11 +1675,12 @@ IdClusters <- function(myDistMatrix=NULL,
 			seeds.nums <- list(v[1L])
 			seeds.seqs <- list(.subset(myXStringSet, o[1]))
 			seeds.clust <- list(1L)
+			seeds.index <- list(o[1])
 			
 			index <- 1L
 			for (j in seq_along(o)[-1]) {
 				if (verbose) {
-					value <- round(((lc - i)*l + j)/lc/l, 2)
+					value <- round(((i - 1)*l + j)/lc/l, 2)
 					if (value > lastValue) {
 						lastValue <- value
 						setTxtProgressBar(pBar, value)
@@ -1703,11 +1718,15 @@ IdClusters <- function(myDistMatrix=NULL,
 						seeds.nums <- list(v[index])
 						seeds.seqs <- list(.subset(myXStringSet, o[j]))
 						seeds.clust <- list(cluster_num)
+						seeds.index <- list(o[j])
+						next
+					} else if (c[o[j], i] > 0) { # cluster pre-assigned
+						c[o[j], i] <- c[c[o[j], i], i]
 						next
 					}
 				}
 				
-				# Determine to which group does the sequence belong
+				# Split the sequences into "alignable" groups
 				m <- .Call("matchListsDual",
 					v[index],
 					seeds.reps,
@@ -1716,6 +1735,7 @@ IdClusters <- function(myDistMatrix=NULL,
 					processors,
 					PACKAGE="DECIPHER")
 				
+				# Determine to which group does the sequence belong
 				# expected number of occurrences of a random word
 				probs <- lengths(seeds.reps)/words
 				probs <- ifelse(probs > 1, 1, probs)
@@ -1734,10 +1754,12 @@ IdClusters <- function(myDistMatrix=NULL,
 					seeds.nums[[nGroups]] <- v[index]
 					seeds.seqs[[nGroups]] <- .subset(myXStringSet, o[j])
 					seeds.clust[[nGroups]] <- cluster_num
+					seeds.index[[nGroups]] <- o[j]
 				} else { # part of an existing group
 					if (length(group) > 1)
 						group <- group[which.max(m[group])]
 					
+					# Try to place into a cluster based on k-mers
 					m <- .Call("matchListsDual",
 						v[index],
 						seeds.nums[[group]],
@@ -1746,11 +1768,18 @@ IdClusters <- function(myDistMatrix=NULL,
 						processors,
 						PACKAGE="DECIPHER")
 					
-					w <- which((1 - m) <= cutoff[i])
+					# percent identity >= threshold
+					w <- which(m >= threshold[i])
 					if (length(w) > 0) {
 						w <- w[which.max(m[w])]
 						c[o[j], i] <- seeds.clust[[group]][w] + offset
-					} else {
+						if (!ASC && i < lc) {
+							cols <- (i + 1):lc
+							cols <- cols[which(m[w] >= threshold[cols])]
+							if (length(cols) > 0) # assign forward
+								c[o[j], cols] <- seeds.index[[group]][w]
+						}
+					} else { # need to align to determine cluster
 						pattern <- .subset(myXStringSet, o[j])
 						
 						weights <- m^3 # emphasize closest sequences
@@ -1758,6 +1787,7 @@ IdClusters <- function(myDistMatrix=NULL,
 						if (any(!is.finite(weights)))
 							weights <- 1
 						
+						# pairwise alignment
 						temp <- AlignProfiles(pattern,
 							seeds.seqs[[group]],
 							s.weight=weights,
@@ -1769,6 +1799,7 @@ IdClusters <- function(myDistMatrix=NULL,
 							FALSE, # penalizeGapGapMatches
 							TRUE, # penalizeGapLetterMatches
 							FALSE, # full matrix
+							1L, # matrix
 							FALSE, # verbose
 							NULL, # pBar
 							processors,
@@ -1777,6 +1808,12 @@ IdClusters <- function(myDistMatrix=NULL,
 						if (length(w) > 0) {
 							w <- w[which.min(d[w])]
 							c[o[j], i] <- seeds.clust[[group]][w] + offset
+							if (!ASC && i < lc) {
+								cols <- (i + 1):lc
+								cols <- cols[which(d[w] <= cutoff[cols])]
+								if (length(cols) > 0) # assign forward
+									c[o[j], cols] <- seeds.index[[group]][w]
+							}
 						} else { # form a new cluster
 							cluster_num <- cluster_num + 1L
 							c[o[j], i] <- cluster_num + offset
@@ -1785,6 +1822,8 @@ IdClusters <- function(myDistMatrix=NULL,
 							seeds.seqs[[group]] <- temp
 							seeds.clust[[group]] <- c(cluster_num,
 								seeds.clust[[group]])
+							seeds.index[[group]] <- c(o[j],
+								seeds.index[[group]])
 						}
 					}
 				}
@@ -1794,70 +1833,30 @@ IdClusters <- function(myDistMatrix=NULL,
 		}
 		myClusters <- as.data.frame(c)
 	} else {
-		w1 <- which(is.infinite(myDistMatrix[lower.tri(myDistMatrix, diag=FALSE)]))
-		if (length(w1) > 0) {
-			if (verbose)
-				warning("myDistMatrix contains infinite values.\n",
-					"Replaced infinite values with max distance >= 1.\n")
-			myDistMatrix[lower.tri(myDistMatrix, diag=FALSE)][w1] <- NA
-		}
-		
-		w2 <- which(is.na(myDistMatrix[lower.tri(myDistMatrix, diag=FALSE)]))
-		if (length(w2) > 0) {
-			if (verbose &&
-				length(w2) > length(w1))
-				warning("myDistMatrix contains NA values.\n",
-					"Replaced NA values with max distance >= 1.\n")
-			max.dist <- max(myDistMatrix[lower.tri(myDistMatrix, diag=FALSE)], na.rm=TRUE)
-			if (max.dist <= 1) {
-				myDistMatrix[lower.tri(myDistMatrix, diag=FALSE)][w2] <- 1
-			} else {
-				myDistMatrix[lower.tri(myDistMatrix, diag=FALSE)][w2] <- max.dist
-			}
-		}
-		
 		# initialize a progress bar
 		if (verbose) {
 			if (method==3) {
 				cat("Constructing initial neighbor-joining tree:\n")
 				flush.console()
 			}
-			pBar <- txtProgressBar(min=0, max=100, initial=0, style=3)
+			pBar <- txtProgressBar(min=0, max=100, initial=0, style=ifelse(interactive(), 3, 1))
 		} else {
 			pBar <- NULL
 		}
 		
-		if (method==1)
-			myClusters <- .Call("clusterNJ",
-				myDistMatrix,
-				cutoff[1],
-				verbose,
-				pBar,
-				processors,
-				PACKAGE="DECIPHER")
-		
-		if (method==2 ||
-			method==4 ||
-			method==5 ||
-			method==6)
-			myClusters <- .Call("clusterUPGMA",
-				myDistMatrix,
-				cutoff[1],
-				method,
-				verbose,
-				pBar,
-				processors,
-				PACKAGE="DECIPHER")
+		myClusters <- .Call("cluster",
+			myDistMatrix,
+			ifelse(method==3, -Inf, cutoff[1]),
+			ifelse(method==3, 1L, method),
+			ifelse(is(myDistMatrix, "matrix"),
+				dim,
+				-dim),
+			verbose,
+			pBar,
+			processors,
+			PACKAGE="DECIPHER")
 		
 		if (method==3) {
-			# create NJ for use as initial tree
-			myClusters <- .Call("clusterNJ",
-				myDistMatrix,
-				cutoff=-Inf,
-				verbose,
-				pBar,
-				processors,
-				PACKAGE="DECIPHER")
 			myClusters <- .reorderClusters(myClusters)
 			
 			m <- matrix(NA,
@@ -2120,14 +2119,19 @@ IdClusters <- function(myDistMatrix=NULL,
 		if (showPlot || type > 1) {
 			# create a dendrogram object
 			myClustersList <- list()
-			if (is.null(dimnames(myDistMatrix)[[1]])) {
+			dNames <- labels(myDistMatrix)
+			if (is.null(dNames)) {
 				myClustersList$labels <- 1:(dim(myClusters)[1] + 1)
 			} else {
-				myClustersList$labels <- dimnames(myDistMatrix)[[1]]
+				if (is(dNames, "list")) {
+					myClustersList$labels <- dNames[[1]]
+				} else {
+					myClustersList$labels <- dNames
+				}
 				
-				w <- which(duplicated(dimnames(myDistMatrix)[[1]]))
+				w <- which(duplicated(myClustersList$labels))
 				if (length(w) > 0) {
-					warning("Duplicated dimnames in dendrogram appended with index.")
+					warning("Duplicated labels in dendrogram appended with index.")
 					myClustersList$labels[w] <- paste(myClustersList$labels[w],
 						w,
 						sep="_")
@@ -2232,14 +2236,16 @@ IdClusters <- function(myDistMatrix=NULL,
 			d <- .applyMidpoints(d, dim)
 		}
 		if (type==1 || type==3) {
-			if (is.null(dimnames(myDistMatrix)[[1]])) {
+			dNames <- labels(myDistMatrix)
+			if (is.null(dNames)) {
 				dNames <- 1:(dim(myClusters)[1] + 1)
 			} else {
-				dNames <- dimnames(myDistMatrix)[[1]]
+				if (is(dNames, "list"))
+					dNames <- dNames[[1]]
 				
 				w <- which(duplicated(dNames))
 				if (length(w) > 0) {
-					warning("Duplicated dimnames in myDistMatrix appended with index.")
+					warning("Duplicated labels in myDistMatrix appended with index.")
 					dNames[w] <- paste(dNames[w],
 						w,
 						sep="_")

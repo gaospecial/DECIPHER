@@ -46,10 +46,10 @@ Either \code{NULL} (the default), a matrix, or a list of matrices with one list 
 Either \code{NULL} (the default), a matrix, or a list of matrices with one list element per sequence in the subject.  (See details section below.)
 }
   \item{perfectMatch}{
-Numeric giving the reward for aligning two matching nucleotides in the alignment.  Only used for \code{DNAStringSet} or \code{RNAStringSet} inputs.
+Numeric giving the reward for aligning two matching nucleotides in the alignment.  Only applicable for \code{DNAStringSet} or \code{RNAStringSet} inputs.
 }
   \item{misMatch}{
-Numeric giving the cost for aligning two mismatched nucleotides in the alignment.  Only used for \code{DNAStringSet} or \code{RNAStringSet} inputs.
+Numeric giving the cost for aligning two mismatched nucleotides in the alignment.  Only applicable for \code{DNAStringSet} or \code{RNAStringSet} inputs.
 }
   \item{gapOpening}{
 Numeric giving the cost for opening a gap in the alignment.

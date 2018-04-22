@@ -191,7 +191,7 @@ StaggerAlignment <- function(myXStringSet,
 		time.1 <- Sys.time()
 		cat("Staggering insertions and deletions:\n")
 		flush.console()
-		pBar <- txtProgressBar(style=3, max=100)
+		pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1), max=100)
 		percentComplete <- before <- 0L
 	}
 	

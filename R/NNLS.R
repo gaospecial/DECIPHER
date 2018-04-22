@@ -48,7 +48,7 @@ NNLS <- function(A,
 	
 	if (verbose) {
 		time.1 <- Sys.time()
-		pBar <- txtProgressBar(max=100, style=3)
+		pBar <- txtProgressBar(max=100, style=ifelse(interactive(), 3, 1))
 	} else {
 		pBar <- NULL
 	}

@@ -30,12 +30,11 @@
 static const R_CallMethodDef callMethods[] = { // method call, pointer, num args
 	{"consensusSequence", (DL_FUNC) &consensusSequence, 6},
 	{"consensusSequenceAA", (DL_FUNC) &consensusSequenceAA, 6},
-	{"clusterNJ", (DL_FUNC) &clusterNJ, 5},
+	{"cluster", (DL_FUNC) &cluster, 7},
 	{"reclusterNJ", (DL_FUNC) &reclusterNJ, 2},
-	{"clusterUPGMA", (DL_FUNC) &clusterUPGMA, 6},
 	{"reclusterUPGMA", (DL_FUNC) &reclusterUPGMA, 2},
 	{"clusterML", (DL_FUNC) &clusterML, 6},
-	{"distMatrix", (DL_FUNC) &distMatrix, 9},
+	{"distMatrix", (DL_FUNC) &distMatrix, 10},
 	{"gaps", (DL_FUNC) &gaps, 2},
 	{"designProbes", (DL_FUNC) &designProbes, 16},
 	{"commonGaps", (DL_FUNC) &commonGaps, 1},
@@ -111,6 +110,8 @@ static const R_CallMethodDef callMethods[] = { // method call, pointer, num args
 	{"parallelMatch", (DL_FUNC) &parallelMatch, 7},
 	{"groupMax", (DL_FUNC) &groupMax, 3},
 	{"removeGaps", (DL_FUNC) &removeGaps, 3},
+	{"alphabetSize", (DL_FUNC) &alphabetSize, 1},
+	{"alphabetSizeReducedAA", (DL_FUNC) &alphabetSizeReducedAA, 2},
 	{NULL, NULL, 0}
 };
 

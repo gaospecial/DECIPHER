@@ -8,6 +8,7 @@ Calculates a distance matrix for an \code{XStringSet}.  Each element of the dist
 }
 \usage{
 DistanceMatrix(myXStringSet,
+               type = "matrix",
                includeTerminalGaps = FALSE,
                penalizeGapLetterMatches = TRUE,
                penalizeGapGapMatches = FALSE,
@@ -18,6 +19,9 @@ DistanceMatrix(myXStringSet,
 \arguments{
   \item{myXStringSet}{
 An \code{XStringSet} object of aligned sequences (\code{DNAStringSet}, \code{RNAStringSet}, or \code{AAStringSet}).
+}
+  \item{type}{
+Character string indicating the type of output desired.  This should be either \code{"matrix"} or \code{"dist"}.  (See value section below.)
 }
   \item{includeTerminalGaps}{
 Logical specifying whether or not to include terminal gaps ("-" or "." characters on each end of the sequence) into the calculation of distance.
@@ -48,7 +52,9 @@ Penalizing gap-to-gap and gap-to-letter mismatches specifies whether to penalize
 The elements of the distance matrix can be referenced by \code{dimnames} corresponding to the \code{names} of the \code{XStringSet}.  Additionally, an attribute named "correction" specifying the method of correction used can be accessed using the function \code{attr}.
 }
 \value{
-A symmetric matrix where each element is the distance between the sequences referenced by the respective row and column.  The \code{dimnames} of the matrix correspond to the \code{names} of the \code{XStringSet}.
+If \code{type} is \code{"matrix"}, a symmetric matrix where each element is the distance between the sequences referenced by the respective row and column.  The \code{dimnames} of the matrix correspond to the \code{names} of the \code{XStringSet}.
+
+If \code{type} is \code{"dist"}, an object of \code{class} \code{"dist"} that contains one triangle of the distance matrix as a vector.  Since the distance matrix is symmetric, storing only one triangle is more memory efficient.
 }
 \author{
 Erik Wright \email{eswright@pitt.edu}
@@ -57,25 +63,46 @@ Erik Wright \email{eswright@pitt.edu}
 \code{\link{IdClusters}}
 }
 \examples{
+# example of using the defaults:
+dna <- DNAStringSet(c("ACTG", "ACCG"))
+dna
+DistanceMatrix(dna)
+
+# changing the output type to "dist":
+d <- DistanceMatrix(dna, type="dist")
+d
+length(d) # minimal memory space required
+m <- as.matrix(d)
+length(m) # more memory space required
+
+# supplying an AAStringSet
+aa <- AAStringSet(c("ASYK", "ATYK", "CTWN"))
+aa
+DistanceMatrix(aa)
+
 # defaults compare intersection of internal ranges:
-dna <- DNAStringSet(c("ANGCT-","-ACCT-"))
+dna <- DNAStringSet(c("ANGCT-", "-ACCT-"))
+dna
 d <- DistanceMatrix(dna)
 # d[1,2] is 1 base in 4 = 0.25
 
-# compare the entire sequence ranges:
-dna <- DNAStringSet(c("ANGCT-","-ACCT-"))
+# compare the entire sequence, including gaps:
+dna <- DNAStringSet(c("ANGCT-", "-ACCT-"))
+dna
 d <- DistanceMatrix(dna, includeTerminalGaps=TRUE,
                     penalizeGapGapMatches=TRUE)
 # d[1,2] is now 3 bases in 6 = 0.50
 
-# compare union of internal ranges:
-dna <- DNAStringSet(c("ANGCT-","-ACCT-"))
+# compare union of internal positions, without terminal gaps:
+dna <- DNAStringSet(c("ANGCT-", "-ACCT-"))
+dna
 d <- DistanceMatrix(dna, includeTerminalGaps=TRUE,
                     penalizeGapGapMatches=FALSE)
 # d[1,2] is now 2 bases in 5 = 0.40
 
 # gap ("-") and unknown (".") characters are interchangeable:
-dna <- DNAStringSet(c("ANGCT.",".ACCT-"))
+dna <- DNAStringSet(c("ANGCT.", ".ACCT-"))
+dna
 d <- DistanceMatrix(dna, includeTerminalGaps=TRUE,
                     penalizeGapGapMatches=FALSE)
 # d[1,2] is still 2 bases in 5 = 0.40

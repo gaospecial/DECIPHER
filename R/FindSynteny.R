@@ -1,16 +1,16 @@
 FindSynteny <- function(dbFile,
 	tblName="Seqs",
 	identifier="",
-	useFrames=FALSE,
-	alphabet=c("MF", "ILV", "A", "C", "WYQHP", "G", "TSN", "RK", "DE"),
+	useFrames=TRUE,
+	alphabet=AA_REDUCED[[1]],
 	geneticCode=GENETIC_CODE,
-	sepCost=-0.01,
-	gapCost=-0.2,
-	shiftCost=-20,
-	codingCost=-3,
-	maxSep=5000,
-	maxGap=5000,
-	minScore=200,
+	sepCost=-1e-6,
+	gapCost=-1e-5,
+	shiftCost=0,
+	codingCost=0,
+	maxSep=8000,
+	maxGap=4000,
+	minScore=20,
 	dropScore=-100,
 	maskRepeats=TRUE,
 	storage=0.5,
@@ -173,10 +173,10 @@ FindSynteny <- function(dbFile,
 		stop("Standard amino acids missing from alphabet:  ",
 			paste(names(w), collapse=", "),
 			".")
-	size <- max(alphabet)
-	if (size==1)
+	sizeAA <- max(alphabet)
+	if (sizeAA==1)
 		stop("More than one grouping of amino acids is required in the alphabet.")
-	n <- as.integer(floor(log(4294967295, size)))
+	n <- as.integer(floor(log(4294967295, sizeAA)))
 	alphabet <- alphabet - 1L
 	
 	results <- matrix(data.frame(),
@@ -222,7 +222,7 @@ FindSynteny <- function(dbFile,
 		l)
 	
 	if (verbose) {
-		pBar <- txtProgressBar(style=3)
+		pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 		tot <- l*(l - 1)/2
 		its <- 0
 	}
@@ -271,6 +271,11 @@ FindSynteny <- function(dbFile,
 			seq1 <- s1
 		}
 		
+		# determine the entropy equivalent alphabet size
+		size <- .Call("alphabetSize",
+			seq1,
+			PACKAGE="DECIPHER")
+		
 		for (g2 in (g1 + 1):l) {
 			s2 <- store[g2][[1L]][["S"]]
 			if (length(s2)==0) {
@@ -311,12 +316,9 @@ FindSynteny <- function(dbFile,
 			# calculate the k-mer size with approximately
 			# a 1% probability of occurring by chance
 			M <- max(width(s1), width(s2))*100
-			N <- as.integer(ceiling(log(M, 4)))
+			N <- as.integer(ceiling(log(M, size)))
 			if (N > 16L)
 				N <- 16L
-			N_AA <- as.integer(ceiling(log(M/3, size)))
-			if (N_AA > n)
-				N_AA <- n
 			
 			E1 <- store[g1][[1L]][["E"]][["nt"]][N][[1L]]
 			if (is.null(E1)) {
@@ -442,6 +444,17 @@ FindSynteny <- function(dbFile,
 					width1 <- cumsum(width(t1))
 					if (length(t1) > 0) {
 						t1 <- AAStringSet(unlist(t1))
+					}
+					
+					# determine the optimal alphabet size
+					if (rF1==1) {
+						sizeAA <- .Call("alphabetSizeReducedAA",
+							t1,
+							alphabet,
+							PACKAGE="DECIPHER")
+						N_AA <- as.integer(ceiling(log(M/3, sizeAA)))
+						if (N_AA > n)
+							N_AA <- n
 					}
 					
 					e1 <- store[g1][[1L]][["E"]][["aa"]][[rF1]][N_AA][[1L]]
@@ -614,6 +627,26 @@ FindSynteny <- function(dbFile,
 			y.f <- y.f[o]
 			weights <- weights[o]
 			
+			# weight = width*log(alphabet size) - log(number of k-mers)
+			# assume width << longest sequence (combined) width
+			maxW <- max(WIDTH1[length(WIDTH1)],
+				WIDTH2[length(WIDTH2)])
+			weights <- as.double(ifelse(x.f==0L,
+				weights*log(size) - log(maxW),
+				weights*log(sizeAA)/3 - log(maxW/3)))
+#			w <- which(weights <= 0)
+#			if (length(w) > 0) {
+#				x.s <- x.s[-w]
+#				x.e <- x.e[-w]
+#				x.i <- x.i[-w]
+#				y.s <- y.s[-w]
+#				y.e <- y.e[-w]
+#				y.i <- y.i[-w]
+#				x.f <- x.f[-w]
+#				y.f <- y.f[-w]
+#				weights <- weights[-w]
+#			}
+			
 			chains <- .Call("chainSegments",
 				x.s,
 				x.e,
@@ -623,9 +656,7 @@ FindSynteny <- function(dbFile,
 				y.e,
 				y.i,
 				y.f,
-				as.double(weights*ifelse(x.f==0L,
-					log(4),
-					log(size)/3)),
+				weights,
 				sepCost,
 				gapCost,
 				shiftCost,
@@ -957,6 +988,26 @@ FindSynteny <- function(dbFile,
 			y.f <- y.f[o]
 			weights <- weights[o]
 			
+			# weight = width*log(alphabet size) - log(number of k-mers)
+			# assume width << longest sequence (combined) width
+			maxW <- max(WIDTH1[length(WIDTH1)],
+				WIDTH2[length(WIDTH2)])
+			weights <- as.double(ifelse(x.f==0L,
+				weights*log(size) - log(maxW),
+				weights*log(sizeAA)/3 - log(maxW/3)))
+#			w <- which(weights <= 0)
+#			if (length(w) > 0) {
+#				x.s <- x.s[-w]
+#				x.e <- x.e[-w]
+#				x.i <- x.i[-w]
+#				y.s <- y.s[-w]
+#				y.e <- y.e[-w]
+#				y.i <- y.i[-w]
+#				x.f <- x.f[-w]
+#				y.f <- y.f[-w]
+#				weights <- weights[-w]
+#			}
+			
 			if (length(y.s) > 0) {
 				d <- max(y.e) - (y.e + y.s)
 			} else {
@@ -971,9 +1022,7 @@ FindSynteny <- function(dbFile,
 				y.e + d,
 				y.i,
 				y.f,
-				as.double(weights*ifelse(x.f==0L,
-					log(4),
-					log(size)/3)),
+				weights,
 				sepCost,
 				gapCost,
 				shiftCost,
@@ -1202,7 +1251,7 @@ FindSynteny <- function(dbFile,
 				
 				widths <- results[g2, g1][[1]][, "end1"] - results[g2, g1][[1]][, "start1"] + 1L
 				remove <- which(remove |
-					widths*log(4) < minScore) # max possible score is too low
+					widths*log(size) < minScore) # max possible score is too low
 				if (length(remove) > 0 || length(hits) > 0) {
 					if (length(remove) > 0)
 						results[g2, g1][[1]] <- results[g2, g1][[1]][-remove,, drop=FALSE]

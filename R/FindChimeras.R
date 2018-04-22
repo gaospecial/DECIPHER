@@ -243,7 +243,7 @@ FindChimeras <- function(dbFile,
 		if (verbose) {
 			cat("\n", group, " (", length(dna), "):\n", sep="")
 			flush.console()
-			pBar <- txtProgressBar(style=3)
+			pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 		}
 		
 		batches <- seq(1, numF, batchSize)
@@ -489,7 +489,7 @@ FindChimeras <- function(dbFile,
 				count <- 0
 				cat("\nSearching Other Groups:\n")
 				flush.console()
-				pBar2 <- txtProgressBar(style=3)
+				pBar2 <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 			}
 			for (other in groups) {
 				if (verbose)

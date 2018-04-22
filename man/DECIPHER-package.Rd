@@ -21,6 +21,7 @@ LazyLoad: \tab yes\cr
 
 Index:
 \preformatted{
+AA_REDUCED               Reduced amino acid alphabets
 Add2DB                   Add Data to a Database
 AdjustAlignment          Improve An Existing Alignment By Adjusting Gap
                          Placements

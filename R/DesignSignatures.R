@@ -5,7 +5,7 @@
 	P,
 	deltaGrules,
 	taqEfficiency=FALSE,
-	maxDistance=.4,
+	maxDistance=0.4,
 	maxGaps=2,
 	align=FALSE,
 	processors=1) {
@@ -343,7 +343,8 @@ DesignSignatures <- function(dbFile,
 	# load dS and dH rules
 	data("deltaSrules",
 		"deltaHrules",
-		envir=environment())
+		envir=environment(),
+		package="DECIPHER")
 	# apply salt correction
 	deltaSrules <- deltaSrules + 0.368*log(ions)/1000
 	# calculate free energy parameters
@@ -370,7 +371,7 @@ DesignSignatures <- function(dbFile,
 			":\n",
 			sep="")
 		flush.console()
-		pBar <- txtProgressBar(style=3)
+		pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 	}
 	for (i in seq_along(identifier)) {
 		dna <- SearchDB(dbConn,
@@ -463,7 +464,7 @@ DesignSignatures <- function(dbFile,
 				sep="")
 		}
 		flush.console()
-		pBar <- txtProgressBar(style=3)
+		pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 	}
 	
 	pdict <- PDict(kmers,
@@ -680,7 +681,7 @@ DesignSignatures <- function(dbFile,
 		time.1 <- Sys.time()
 		cat("\nSelecting the most common primer sequences:\n")
 		flush.console()
-		pBar <- txtProgressBar(style=3)
+		pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 	}
 	
 	f.p <- f.primers
@@ -997,7 +998,7 @@ DesignSignatures <- function(dbFile,
 		time.1 <- Sys.time()
 		cat("\nDetermining PCR products from each group:\n")
 		flush.console()
-		pBar <- txtProgressBar(style=3)
+		pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 	}
 	
 	threePrimeWidth <- floor(kmerSize/2)
@@ -1416,7 +1417,7 @@ DesignSignatures <- function(dbFile,
 		time.1 <- Sys.time()
 		cat("\nScoring primer pair combinations:\n")
 		flush.console()
-		pBar <- txtProgressBar(style=3)
+		pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 		i <- 0
 		previous <- 0
 	}
@@ -1487,7 +1488,7 @@ DesignSignatures <- function(dbFile,
 		time.1 <- Sys.time()
 		cat("\nChoosing optimal forward and reverse pairs:\n")
 		flush.console()
-		pBar <- txtProgressBar(style=3)
+		pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 	}
 	
 	primers <- data.frame(forward_primer=I(character(numPrimerSets)),
@@ -1600,7 +1601,7 @@ DesignSignatures <- function(dbFile,
 			time.1 <- Sys.time()
 			cat("\nFinding the best restriction enzyme:\n")
 			flush.console()
-			pBar <- txtProgressBar(style=3)
+			pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 		}
 		
 		f.p <- DNAStringSet(primers$forward_primer)
@@ -1861,8 +1862,7 @@ DesignSignatures <- function(dbFile,
 						cuts <- DigestDNA(enzymes[en],
 							products,
 							type="positions",
-							strand="top",
-							processors=processors)
+							strand="top")
 						pieces <- unlist(lapply(cuts,
 							function(x)
 								length(x[[1]])))

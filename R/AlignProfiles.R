@@ -187,7 +187,7 @@ AlignProfiles <- function(pattern,
 				stop("substitutionMatrix is incomplete.")
 			subMatrix <- substitutionMatrix
 		} else {
-			subMatrix <- eval(parse(text=data(list=substitutionMatrix, envir=environment())))
+			subMatrix <- eval(parse(text=data(list=substitutionMatrix, envir=environment(), package=ifelse(substitutionMatrix=="MIQS", "DECIPHER", "Biostrings"))))
 		}
 		subMatrix <- subMatrix[AAs, AAs]
 		subMatrix <- as.numeric(subMatrix)
@@ -205,7 +205,7 @@ AlignProfiles <- function(pattern,
 				stop("substitutionMatrix must be NULL or a matrix.")
 			}
 		} else if (type==2L && missing(perfectMatch) && missing(misMatch)) {
-			sM <- matrix(c(11, 3, 5, 4, 3, 12, 3, 6, 5, 3, 12, 3, 4, 6, 3, 10),
+			sM <- matrix(c(13, 4, 6, 4, 4, 14, 4, 6, 6, 4, 14, 4, 4, 6, 4, 13),
 				nrow=4,
 				ncol=4,
 				dimnames=list(bases, bases))
@@ -235,7 +235,7 @@ AlignProfiles <- function(pattern,
 				structureMatrix <- matrix(c(6, 1, -2, 1, 13, 0, -2, 0, 1),
 					nrow=3) # order is H, E, C
 			} else {
-				structureMatrix <- matrix(c(0, 1, 1, 1, 10, -5, 1, -5, 10),
+				structureMatrix <- matrix(c(4, 2, 2, 2, 24, 0, 2, 0, 24),
 					nrow=3) # order is ., (, )
 			}
 		} else {

@@ -441,14 +441,15 @@ SEXP matchListsDual(SEXP x, SEXP y, SEXP verbose, SEXP pBar, SEXP nThreads)
 	return ans;
 }
 
-// matrix of d[i, j] = ordered matches (x[i], x[j]) / min(length)
+// dist matrix = ordered matches (x[i], x[j]) / min(length)
 // requires a list of unsorted integers retaining the order of x
 SEXP matchOrder(SEXP x, SEXP verbose, SEXP pBar, SEXP nThreads)
 {	
-	int i, j, size_x = length(x), before, v, *rPercentComplete;
+	R_xlen_t i, j, size_x = xlength(x);
+	int before, v, *rPercentComplete;
 	int lx, ly, *X, *Y;
 	SEXP ans;
-	PROTECT(ans = allocMatrix(REALSXP, size_x, size_x));
+	PROTECT(ans = allocVector(REALSXP, size_x*(size_x - 1)/2));
 	double *rans = REAL(ans);
 	SEXP percentComplete, utilsPackage;
 	v = asLogical(verbose);
@@ -461,9 +462,6 @@ SEXP matchOrder(SEXP x, SEXP verbose, SEXP pBar, SEXP nThreads)
 		// make it possible to access R functions from the utils package for the progress bar
 		PROTECT(utilsPackage = eval(lang2(install("getNamespace"), ScalarString(mkChar("utils"))), R_GlobalEnv));
 	}
-	
-	for (i = 0; i < size_x; i++)
-		*(rans + i*size_x + i) = 0;
 	
 	for (i = 0; i < size_x; i++) {
 		#pragma omp parallel for private(j, X, Y, lx, ly) schedule(guided) num_threads(nthreads)
@@ -527,12 +525,10 @@ SEXP matchOrder(SEXP x, SEXP verbose, SEXP pBar, SEXP nThreads)
 			}
 			
 			if (lx < ly) {
-				*(rans + i*size_x + j) = 1 - (double)matches/(double)lx;
+				rans[size_x*i - i*(i + 1)/2 + j - i - 1] = 1 - (double)matches/(double)lx;
 			} else {
-				*(rans + i*size_x + j) = 1 - (double)matches/(double)ly;
+				rans[size_x*i - i*(i + 1)/2 + j - i - 1] = 1 - (double)matches/(double)ly;
 			}
-			
-			*(rans + i + j*size_x) = *(rans + i*size_x + j);
 		}
 		
 		if (v) {

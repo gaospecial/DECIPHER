@@ -27,7 +27,7 @@ PredictHEC <- function(myAAStringSet,
 	if (length(background) != 3)
 		stop("background must be length 3.")
 	if (is.null(HEC_MI1)) {
-		data("HEC_MI1", envir=environment())
+		data("HEC_MI1", envir=environment(), package="DECIPHER")
 	} else {
 		if (!is.double(HEC_MI1))
 			stop("HEC_MI1 must be an array of numerics.")
@@ -40,7 +40,7 @@ PredictHEC <- function(myAAStringSet,
 			stop("HEC_MI1 must have dimensions 20 x (2*windowSize + 1) x 3.")
 	}
 	if (is.null(HEC_MI2)) {
-		data("HEC_MI2", envir=environment())
+		data("HEC_MI2", envir=environment(), package="DECIPHER")
 	} else {
 		if (!is.double(HEC_MI2))
 			stop("HEC_MI2 must be an array of numerics.")

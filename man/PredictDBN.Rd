@@ -14,7 +14,7 @@ PredictDBN(myXStringSet,
            avgProdCorr = 1,
            slope = 2,
            shift = 1.3,
-           threshold = 0.5,
+           threshold = 0.7,
            pseudoknots = 1,
            weight = 1,
            processors = 1,
@@ -25,7 +25,7 @@ PredictDBN(myXStringSet,
 A \code{DNAStringSet} or \code{RNAStringSet} object containing aligned sequences.
 }
   \item{type}{
-Character string indicating the type of results desired.  This should be (an unambiguous abbreviation of) one of \code{"states"}, \code{"pairs"}, \code{"scores"}, or \code{"structures"}.
+Character string indicating the type of results desired.  This should be (an unambiguous abbreviation of) one of \code{"states"}, \code{"pairs"}, \code{"scores"}, \code{"structures"}, or \code{"search"}.  (See value section below.)
 }
   \item{minOccupancy}{
 Numeric specifying the minimum occupancy (1 - fraction of gaps) required to include a column of the alignment in the prediction.
@@ -91,6 +91,8 @@ If \code{type} is \code{"pairs"}, then a matrix is returned with one row for eac
 If \code{type} is \code{"scores"}, then a matrix of three rows is returned, where the values in a column represent the maximum score for a state in each position.  Columns sum to \code{1} if the position was above \code{minOccupancy} and \code{0} otherwise.
 
 If \code{type} is \code{"structures"}, then the output is a list with one element for each sequence in \code{myXStringSet}.  Each list element contains a matrix of dimension 3 (each state) by the number of nucleotides in the sequence.  Columns of the matrix sum to zero where the nucleotide was located in a position that was below \code{minOccupancy}.  Otherwise, positions are considered paired if they are consistent with pairing (i.e., A/U, C/G, or G/U) in the consensus secondary structure.
+
+If \code{type} is \code{"search"} then an attempt is made to find additional secondary structure beyond positions exhibiting covariation.  First, anchors are identified as pairs of covarying positions with their score above \code{threshold}.  Next, the regions between anchors are searched for previously unidentified stem loops.  Finally, any helices are assigned a score according to their length, i.e. one minus the probability of finding that many consecutive pairs within the anchor boundaries by chance.  Hence, output \code{type} \code{"search"} will find secondary structure outside of the consensus structure shared by most sequences, and can identify secondary structure in conserved alignment regions.
 }
 \references{
 Buslje, C., et al. (2009). Correction for phylogeny, small number of observations and data redundancy improves the identification of coevolving amino acid pairs using mutual information. Bioinformatics, \bold{25(9)}, 1125-1131.
@@ -106,16 +108,33 @@ Erik Wright \email{eswright@pitt.edu}
 \code{\link{PredictHEC}}
 }
 \examples{
+# load the example non-coding RNA sequences
 db <- system.file("extdata", "Bacteria_175seqs.sqlite", package="DECIPHER")
 rna <- SearchDB(db, type="RNAStringSet")
-p <- PredictDBN(rna, "states")
-p
 
-# color paired bases in the sequences
-w <- which(!(strsplit(p, "")[[1]] \%in\% c(".", "-")))
-BrowseSeqs(c(BStringSet(p), BStringSet(rna)),
-           colorPatterns=rep(w, each=2),
-           patterns=RNA_BASES)
+# predict the secondary structure in dot-bracket notation (dbn)
+p <- PredictDBN(rna, "states") # predict the secondary structure in dbn
+p # pairs are denoted by (), and (optionally) pseudoknots by [], {}, and <>
 
-PredictDBN(rna, "pairs") # paired positions
+# convert the dot-bracket notation into pairs of positions within the alignment
+p <- PredictDBN(rna, "pairs") # paired positions in the alignment
+head(p) # matrix giving the pairs and their pseudoknot order (when > 0)
+
+# determine the score at every alignment position
+p <- PredictDBN(rna, "scores") # score in the alignment
+p["(", 122] # score for left-pairing at alignment position 122
+p[")", 260] # score for right-pairing at alignment position 260
+
+# find the scores individually for every sequence in the alignment
+p <- PredictDBN(rna, "structures") # scores per sequence
+p[[1]][, 1] # the scores for the first position in the first sequence
+p[[2]][, 10] # the scores for the tenth position in the second sequence
+# these positional scores can be used as shades of red, green, and blue:
+BrowseSeqs(rna, patterns=p) # red = unpaired, green = left-pairing, blue = right
+# positions in black are not part of the consensus secondary structure
+
+# search for additional secondary structure between the consensus pairs
+p <- PredictDBN(rna, "search") # scores per sequence after searching
+BrowseSeqs(rna, patterns=p) # red = unpaired, green = left-pairing, blue = right
+# note that "search" identified many more pairings than "structures"
 }

@@ -10,16 +10,16 @@ Finds syntenic blocks between groups of sequences in a database.
 FindSynteny(dbFile,
             tblName = "Seqs",
             identifier = "",
-            useFrames = FALSE,
-            alphabet = c("MF", "ILV", "A", "C", "WYQHP", "G", "TSN", "RK", "DE"),
+            useFrames = TRUE,
+            alphabet = AA_REDUCED[[1]],
             geneticCode = GENETIC_CODE,
-            sepCost = -0.01,
-            gapCost = -0.2,
-            shiftCost = -20,
-            codingCost = -3,
-            maxSep = 5000,
-            maxGap = 5000,
-            minScore = 200,
+            sepCost = -1e-6,
+            gapCost = -1e-5,
+            shiftCost = 0,
+            codingCost = 0,
+            maxSep = 8000,
+            maxGap = 4000,
+            minScore = 20,
             dropScore = -100,
             maskRepeats = TRUE,
             storage = 0.5,
@@ -37,7 +37,7 @@ Character string specifying the table where the sequences are located.
 Optional character string used to narrow the search results to those matching a specific identifier.  If "" then all identifiers are selected.
 }
   \item{useFrames}{
-Logical specifying whether to use 6-frame amino acid translations to help find more distant hits.  If \code{FALSE} (the default) then faster but less sensitive to distant homology.
+Logical specifying whether to use 6-frame amino acid translations to help find more distant hits.  Using the \code{alphabet} is helpful when the genome is largely composed of coding DNA.  If \code{FALSE} then faster but less sensitive to distant homology.
 }
   \item{alphabet}{
 Character vector of amino acid groupings used to reduce the 20 standard amino acids into smaller groups.  Alphabet reduction helps to find more distant homologies between sequences.  A non-reduced amino acid alphabet can be used by setting \code{alphabet} equal to \code{AA_STANDARD}.
@@ -64,7 +64,7 @@ Maximal separation (in nucleotides) between hits in the same block.
 The maximum number of gaps between hits in the same block.
 }
   \item{minScore}{
-The minimum score required for a chain of hits to become a block.
+The minimum score required for a chain of hits to become a block.  Higher values of \code{minScore} are less likely to yield false positive hits.  Recommended values are between \code{20} (the default) and \code{40}.
 }
   \item{dropScore}{
 The change from maximal score required to stop extending blocks.
@@ -96,7 +96,7 @@ Erik Wright \email{eswright@pitt.edu}
 }
 \examples{
 db <- system.file("extdata", "Influenza.sqlite", package="DECIPHER")
-synteny <- FindSynteny(db, useFrames=TRUE, minScore=50)
+synteny <- FindSynteny(db)
 synteny
 pairs(synteny) # scatterplot matrix
 }

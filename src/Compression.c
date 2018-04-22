@@ -1819,7 +1819,7 @@ SEXP decompress(SEXP x, SEXP nThreads)
 					} else if (p[j]==254 || p[j]==255) { // repeat
 						int rev = (p[j]==254) ? 0 : 1;
 						unsigned int start = 0;
-						unsigned int len = 0;
+						unsigned int replen = 0;
 						j++;
 						
 						if (c > 16777215) {
@@ -1827,32 +1827,32 @@ SEXP decompress(SEXP x, SEXP nThreads)
 							start |= p[j++] << 16;
 							start |= p[j++] << 8;
 							start |= p[j++];
-							len |= p[j++] << 24;
-							len |= p[j++] << 16;
-							len |= p[j++] << 8;
-							len |= p[j];
+							replen |= p[j++] << 24;
+							replen |= p[j++] << 16;
+							replen |= p[j++] << 8;
+							replen |= p[j];
 						} else if (c > 65535) {
 							start |= p[j++] << 16;
 							start |= p[j++] << 8;
 							start |= p[j++];
-							len |= p[j++] << 16;
-							len |= p[j++] << 8;
-							len |= p[j];
+							replen |= p[j++] << 16;
+							replen |= p[j++] << 8;
+							replen |= p[j];
 						} else if (c > 255) {
 							start |= p[j++] << 8;
 							start |= p[j++];
-							len |= p[j++] << 8;
-							len |= p[j];
+							replen |= p[j++] << 8;
+							replen |= p[j];
 						} else {
 							start |= p[j++];
-							len |= p[j];
+							replen |= p[j];
 						}
 						
 						if (rev==0) { // exact repeat
-							for (k = 0; k < len; k++, start++, c++)
+							for (k = 0; k < replen; k++, start++, c++)
 								s[c] = s[start];
 						} else { // revcomp repeat
-							for (k = 0; k < len; k++, start--, c++) {
+							for (k = 0; k < replen; k++, start--, c++) {
 								switch (s[start]) {
 									case 'A':
 										s[c] = 'T';
