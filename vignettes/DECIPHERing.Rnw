@@ -147,8 +147,9 @@ The functions of DECIPHER can be grouped into several categories based on intend
 \item Install \Rpackage{DECIPHER} in R by entering:
 \begin{Schunk}
 \begin{Sinput}
-> source("https://bioconductor.org/biocLite.R")
-> biocLite("DECIPHER")
+> if (!requireNamespace("BiocManager", quietly=TRUE))
+    > install.packages("BiocManager")
+> BiocManager::install("DECIPHER")
 \end{Sinput}
 \end{Schunk}
 \end{enumerate}
@@ -160,8 +161,9 @@ The functions of DECIPHER can be grouped into several categories based on intend
 \item Reinstall \Rpackage{DECIPHER} in R by entering:
 \begin{Schunk}
 \begin{Sinput}
-> source("https://bioconductor.org/biocLite.R")
-> biocLite("BiocUpgrade")
+> if (!requireNamespace("BiocManager", quietly=TRUE))
+    > install.packages("BiocManager")
+> BiocManager::install("BiocUpgrade")
 \end{Sinput}
 \end{Schunk}
 \end{enumerate}
@@ -175,8 +177,9 @@ The functions of DECIPHER can be grouped into several categories based on intend
 \item Install \Rpackage{Biostrings} in R by entering:
 \begin{Schunk}
 \begin{Sinput}
-> source("https://bioconductor.org/biocLite.R")
-> biocLite("Biostrings")
+> if (!requireNamespace("BiocManager", quietly=TRUE))
+    > install.packages("BiocManager")
+> BiocManager::install("Biostrings")
 \end{Sinput}
 \end{Schunk}
 \item Install \Rpackage{RSQLite} in R by entering:
