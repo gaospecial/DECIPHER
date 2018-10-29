@@ -152,7 +152,7 @@ db <- system.file("extdata", "Bacteria_175seqs.sqlite", package="DECIPHER")
 \dontrun{
 # High Resolution Melt (HRM) assay:
 primers <- DesignSignatures(db,
-           resolution=seq(80, 100, 0.25), # degrees Celsius
+           resolution=seq(75, 100, 0.25), # degrees Celsius
            minProductSize=55, # base pairs
            maxProductSize=400)
 

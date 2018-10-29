@@ -5,7 +5,7 @@ IdTaxa <- function(test,
 	threshold=60,
 	bootstraps=100,
 	samples=L^0.47,
-	minDescend=1,
+	minDescend=0.98,
 	processors=1,
 	verbose=TRUE) {
 	

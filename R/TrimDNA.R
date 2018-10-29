@@ -6,10 +6,10 @@ TrimDNA <- function(myDNAStringSet,
 	maxDistance=0.1,
 	minOverlap=5,
 	allowInternal=TRUE,
-	alpha=0.2,
-	threshold=0.02,
-	maxAverageError=threshold/2,
-	maxAmbiguities=0.01,
+	alpha=0.1,
+	threshold=0.01,
+	maxAverageError=threshold,
+	maxAmbiguities=0.1,
 	minWidth=36,
 	verbose=TRUE) {
 	
@@ -27,14 +27,14 @@ TrimDNA <- function(myDNAStringSet,
 	if (length(leftPatterns)==0)
 		stop("leftPatterns must be at least length one.")
 	if (class(leftPatterns) %in% c("DNAString", "DNAStringSet")) {
-		leftPattern <- as.character(leftPatterns)
+		leftPatterns <- as.character(leftPatterns)
 	} else if (!is.character(leftPatterns)) {
 		stop("leftPatterns must be a DNAStringSet or character vector.")
 	}
 	if (length(rightPatterns)==0)
 		stop("rightPatterns must be at least length one.")
 	if (class(rightPatterns) %in% c("DNAString", "DNAStringSet")) {
-		rightPattern <- as.character(rightPatterns)
+		rightPatterns <- as.character(rightPatterns)
 	} else if (!is.character(rightPatterns)) {
 		stop("rightPatterns must be a DNAStringSet or character vector.")
 	}
@@ -137,7 +137,7 @@ TrimDNA <- function(myDNAStringSet,
 		if (verbose) {
 			n <- length(left) - length(x) - n
 			cat(round(n/length(left)*100, 1),
-				"% flanking\n",
+				"% flanking\n\n",
 				sep="")
 			flush.console()
 		}
@@ -195,7 +195,7 @@ TrimDNA <- function(myDNAStringSet,
 	
 	if (!is.null(quality)) {
 		if (verbose) {
-			cat("\nTrimming by quality score: ")
+			cat("Trimming by quality score: ")
 			flush.console()
 		}
 		bounds <- .Call("movAvg",
@@ -216,7 +216,7 @@ TrimDNA <- function(myDNAStringSet,
 			cat(100*round(length(wl)/length(lefts), 1),
 				"% left, ",
 				100*round(length(wr)/length(rights), 1),
-				"% right\n",
+				"% right\n\n",
 				sep="")
 			flush.console()
 		}
@@ -257,7 +257,6 @@ TrimDNA <- function(myDNAStringSet,
 			names=ns)
 	
 	if (verbose) {
-		cat("\n")
 		time.2 <- Sys.time()
 		print(round(difftime(time.2,
 			time.1,

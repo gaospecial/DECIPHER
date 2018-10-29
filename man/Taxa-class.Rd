@@ -14,6 +14,7 @@ Taxonomic classification is the process of assigning an organism a label that is
 \method{plot}{Taxa}(x,
     y = NULL,
     showRanks = TRUE,
+    n = NULL,
     \dots)
 
 \method{print}{Taxa}(x,
@@ -28,6 +29,9 @@ An (optional) object of class \code{Taxa} with the opposite subclass as \code{x}
 }
   \item{showRanks}{
 Logical specifying whether to show all rank levels when plotting an object of class \code{Taxa} and subclass \code{Test}.  If \code{TRUE} (the default), then ranks are shown as (colored) concentric rings with radial lines delimiting taxa boundaries.
+}
+  \item{n}{
+Numeric vector giving the frequency of each classification if \code{x} or \code{y} is an object of subclass \code{Test}, or the default (\code{NULL}) to treat all classifications as occurring once.  Typically, specifying \code{n} is useful when the classifications represent varying numbers of observations, e.g., when only unique sequences were originally classified.
 }
   \item{\dots}{
 Other optional parameters.

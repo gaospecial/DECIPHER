@@ -144,6 +144,7 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 	// 3 = scores
 	// 4 = structures
 	// 5 = search
+	// 6 = evidence
 	int o = asInteger(output);
 	double minO = asReal(minOccupancy);
 	double *coef = REAL(impact);
@@ -423,6 +424,7 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 	// apply sigmoidal transformation
 	sh *= minVal; // shift
 	sl /= -1*(sh - minVal); // -slope
+	n = 0; // number of positions above threshold
 	for (i = 0; i < (tot - 1); i++) {
 		for (j = i + 1; j < tot; j++) {
 			MI[i*tot + j] = 1/(1 + exp(sl*log(MI[i*tot + j]/sh)));
@@ -430,6 +432,8 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 				MI[i*tot + j] = 0;
 			} else if (o < 3 && MI[i*tot + j] < thresh) {
 				MI[i*tot + j] = 0;
+			} else if (o==6 &&  MI[i*tot + j] >= thresh) {
+				n++;
 			}
 			//Rprintf("\ni = %d j = %d MI = %1.2f", pos[i] + 1, pos[j] + 1, MI[i*tot + j]);
 		}
@@ -596,6 +600,25 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 			} else {
 				rans[3*pos[i]] = 1 - sum;
 			}
+		}
+	} else if (o==6) { // evidence
+		PROTECT(ans = allocMatrix(REALSXP, n, 3));
+		rans = REAL(ans);
+		
+		int count = 0;
+		for (i = 0; i < (tot - 1); i++) {
+			for (j = i + 1; j < tot; j++) {
+				if (MI[i*tot + j] >= thresh) {
+					rans[count] = pos[i] + 1; // left pair
+					rans[count + n] = pos[j] + 1; // right pair
+					rans[count + 2*n] = MI[i*tot + j]; // score
+					count++;
+					if (count==n)
+						break;
+				}
+			}
+			if (count==n)
+				break;
 		}
 	} else { // structures or search
 		// initialize constants for output type "structures"

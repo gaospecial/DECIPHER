@@ -619,15 +619,14 @@ int extend(const Chars_holder *S1, const Chars_holder *S2, int *s1_start, int *s
 		}
 		
 		if (v1==v2) { // perfect match
-			score += 2;
+			score += 1; // score increases by about +1 per nucleotide
 		} else if ((v1==0 && v2==2) || // A/G
 			(v1==2 && v2==0) || // G/A
 			(v1==1 && v2==3) || // C/T
 			(v1==3 && v2==1)) { // T/C
-			// transition
-			score -= 1;
-		} else { // transversion
-			score -= 2;
+			score -= 2; // allow ~33% transitions
+		} else {
+			score -= 3; // allow ~25% transversions
 		}
 		
 		if (score > max) {

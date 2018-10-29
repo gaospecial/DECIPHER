@@ -15,10 +15,10 @@ TrimDNA(myDNAStringSet,
         maxDistance = 0.1,
         minOverlap = 5,
         allowInternal = TRUE,
-        alpha = 0.2,
-        threshold = 0.02,
-        maxAverageError = threshold/2,
-        maxAmbiguities = 0.01,
+        alpha = 0.1,
+        threshold = 0.01,
+        maxAverageError = threshold,
+        maxAmbiguities = 0.1,
         minWidth = 36,
         verbose = TRUE)
 }
@@ -87,6 +87,7 @@ Erik Wright \email{eswright@pitt.edu}
 \code{\link{CorrectFrameshifts}}
 }
 \examples{
+# simple example of trimming a single sequence
 dna <- DNAStringSet("AAAAAAAAAATTACTTCCCCCCCCCC")
 qscores <- PhredQuality("0000000000AAAAAAAAAAAAAAAA")
 
@@ -104,4 +105,15 @@ end(x[[1]])
 width(x[[1]])
 
 x[[2]]
+
+# example of trimming a FASTQ file by quality scores
+fpath <- system.file("extdata",
+	"s_1_sequence.txt",
+	package="Biostrings")
+reads <- readDNAStringSet(fpath, "fastq", with.qualities=TRUE)
+TrimDNA(reads,
+	leftPatterns="",
+	rightPatterns="",
+	type="sequences",
+	quality=PhredQuality(mcols(reads)$qualities))
 }

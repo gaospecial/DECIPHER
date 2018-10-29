@@ -1868,12 +1868,20 @@ IdClusters <- function(myDistMatrix=NULL,
 						"-LnL", "AICc", "BIC")))
 			
 			if (!(length(model)==1 && model[1]=="JC69")) {
-				N <- sum(ifelse(apply(consensusMatrix(myXStringSet),
-							2,
-							function(x)
-								return(length(which(x[1:14] > 0)))) > 1,
-						1,
-						0))
+				a <- apply(consensusMatrix(myXStringSet),
+					2,
+					function(x)
+						sum(x[1:14] > 0)) > 1
+				N <- sum(a)
+				
+				# remove invariant sites
+				#if (N > 0) {
+				#	myXStringSet <- as(lapply(extractAt(myXStringSet,
+				#				IRanges(start=which(a), width=1)),
+				#			unlist),
+				#		class(myXStringSet))
+				#}
+				
 				if (verbose)
 					cat("\n")
 				for (i in 1:length(model)) {
@@ -2054,12 +2062,14 @@ IdClusters <- function(myDistMatrix=NULL,
 				if (abs(.bestLnL - currentLnL) < 1e0 &&
 					currentNNIs==.NNIs) {
 					temp_params <- model_params
-				} else {
+				} else if (!(length(model)==1 && model[1]=="JC69")) {
 					m[1,] <- .optimizeModel(myClusters,
 						rownames(m),
 						myXStringSet,
 						N,
 						processors=processors)
+					temp_params <- .giveParams(as.numeric(m[1:7]))
+				} else {
 					temp_params <- .giveParams(as.numeric(m[1:7]))
 				}
 				

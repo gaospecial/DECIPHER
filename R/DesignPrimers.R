@@ -629,12 +629,12 @@ DesignPrimers <- function(tiles,
 		if (length(w) > 0)
 			primers <- primers[-w,]
 		d <- dim(primers)[1]
-		if (d==0) {
+		if (d <= 1) { # need at least two primers
 			warning("No primers met the specified constraints: ", id)
 			next
 		}
 		if (verbose) {
-			cat(" (", d, "):\n", sep="")
+			cat(" (", d, " candidate primers):\n", sep="")
 			flush.console()
 			pBar <- txtProgressBar(min=0, max=100, initial=0, style=ifelse(interactive(), 3, 1))
 		}

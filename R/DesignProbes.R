@@ -1100,7 +1100,7 @@ DesignProbes <- function(tiles,
 		}
 		
 		if (verbose) {
-			cat(" (", d, "):\n", sep="")
+			cat(" (", d, " candidate probe", ifelse(d==1, "", "s"), "):\n", sep="")
 			flush.console()
 			pBar <- txtProgressBar(min=0, max=100, initial=0, style=ifelse(interactive(), 3, 1))
 		}

@@ -338,7 +338,7 @@ DesignSignatures <- function(dbFile,
 	# set the seed for repeatable sampling
 	last.seed <- .Random.seed
 	set.seed(1234)
-	on.exit({.Random.seed <- last.seed})
+	on.exit({.Random.seed <- last.seed}, add=TRUE)
 	
 	# load dS and dH rules
 	data("deltaSrules",
@@ -799,7 +799,7 @@ DesignSignatures <- function(dbFile,
 		names(r.primers) <- as.numeric(names(r.primers)) + (p.r + hits.r)/max_hits
 		
 		if (verbose)
-			setTxtProgressBar(pBar, i/(length(identifier) - 1))
+			setTxtProgressBar(pBar, i/length(identifier))
 	}
 	
 	# eliminate primers with fewest hits

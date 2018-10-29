@@ -457,10 +457,10 @@ SEXP cluster(SEXP x, SEXP cutoff, SEXP method, SEXP l, SEXP verbose, SEXP pBar, 
 					rans[3*(length - 1) + k] = 0;
 					rans[4*(length - 1) + k] = 0;
 				} else if (rans[4*(length - 1) + k] < 0) {
-					rans[3*(length - 1) + k] = -1*rans[4*(length - 1) + k]; // add difference to other branch
+					rans[3*(length - 1) + k] += -1*rans[4*(length - 1) + k]; // add difference to other branch
 					rans[4*(length - 1) + k] = 0;
 				} else if (rans[3*(length - 1) + k] < 0) {
-					rans[4*(length - 1) + k] = -1*rans[3*(length - 1) + k];
+					rans[4*(length - 1) + k] += -1*rans[3*(length - 1) + k]; // add difference to other branch
 					rans[3*(length - 1) + k] = 0;
 				}
 			} else {
@@ -521,10 +521,10 @@ SEXP cluster(SEXP x, SEXP cutoff, SEXP method, SEXP l, SEXP verbose, SEXP pBar, 
 					rans[3*(length - 1) + k] = 0;
 					rans[4*(length - 1) + k] = 0;
 				} else if (rans[4*(length - 1) + k] < 0) {
-					rans[3*(length - 1) + k] = -1*rans[4*(length - 1) + k]; // add difference to other branch
+					rans[3*(length - 1) + k] += -1*rans[4*(length - 1) + k]; // add difference to other branch
 					rans[4*(length - 1) + k] = 0;
 				} else if (rans[3*(length - 1) + k] < 0) {
-					rans[4*(length - 1) + k] = -1*rans[3*(length - 1) + k];
+					rans[4*(length - 1) + k] += -1*rans[3*(length - 1) + k]; // add difference to other branch
 					rans[3*(length - 1) + k] = 0;
 				}
 			} else {
@@ -561,10 +561,10 @@ SEXP cluster(SEXP x, SEXP cutoff, SEXP method, SEXP l, SEXP verbose, SEXP pBar, 
 					rans[3*(length - 1) + k] = 0;
 					rans[4*(length - 1) + k] = 0;
 				} else if (rans[4*(length - 1) + k] < 0) {
-					rans[3*(length - 1) + k] = -1*rans[4*(length - 1) + k]; // add difference to other branch
+					rans[3*(length - 1) + k] += -1*rans[4*(length - 1) + k]; // add difference to other branch
 					rans[4*(length - 1) + k] = 0;
 				} else if (rans[3*(length - 1) + k] < 0) {
-					rans[4*(length - 1) + k] = -1*rans[3*(length - 1) + k];
+					rans[4*(length - 1) + k] += -1*rans[3*(length - 1) + k]; // add difference to other branch
 					rans[3*(length - 1) + k] = 0;
 				}
 			} else {

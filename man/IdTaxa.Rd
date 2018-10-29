@@ -14,7 +14,7 @@ IdTaxa(test,
        threshold = 60,
        bootstraps = 100,
        samples = L^0.47,
-       minDescend = 1,
+       minDescend = 0.98,
        processors = 1,
        verbose = TRUE)
 }
@@ -41,7 +41,7 @@ Integer giving the number of bootstrap replicates to perform for each sequence.
 A function or call written as a function of `L', which will evaluate to a numeric vector the same length as `L'.  Typically of the form ``\code{A + B*L^C}'', where `A', `B', and `C' are constants.
 }
   \item{minDescend}{
-Numeric giving the minimum fraction of \code{bootstraps} required to descend the tree during the initial tree descend phase of the algorithm.  Higher values are less likely to descend the tree, causing direct comparison against more sequences in the \code{trainingSet}.
+Numeric giving the minimum fraction of \code{bootstraps} required to descend the tree during the initial tree descend phase of the algorithm.  Higher values are less likely to descend the tree, causing direct comparison against more sequences in the \code{trainingSet}.  Lower values may increase classification speed at the expense of accuracy.  Suggested values are between \code{1.0} and \code{0.9}.
 }
   \item{processors}{
 The number of processors to use, or \code{NULL} to automatically detect and use all available processors.
@@ -68,7 +68,7 @@ If the classifier was trained with a set of \code{rank}s, a character vector con
 If \code{type} is \code{"collapsed"} then a character vector is returned with the taxonomic assignment for each sequence.  This takes the repeating form ``Taxon name [rank, confidence\%]; ...'' if \code{rank}s were supplied during training, or ``Taxon name [confidence\%]; ...'' otherwise.
 }
 \references{
-Coming soon!
+Murali, A., et al. (2018). IDTAXA: a novel approach for accurate taxonomic classification of microbiome sequences. Microbiome, 6, 140. https://doi.org/10.1186/s40168-018-0521-5
 }
 \author{
 Erik Wright \email{eswright@pitt.edu}

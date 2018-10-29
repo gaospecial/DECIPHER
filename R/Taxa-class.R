@@ -7,7 +7,8 @@
 	final.angle=270,
 	col,
 	cex=1,
-	circle=TRUE) {
+	circle=TRUE,
+	font=rep(1, length(x))) {
 	labels <- as.graphicsAnnot(labels)
 	x <- c(0, cumsum(x)/sum(x)*final.angle/360)
 	dx <- diff(x)
@@ -86,28 +87,37 @@
 				labels[i],
 				xpd=TRUE,
 				srt=ifelse(P$x < 0,
-					P$an/pi*180+180,
+					P$an/pi*180 + 180,
 					P$an/pi*180),
 				adj=ifelse(P$x < 0,
 					1,
 					0),
-				cex=cex)
+				cex=cex,
+				font=font[i])
 		}
 	}
 	par(p)
 }
 
-.plotIDs <- function(x, showRanks) {
+.plotIDs <- function(x, showRanks, n) {
 	taxa <- lapply(x,
 		function(x)
 			x[[1]][-1])
 	d <- which(!duplicated(taxa))
 	u <- taxa[d]
-	u <- unique(taxa)
 	m <- match(taxa, u)
-	tot <- table(m)
+	tot <- tapply(n, m, sum)
 	
 	if (all(lengths(x[d]) > 2)) {
+		hasRanks <- TRUE
+		lastRank <- sapply(x[d],
+			function(x) {
+				if (startsWith(tail(x[[1]], n=1), "unclassified_")) {
+					""
+				} else {
+					tail(x[[3]], n=1)
+				}
+			})
 		rank <- lapply(x[d],
 			function(x)
 				x[[3]][-1])
@@ -143,6 +153,7 @@
 		}
 		u_ranks <- temp[-c(1, length(temp))]
 	} else {
+		hasRanks <- FALSE
 		rank <- lapply(u,
 			function(x) {
 				paste("Level", seq_along(x))
@@ -183,6 +194,8 @@
 		as.data.frame(t(idsTbl)))
 	tot <- tot[o]
 	idsTbl <- idsTbl[, o, drop=FALSE]
+	if (hasRanks)
+		lastRank <- lastRank[o]
 	
 	org_colors <- rainbow(length(o), s=0.6)
 	colors <- col2rgb(org_colors)
@@ -209,15 +222,22 @@
 		}
 		if (i==l) { # draw outer ring
 			names(t)[t < 0.01] <- ""
+			if (hasRanks) {
+				font <- ifelse(lastRank %in% c("genus", "species"), 3, 1)
+			} else {
+				font <- 1
+			}
 			if (showRanks) {
 				.spoke(t,
 					col=cols,
-					cex=0.8)
+					cex=0.8,
+					font=font)
 			} else {
 				.spoke(t,
 					col=cols,
 					cex=0.8,
-					final.angle=360)
+					final.angle=360,
+					font=font)
 				break
 			}
 		} else {
@@ -268,7 +288,7 @@
 	return(ans)
 }
 
-plot.Taxa <- function(x, y=NULL, showRanks=TRUE, ...) {
+plot.Taxa <- function(x, y=NULL, showRanks=TRUE, n=NULL, ...) {
 	if (class(x)[1] != "Taxa")
 		stop("x must be an object of class 'Taxa'.")
 	if (!is.logical(showRanks))
@@ -289,6 +309,16 @@ plot.Taxa <- function(x, y=NULL, showRanks=TRUE, ...) {
 		} else {
 			stop("x has unrecognized class: ", class(x)[2])
 		}
+		if (is.null(n)) {
+			n <- rep(1, length(test))
+		} else {
+			if (length(n) != length(test))
+				stop("n has the wrong length.")
+			if (!is.numeric(n))
+				stop("n must be a numeric.")
+			if (any(n <= 0))
+				stop("n must all be greater than zero.")
+		}
 		
 		layout(matrix(1:2),
 			heights=c(2, 1))
@@ -300,18 +330,17 @@ plot.Taxa <- function(x, y=NULL, showRanks=TRUE, ...) {
 			upone <- sapply(test,
 				function(x)
 					tail(x$taxon, n=2)[1])
-			t <- table(groups)
-			t <- t/sum(t)
+			t <- sort(unique(groups))
 			
 			# record the lowest taxon present in taxa
-			m <- match(names(t), groups)
-			groups <- names(t)
+			m <- match(t, groups)
+			groups <- t
 			w <- which(!(groups %in% train$taxa))
 			if (length(w) > 0)
 				groups[w] <- upone[m[w]]
 			
 			# Create a pie chart
-			colors <- .plotIDs(test, showRanks)
+			colors <- .plotIDs(test, showRanks, n)
 			
 			# Create a taxonomic tree
 			makeTree <- function(I) {
@@ -372,6 +401,8 @@ plot.Taxa <- function(x, y=NULL, showRanks=TRUE, ...) {
 			par(p)
 		}
 	} else if (class(x)[2]=="Train") {
+		if (!is.null(n))
+			stop("n must be NULL if x is of class 'Train'.")
 		layout(matrix(c(1, 2, 3, 1, 2, 4), nrow=3))
 		
 		# Create a taxonomic tree
@@ -498,8 +529,18 @@ plot.Taxa <- function(x, y=NULL, showRanks=TRUE, ...) {
 		
 		par(p)
 	} else if (class(x)[2]=="Test") {
+		if (is.null(n)) {
+			n <- rep(1, length(x))
+		} else {
+			if (length(n) != length(x))
+				stop("n must be the same length as x.")
+			if (!is.numeric(n))
+				stop("n must be a numeric.")
+			if (any(n <= 0))
+				stop("n must all be greater than zero.")
+		}
 		if (length(x) > 0)
-			.plotIDs(x, showRanks)
+			.plotIDs(x, showRanks, n)
 	} else {
 		stop("x has unrecognized class: ", class(x)[2])
 	}

@@ -148,22 +148,8 @@ The functions of DECIPHER can be grouped into several categories based on intend
 \begin{Schunk}
 \begin{Sinput}
 > if (!requireNamespace("BiocManager", quietly=TRUE))
-    > install.packages("BiocManager")
++     install.packages("BiocManager")
 > BiocManager::install("DECIPHER")
-\end{Sinput}
-\end{Schunk}
-\end{enumerate}
-
-\subsection{Update to the Latest Version}
-
-\begin{enumerate}
-\item Update \R{} to the latest version available from \underline{\url{http://www.r-project.org/}}.
-\item Reinstall \Rpackage{DECIPHER} in R by entering:
-\begin{Schunk}
-\begin{Sinput}
-> if (!requireNamespace("BiocManager", quietly=TRUE))
-    > install.packages("BiocManager")
-> BiocManager::install("BiocUpgrade")
 \end{Sinput}
 \end{Schunk}
 \end{enumerate}
@@ -178,7 +164,7 @@ The functions of DECIPHER can be grouped into several categories based on intend
 \begin{Schunk}
 \begin{Sinput}
 > if (!requireNamespace("BiocManager", quietly=TRUE))
-    > install.packages("BiocManager")
++     install.packages("BiocManager")
 > BiocManager::install("Biostrings")
 \end{Sinput}
 \end{Schunk}
@@ -194,7 +180,7 @@ The functions of DECIPHER can be grouped into several categories based on intend
 \subsubsection{Mac OS X}
 
 \begin{enumerate}
-\item First install Command Line Tools in the App Store.  Then, in \R{} run:
+\item First install Command Line Tools from Apple, which contains compliers that are required to build packages on the Mac.  Next, you must install the clang complier available \underline{\url{https://cran.r-project.org/bin/macosx/tools/}{here}}.  Then, in \R{} run:
 \begin{Schunk}
 \begin{Sinput}
 > install.packages("<<path to Mac OS X DECIPHER.tgz>>", repos=NULL)

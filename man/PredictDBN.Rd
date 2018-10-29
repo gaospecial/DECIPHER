@@ -25,7 +25,7 @@ PredictDBN(myXStringSet,
 A \code{DNAStringSet} or \code{RNAStringSet} object containing aligned sequences.
 }
   \item{type}{
-Character string indicating the type of results desired.  This should be (an unambiguous abbreviation of) one of \code{"states"}, \code{"pairs"}, \code{"scores"}, \code{"structures"}, or \code{"search"}.  (See value section below.)
+Character string indicating the type of results desired.  This should be (an unambiguous abbreviation of) one of \code{"states"}, \code{"pairs"}, \code{"evidence"}, \code{"scores"}, \code{"structures"}, or \code{"search"}.  (See value section below.)
 }
   \item{minOccupancy}{
 Numeric specifying the minimum occupancy (1 - fraction of gaps) required to include a column of the alignment in the prediction.
@@ -46,7 +46,7 @@ Numeric giving the relative shift of the sigmoid used to convert mutual informat
 Numeric specifying the score threshold at which to consider positions for pairing.  Only applicable if \code{type} is \code{"states"} or \code{"pairs"}.
 }
   \item{pseudoknots}{
-Integer indicating the maximum order of pseudoknots that are acceptable.  A value of \code{0} will prevent pseudoknots in the structure, whereas \code{1} (the default) will search for first-order psuedoknots.
+Integer indicating the maximum order of pseudoknots that are acceptable.  A value of \code{0} will prevent pseudoknots in the structure, whereas \code{1} (the default) will search for first-order psuedoknots.  Only used if \code{type} is \code{"states"} or \code{"pairs"}.
 }
   \item{weight}{
 A numeric vector of weights for each sequence, or a single number implying equal weights.
@@ -88,6 +88,8 @@ If \code{type} is \code{"states"} (the default), then the output is a character 
 
 If \code{type} is \code{"pairs"}, then a matrix is returned with one row for each base pairing and three columns giving the positions of the paired bases and their \code{pseudoknot} order.
 
+If \code{type} is \code{"evidence"}, then a matrix is returned with one row for each base pairing and three columns giving the positions of the paired bases and their respective scores (greater than or equal to \code{threshold}).  This differs from \code{type} \code{"pairs"} in that \code{"evidence"} does not perform a traceback.  Therefore, it is possible to have conflicting evidence where a single base has evidence for pairing with multiple other bases.
+
 If \code{type} is \code{"scores"}, then a matrix of three rows is returned, where the values in a column represent the maximum score for a state in each position.  Columns sum to \code{1} if the position was above \code{minOccupancy} and \code{0} otherwise.
 
 If \code{type} is \code{"structures"}, then the output is a list with one element for each sequence in \code{myXStringSet}.  Each list element contains a matrix of dimension 3 (each state) by the number of nucleotides in the sequence.  Columns of the matrix sum to zero where the nucleotide was located in a position that was below \code{minOccupancy}.  Otherwise, positions are considered paired if they are consistent with pairing (i.e., A/U, C/G, or G/U) in the consensus secondary structure.
@@ -119,6 +121,10 @@ p # pairs are denoted by (), and (optionally) pseudoknots by [], {}, and <>
 # convert the dot-bracket notation into pairs of positions within the alignment
 p <- PredictDBN(rna, "pairs") # paired positions in the alignment
 head(p) # matrix giving the pairs and their pseudoknot order (when > 0)
+
+# show all available evidence of base pairing
+p <- PredictDBN(rna, "evidence") # all pairs with scores >= threshold
+head(p) # matrix giving the pairs and their scores
 
 # determine the score at every alignment position
 p <- PredictDBN(rna, "scores") # score in the alignment

@@ -21,7 +21,7 @@ PredictDBN <- function(myXStringSet,
 	u <- unique(width(myXStringSet))
 	if (length(u)!=1)
 		stop("Sequences in myXStringSet must be the same width (aligned).")
-	TYPES <- c("states", "pairs", "scores", "structures", "search")
+	TYPES <- c("states", "pairs", "scores", "structures", "search", "evidence")
 	if (length(type)==0)
 		stop("No type specified.")
 	type <- pmatch(type, TYPES)
@@ -36,6 +36,8 @@ PredictDBN <- function(myXStringSet,
 			return(matrix(nrow=0, ncol=3, dimnames=list(NULL, c("(", ")", "order"))))
 		} else if (type==3L) {
 			return(matrix(nrow=3, ncol=0, dimnames=list(c(".", "(", ")"), NULL)))
+		} else if (type==6L) {
+			return(matrix(nrow=0, ncol=3, dimnames=list(NULL, c("(", ")", "score"))))
 		} else {
 			x <- matrix(0, nrow=3, ncol=0, dimnames=list(c(".", "(", ")"), NULL))
 			x <- lapply(seq_len(l),
@@ -167,9 +169,7 @@ PredictDBN <- function(myXStringSet,
 		ans <- matrix(c(c1[o], c2[o], c3[o]),
 			ncol=3,
 			dimnames=list(NULL, c("(", ")", "order")))
-	}
-	
-	if (type==3L) {
+	} else if (type==3L) {
 		rownames(ans) <- c(".", "(", ")")
 	} else if (type==4L) {
 		ans <- lapply(ans,
@@ -177,6 +177,8 @@ PredictDBN <- function(myXStringSet,
 				rownames(x) <- c(".", "(", ")")
 				return(x)
 			})
+	} else if (type==6L) {
+		colnames(ans) <- c("(", ")", "score")
 	}
 	
 	if (verbose) {

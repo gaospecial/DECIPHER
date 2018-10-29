@@ -112,7 +112,7 @@ Character vector containing any taxonomic groups that repeatedly had problems wi
 }
 }
 \references{
-Coming soon!
+Murali, A., et al. (2018). IDTAXA: a novel approach for accurate taxonomic classification of microbiome sequences. Microbiome, 6, 140. https://doi.org/10.1186/s40168-018-0521-5
 }
 \author{
 Erik Wright \email{eswright@pitt.edu}

@@ -324,7 +324,7 @@ head(assignment)
 
 \subsection{Plotting the results}
 
-We can also plot the results, as shown in Figure \ref{f2}.  This produces a pie chart showing the relative abundance of the taxonomic groups assigned to test sequences.  It also displays the training taxonomic tree, with edges colored where they match the taxonomic groups shown in the pie chart.  Note that we could also have only plotted the pie chart by omitting the \code{trainingSet}.
+We can also plot the results, as shown in Figure \ref{f2}.  This produces a pie chart showing the relative abundance of the taxonomic groups assigned to test sequences.  It also displays the training taxonomic tree, with edges colored where they match the taxonomic groups shown in the pie chart.  Note that we could also have only plotted the pie chart by omitting the \code{trainingSet}.  Also, it is possible to specify the parameter \Rfunarg{n} if each classification represents to a varying number of sequences, e.g., when only unique sequences were originally classified.
 
 \begin{centerfig}
 <<expr16,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6>>=

@@ -172,7 +172,7 @@ TYPE <- "melt"
 MIN_SIZE <- 55 # base pairs
 MAX_SIZE <- 400
 # the recommended values for resolution
-RESOLUTION <- seq(80, 100, 0.25) # degrees Celsius
+RESOLUTION <- seq(75, 100, 0.25) # degrees Celsius
 LEVELS <- 10
 @
 

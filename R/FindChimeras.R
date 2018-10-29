@@ -102,7 +102,7 @@ FindChimeras <- function(dbFile,
 	
 	if (is.character(dbFileReference)) {
 		dbConn2 = dbConnect(driver, dbFileReference)
-		on.exit(dbDisconnect(dbConn2))
+		on.exit(dbDisconnect(dbConn2), add=TRUE)
 	} else {
 		dbConn2 = dbFileReference
 		if (!inherits(dbConn2,"SQLiteConnection")) 
@@ -187,6 +187,9 @@ FindChimeras <- function(dbFile,
 	m <- integer()
 	rns <- integer()
 	
+	if (verbose)
+		pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
+	
 	for (group in myGroups) {
 		if (firstRound2) {
 			group_dna <- SearchDB(dbConn2,
@@ -240,19 +243,10 @@ FindChimeras <- function(dbFile,
 		dna <- u_dna
 		numF <- length(dna)
 		
-		if (verbose) {
-			cat("\n", group, " (", length(dna), "):\n", sep="")
-			flush.console()
-			pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
-		}
-		
 		batches <- seq(1, numF, batchSize)
 		
 		# for all sequences
 		for (j in batches) {
-			if (verbose)
-				setTxtProgressBar(pBar, j/numF)
-			
 			# subset of the whole group's sequence set
 			seqs <- j:(j + batchSize - 1)
 			# remove sequences beyond length of sequence set
@@ -480,16 +474,11 @@ FindChimeras <- function(dbFile,
 			
 			# for each group where the fragment did not originate
 			if (verbose) {
-				if ((j + batchSize - 1) >= numF) {
-					setTxtProgressBar(pBar, 1)
-					close(pBar)
-				} else {
-					cat("\n")
-				}
+				beg <- j - 1
+				fin <- j + batchSize
+				if (fin > numF)
+					fin <- numF
 				count <- 0
-				cat("\nSearching Other Groups:\n")
-				flush.console()
-				pBar2 <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 			}
 			for (other in groups) {
 				if (verbose)
@@ -662,15 +651,8 @@ FindChimeras <- function(dbFile,
 					}
 				}
 				if (verbose)
-					setTxtProgressBar(pBar2, count/length(groups))
-			}
-			if (verbose) {
-				setTxtProgressBar(pBar2, 1)
-				close(pBar2)
-				if ((j + batchSize - 1) < numF) {
-					cat("\n", group, " (", numF, "):\n", sep="")
-					flush.console()
-				}
+					setTxtProgressBar(pBar,
+						(beg + (fin - beg)*count/length(groups))/numF)
 			}
 			
 			# initialize fragment variables
@@ -685,12 +667,6 @@ FindChimeras <- function(dbFile,
 				else
 					all_results <- rbind(all_results, result)
 			}
-		}
-		
-		if (verbose) {
-			if (pBar$getVal() < 1)
-				setTxtProgressBar(pBar, 1)
-			close(pBar)
 		}
 	}
 	
@@ -711,6 +687,8 @@ FindChimeras <- function(dbFile,
 			verbose=FALSE)
 	
 	if (verbose) {
+		setTxtProgressBar(pBar, 1)
+		close(pBar)
 		if (is.null(all_results)) {
 			cat("\nNo chimeras found.")
 		} else {

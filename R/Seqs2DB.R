@@ -191,12 +191,12 @@ Seqs2DB <- function(seqs,
 			} else {
 				con <- gzfile(seqs, "rb")
 			}
-			on.exit(close(con))
+			on.exit(close(con), add=TRUE)
 		} else if (inherits(seqs, "connection")) {
 			con <- seqs
 			if (!isOpen(con)) {
 				open(con, type="rb")
-				on.exit(close(con))
+				on.exit(close(con), add=TRUE)
 			}
 		} else {
 			stop("seqs must be a file path or connection.")
@@ -245,8 +245,9 @@ Seqs2DB <- function(seqs,
 			if (buffer != "")
 				r <- paste(buffer, r, sep=ifelse(newline, "\n", ""))
 			newline <- substr(r, nchar(r), nchar(r))=="\n"
+			r <- gsub("\r\n", "\n", r, useBytes=TRUE, fixed=TRUE)
+			r <- gsub("\r", "\n", r, useBytes=TRUE, fixed=TRUE)
 			r <- strsplit(r, "\n", useBytes=TRUE, fixed=TRUE)[[1]]
-			r <- gsub("\r", "", r, useBytes=TRUE, fixed=TRUE)
 			
 			# descriptions contains the line index of each sequence
 			descriptions <- which(substr(r, 1L, 1L)==">")
@@ -347,12 +348,12 @@ Seqs2DB <- function(seqs,
 			} else {
 				con <- gzfile(seqs, "rb")
 			}
-			on.exit(close(con))
+			on.exit(close(con), add=TRUE)
 		} else if (inherits(seqs, "connection")) {
 			con <- seqs
 			if (!isOpen(con)) {
 				open(con, type="rb")
-				on.exit(close(con))
+				on.exit(close(con), add=TRUE)
 			}
 		} else {
 			stop("seqs must be a file path or connection.")
@@ -402,8 +403,9 @@ Seqs2DB <- function(seqs,
 			if (buffer != "")
 				r <- paste(buffer, r, sep=ifelse(newline, "\n", ""))
 			newline <- substr(r, nchar(r), nchar(r))=="\n"
+			r <- gsub("\r\n", "\n", r, useBytes=TRUE, fixed=TRUE)
+			r <- gsub("\r", "\n", r, useBytes=TRUE, fixed=TRUE)
 			r <- strsplit(r, "\n", useBytes=TRUE, fixed=TRUE)[[1]]
-			r <- gsub("\r", "", r, useBytes=TRUE, fixed=TRUE)
 			
 			# descriptions contains the line index of each sequence
 			descriptions <- which(substr(r, 1L, 1L)=="@")
@@ -495,12 +497,12 @@ Seqs2DB <- function(seqs,
 			} else {
 				con <- gzfile(seqs, "rb")
 			}
-			on.exit(close(con))
+			on.exit(close(con), add=TRUE)
 		} else if (inherits(seqs, "connection")) {
 			con <- seqs
 			if (!isOpen(con)) {
 				open(con, type="rb")
-				on.exit(close(con))
+				on.exit(close(con), add=TRUE)
 			}
 		} else {
 			stop("seqs must be a file path or connection.")
@@ -550,8 +552,9 @@ Seqs2DB <- function(seqs,
 			if (buffer != "")
 				r <- paste(buffer, r, sep=ifelse(newline, "\n", ""))
 			newline <- substr(r, nchar(r), nchar(r))=="\n"
+			r <- gsub("\r\n", "\n", r, useBytes=TRUE, fixed=TRUE)
+			r <- gsub("\r", "\n", r, useBytes=TRUE, fixed=TRUE)
 			r <- strsplit(r, "\n", useBytes=TRUE, fixed=TRUE)[[1]]
-			r <- gsub("\r", "", r, useBytes=TRUE, fixed=TRUE)
 			
 			# descriptions contains the line index of each sequence
 			descriptions <- which(substr(r, 1L, 5L)=="LOCUS")

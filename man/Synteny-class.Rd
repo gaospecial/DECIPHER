@@ -42,7 +42,7 @@ Syntenic blocks are DNA segments composed of conserved hits occurring in the sam
 }
 \arguments{
   \item{x}{
-An object of class ``Synteny''.
+An object of class \code{Synteny}.
 }
   \item{bounds}{
 Logical specifying whether to plot sequence boundaries as horizontal or vertical lines.
