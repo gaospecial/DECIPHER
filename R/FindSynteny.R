@@ -4,13 +4,13 @@ FindSynteny <- function(dbFile,
 	useFrames=TRUE,
 	alphabet=AA_REDUCED[[1]],
 	geneticCode=GENETIC_CODE,
-	sepCost=-0.01,
-	gapCost=-0.1,
+	sepCost=0,
+	gapCost=-0.01,
 	shiftCost=0,
 	codingCost=0,
 	maxSep=2000,
-	maxGap=200,
-	minScore=20,
+	maxGap=500,
+	minScore=40,
 	dropScore=-100,
 	maskRepeats=TRUE,
 	storage=0.5,
@@ -313,9 +313,10 @@ FindSynteny <- function(dbFile,
 				seq2 <- s2
 			}
 			
-			# calculate the k-mer size with approximately
-			# a 1% probability of occurring by chance
-			M <- max(width(s1), width(s2))*100
+			# calculate the k-mer size with 10%
+			# probability of occuring by chance
+			M <- max(WIDTH1[length(WIDTH1)],
+				WIDTH2[length(WIDTH2)])*10
 			N <- as.integer(ceiling(log(M, size)))
 			if (N > 16L)
 				N <- 16L
@@ -604,6 +605,8 @@ FindSynteny <- function(dbFile,
 				x.f <- unlist(x.f)
 				y.f <- unlist(y.f)
 				weights <- unlist(weights)
+				maxW <- max(WIDTH1[length(WIDTH1)],
+					WIDTH2[length(WIDTH2)])*10 # equivalent to ~10 searches
 			} else {
 				x.s <- starts1
 				x.e <- ends1
@@ -613,6 +616,8 @@ FindSynteny <- function(dbFile,
 				y.i <- index2
 				x.f <- y.f <- rep(0L, length(starts1))
 				weights <- widths
+				maxW <- max(WIDTH1[length(WIDTH1)],
+					WIDTH2[length(WIDTH2)])
 			}
 			
 			# order by increasing sequence index in g1
@@ -628,12 +633,13 @@ FindSynteny <- function(dbFile,
 			weights <- weights[o]
 			
 			# weight = width*log(alphabet size) - log(number of k-mers)
-			# assume width << longest sequence (combined) width
-			maxW <- max(WIDTH1[length(WIDTH1)],
-				WIDTH2[length(WIDTH2)])
+			# assumes width << longest sequence (combined) width
+			# the number of k-mers in search space is approximated as
+			# the longest sequence times the number of times searched
+			# where the number of times searched is ~(sep + gap)
 			weights <- as.double(ifelse(x.f==0L,
-				weights*log(size) - log(maxW),
-				weights*log(sizeAA)/3 - log(maxW/3)))
+				weights*log(size),
+				weights*log(sizeAA)/3))
 #			w <- which(weights <= 0)
 #			if (length(w) > 0) {
 #				x.s <- x.s[-w]
@@ -665,6 +671,7 @@ FindSynteny <- function(dbFile,
 				maxGap,
 				order(x.i, x.e) - 1L,
 				minScore,
+				maxW,
 				PACKAGE="DECIPHER")
 			
 			scores <- chains[[2]]
@@ -988,13 +995,9 @@ FindSynteny <- function(dbFile,
 			y.f <- y.f[o]
 			weights <- weights[o]
 			
-			# weight = width*log(alphabet size) - log(number of k-mers)
-			# assume width << longest sequence (combined) width
-			maxW <- max(WIDTH1[length(WIDTH1)],
-				WIDTH2[length(WIDTH2)])
 			weights <- as.double(ifelse(x.f==0L,
-				weights*log(size) - log(maxW),
-				weights*log(sizeAA)/3 - log(maxW/3)))
+				weights*log(size),
+				weights*log(sizeAA)/3))
 #			w <- which(weights <= 0)
 #			if (length(w) > 0) {
 #				x.s <- x.s[-w]
@@ -1031,6 +1034,7 @@ FindSynteny <- function(dbFile,
 				maxGap,
 				order(x.i, x.e) - 1L,
 				minScore,
+				maxW,
 				PACKAGE="DECIPHER")
 			
 			scores <- chains[[2]]
@@ -1135,11 +1139,16 @@ FindSynteny <- function(dbFile,
 						index2[o[i]]==index2[o[last]]) {
 						if (ends1[o[i]] <= ends1[o[last]]) {
 							# completely overlapping
-							if (score[o[i]] >= score[o[last]]) {
-								remove[o[last]] <- TRUE
-								last <- i
-							} else {
-								remove[o[i]] <- TRUE
+							chain_l <- chains[[o[last]]]
+							over_l <- ee1[chain_l] >= starts1[o[i]] &
+								ss1[chain_l] <= ends1[o[i]]
+							if (any(over_l)) { # overlapping hits
+								if (score[o[i]] >= score[o[last]]) {
+									remove[o[last]] <- TRUE
+									last <- i
+								} else {
+									remove[o[i]] <- TRUE
+								}
 							}
 						} else {
 							# remove partial overlap from last
@@ -1196,11 +1205,16 @@ FindSynteny <- function(dbFile,
 						index2[o[i]]==index2[o[last]]) {
 						if (ends2[o[i]] <= ends2[o[last]]) {
 							# completely overlapping
-							if (score[o[i]] >= score[o[last]]) {
-								remove[o[last]] <- TRUE
-								last <- i
-							} else {
-								remove[o[i]] <- TRUE
+							chain_l <- chains[[o[last]]]
+							over_l <- ee2[chain_l] >= starts2[o[i]] &
+								ss2[chain_l] <= ends2[o[i]]
+							if (any(over_l)) { # overlapping hits
+								if (score[o[i]] >= score[o[last]]) {
+									remove[o[last]] <- TRUE
+									last <- i
+								} else {
+									remove[o[i]] <- TRUE
+								}
 							}
 						} else {
 							# remove partial overlap from last

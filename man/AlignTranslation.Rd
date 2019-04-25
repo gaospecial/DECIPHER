@@ -32,7 +32,7 @@ Numeric vector giving a single reading frame for all of the sequences, or an ind
 Character string indicating the type of output desired.  This should be (an abbreviation of) one of \code{"DNAStringSet"}, \code{"RNAStringSet"}, \code{"AAStringSet"}, or \code{"both"}.  (See value section below.)
 }
   \item{geneticCode}{
-Named character vector in the same format as \code{GENETIC_CODE} (the default), which represents the standard genetic code.
+Either a character vector giving the genetic code in the same format as \code{GENETIC_CODE} (the default), or a list containing one genetic code for each sequence in \code{myXStringSet}.
 }
   \item{\dots}{
 Further arguments to be passed directly to \code{\link{AlignSeqs}}, including \code{gapOpening}, \code{gapExtension}, \code{gapPower}, \code{terminalGap}, \code{restrict}, \code{anchor}, \code{normPower}, \code{substitutionMatrix}, \code{structureMatrix}, \code{alphabet}, \code{guideTree}, \code{iterations}, \code{refinements}, \code{useStructures}, \code{structures}, \code{FUN}, and \code{levels}.
@@ -77,4 +77,15 @@ fas <- system.file("extdata", "50S_ribosomal_protein_L2.fas", package="DECIPHER"
 dna <- readDNAStringSet(fas)
 DNA <- AlignTranslation(dna) # align the translation then reverse translate
 DNA
+
+# using a mixture of standard and non-standard genetic codes
+gC1 <- getGeneticCode(id_or_name2="1", full.search=FALSE, as.data.frame=FALSE)
+# Mollicutes use an alternative genetic code
+gC2 <- getGeneticCode(id_or_name2="4", full.search=FALSE, as.data.frame=FALSE)
+w <- grep("Mycoplasma|Ureaplasma", names(dna))
+gC <- vector("list", length(dna))
+gC[-w] <- list(gC1)
+gC[w] <- list(gC2)
+AA <- AlignTranslation(dna, geneticCode=gC, type="AAStringSet")
+BrowseSeqs(AA)
 }

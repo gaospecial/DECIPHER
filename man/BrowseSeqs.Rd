@@ -65,6 +65,9 @@ ES Wright (2016) "Using DECIPHER v2.0 to Analyze Big Biological Sequence Data in
 \author{
 Erik Wright \email{eswright@pitt.edu}
 }
+\note{
+Some web browsers do not display colored characters with equal widths.  If positions do not align across sequences then try opening the \code{htmlFile} with a different web browser.
+}
 \seealso{
 \code{\link{BrowseDB}}, \code{\link{ConsensusSequence}}
 }
@@ -85,7 +88,7 @@ BrowseSeqs(dna, highlight=1) # other sequences are dots where matching
 # highlight the consensus sequence at the bottom
 BrowseSeqs(dna, highlight=0) # other sequences are dots where matching
 
-# split the wide view into multiple vertical pages (i.e., for printing)
+# split the wide view into multiple vertical pages (for printing)
 BrowseSeqs(dna, colWidth=100, highlight=1)
 
 # specify an alternative color scheme for -, A, C, G, T
@@ -135,4 +138,17 @@ hec <- PredictHEC(AA, type="probabilities") # calculate the secondary structures
 hec[[3]][, 18] # the 18th position in sequence 3 is likely part of a beta-sheet (E)
 # the positional probabilities can be used as shades of red, green, and blue:
 BrowseSeqs(AA, patterns=hec) # red = alpha-helix, green = beta-sheet, blue = coil
+
+# color codons according to their corresponding amino acid
+DNA <- AlignTranslation(dna) # align the translation then reverse translate
+colors <- rainbow(21, v=0.8, start=0.9, end=0.7) # codon colors
+m <- match(GENETIC_CODE, unique(GENETIC_CODE)) # corresponding amino acid
+codonBounds <- matrix(c(seq(1, width(DNA)[1], 3), # start of codons
+	seq(3, width(DNA)[1], 3)), # end of codons
+	nrow=2,
+	byrow=TRUE)
+BrowseSeqs(DNA,
+	colorPatterns=codonBounds,
+	patterns=c("---", names(GENETIC_CODE)), # codons to color
+	colors=c("black", substring(colors[m], 1, 7)))
 }

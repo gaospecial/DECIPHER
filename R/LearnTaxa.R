@@ -88,6 +88,7 @@ LearnTaxa <- function(train,
 	classes <- sapply(strsplit(classes, "Root;"),
 		`[`,
 		2L)
+	classes <- gsub(" +$", "", classes)
 	classes <- paste(classes,
 		ifelse(endsWith(classes, ";"),
 			"",
@@ -102,6 +103,8 @@ LearnTaxa <- function(train,
 	kmers <- lapply(kmers,
 		function(x)
 			sort(unique(x + 1L), na.last=NA))
+	if (any(lengths(kmers)==0))
+		stop("All training sequences must have at least one k-mer.")
 	
 	# create lists of:
 	# taxonomy = all distinct taxa ranks

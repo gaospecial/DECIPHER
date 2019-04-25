@@ -88,7 +88,7 @@ static const R_CallMethodDef callMethods[] = { // method call, pointer, num args
 	{"radixOrder", (DL_FUNC) &radixOrder, 2},
 	{"fillOverlaps", (DL_FUNC) &fillOverlaps, 2},
 	{"indexByContig", (DL_FUNC) &indexByContig, 5},
-	{"chainSegments", (DL_FUNC) &chainSegments, 17},
+	{"chainSegments", (DL_FUNC) &chainSegments, 18},
 	{"basicTranslate", (DL_FUNC) &basicTranslate, 3},
 	{"firstSeqsGapsEqual", (DL_FUNC) &firstSeqsGapsEqual, 9},
 	{"positionWeightMatrix", (DL_FUNC) &positionWeightMatrix, 4},

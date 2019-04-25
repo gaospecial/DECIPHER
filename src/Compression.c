@@ -21,6 +21,9 @@
 #include <omp.h>
 #endif
 
+// for calloc/free
+#include <stdlib.h>
+
 /* for Calloc/Free */
 #include <R_ext/RS.h>
 
@@ -531,7 +534,7 @@ SEXP nbit(SEXP x, SEXP y, SEXP compRepeats, SEXP nThreads)
 	// compress the sequences
 	#pragma omp parallel for private(i,j,k,p,s,pos) schedule(guided) num_threads(nthreads)
 	for (i = 0; i < n; i++) {
-		ptrs[i] = Calloc(l[i] > 3 ? l[i] : 4, unsigned char); // initialized to zero
+		ptrs[i] = (unsigned char *) calloc(l[i] > 3 ? l[i] : 4, sizeof(unsigned char)); // initialized to zero (thread-safe on Windows)
 		p = ptrs[i];
 		s = strs[i];
 		
@@ -540,9 +543,9 @@ SEXP nbit(SEXP x, SEXP y, SEXP compRepeats, SEXP nThreads)
 		int lastTemp, currTemp, rev, len, len2, thresh = 1;
 		if (cR==1) {
 			if (l[i] <= 5120) { // 20*2^8 = 5120 (~5% chance of an 8-mer occurring only once)
-				dict = Calloc(256, unsigned int);
+				dict = (unsigned int *) calloc(256, sizeof(unsigned int)); // initialized to zero (thread-safe on Windows)
 			} else {
-				dict = Calloc(65536, unsigned int);
+				dict = (unsigned int *) calloc(65536, sizeof(unsigned int)); // initialized to zero (thread-safe on Windows)
 			}
 		}
 		
@@ -1319,7 +1322,7 @@ SEXP nbit(SEXP x, SEXP y, SEXP compRepeats, SEXP nThreads)
 		}
 		
 		if (cR==1)
-			Free(dict);
+			free(dict);
 		
 		if (success==0) {
 			l[i] = 0;
@@ -1352,7 +1355,7 @@ SEXP nbit(SEXP x, SEXP y, SEXP compRepeats, SEXP nThreads)
 			memcpy(RAW(ans), p, l[i]);
 		}
 		
-		Free(p);
+		free(p);
 		SET_VECTOR_ELT(ret, i, ans);
 		UNPROTECT(1); // ans
 	}
@@ -1437,7 +1440,7 @@ SEXP qbit(SEXP x, SEXP y, SEXP nThreads)
 	// compress the quality scores
 	#pragma omp parallel for private(i,j,p,s) schedule(guided) num_threads(nthreads)
 	for (i = 0; i < n; i++) {
-		ptrs[i] = Calloc(l[i] > 3 ? l[i] : 4, unsigned char); // initialized to zero
+		ptrs[i] = (unsigned char *) calloc(l[i] > 3 ? l[i] : 4, sizeof(unsigned char)); // initialized to zero (thread-safe on Windows)
 		p = ptrs[i];
 		s = strs[i];
 		
@@ -1517,7 +1520,7 @@ SEXP qbit(SEXP x, SEXP y, SEXP nThreads)
 		char min = 127; // minimum value > 1
 		int temp;
 		l[i]--;
-		unsigned char *t = Calloc(l[i], unsigned char);
+		unsigned char *t = (unsigned char *) calloc(l[i], sizeof(unsigned char));
 		for (j = 0; j < l[i]; j++) {
 			temp = s[j + 1] - s[j];
 			if (temp > 0) {
@@ -1639,7 +1642,7 @@ SEXP qbit(SEXP x, SEXP y, SEXP nThreads)
 			j++;
 		}
 		
-		Free(t);
+		free(t);
 		
 		if (success==0) {
 			l[i] = 0;
@@ -1678,7 +1681,7 @@ SEXP qbit(SEXP x, SEXP y, SEXP nThreads)
 			memcpy(RAW(ans), p, l[i]);
 		}
 		
-		Free(p);
+		free(p);
 		SET_VECTOR_ELT(ret, i, ans);
 		UNPROTECT(1); // ans
 	}
@@ -1740,9 +1743,9 @@ SEXP decompress(SEXP x, SEXP nThreads)
 		
 		if (type==192 || type==160) { // nbit or qbit compression
 			if (type==192 && (p[0] & 8)==0) { // ascii
-				s = Calloc(l[i], char); // each sequence
+				s = (char *) calloc(l[i], sizeof(char)); // initialized to zero (thread-safe on Windows)
 				memcpy(s, p + 1, l[i] - 1);
-				strs[i] = s;
+				strs[i] = s; // each sequence
 				continue;
 			} else {
 				len = 0;
@@ -1796,8 +1799,8 @@ SEXP decompress(SEXP x, SEXP nThreads)
 		}
 		
 		// initialized to zero
-		s = Calloc(len + 4, char); // each sequence
-		strs[i] = s;
+		s = (char *) calloc(len + 4, sizeof(char)); // initialized to zero (thread-safe on Windows)
+		strs[i] = s; // each sequence
 		
 		// decompress the payload
 		if (type==192) { // nbit compression
@@ -2239,7 +2242,8 @@ SEXP decompress(SEXP x, SEXP nThreads)
 		} else { // qbit compression
 			s[0] = (p[j] & 254) >> 1;
 			
-			unsigned char *t = Calloc(len, unsigned char); // t-gaps
+			// initialize an array of t-gaps
+			unsigned char *t = (unsigned char *) calloc(len, sizeof(unsigned char)); // initialized to zero (thread-safe on Windows)
 			
 			int c = 0; // position in t
 			int b = 7; // current bit in byte
@@ -2331,7 +2335,7 @@ SEXP decompress(SEXP x, SEXP nThreads)
 			for (k = 1; k < len; k++)
 				s[k] = s[k - 1] + bijection[t[k - 1]];
 			
-			Free(t);
+			free(t);
 		}
 		s[len] = '\0'; // null-terminate
 		
@@ -2376,7 +2380,7 @@ SEXP decompress(SEXP x, SEXP nThreads)
 		} else { // decompressed
 			s = strs[i];
 			SET_STRING_ELT(seqs, i, mkChar(s));
-			Free(s);
+			free(s);
 		}
 	}
 	

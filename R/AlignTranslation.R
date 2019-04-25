@@ -49,6 +49,17 @@ AlignTranslation <- function(myXStringSet,
 		if (class(myXStringSet) != "RNAStringSet")
 			stop("type cannot be 'DNAStringSet' when myXStringSet is a RNAStringSet.")
 	}
+	if (is.list(geneticCode)) {
+		if (length(geneticCode)!=length(myXStringSet))
+			stop("The list geneticCode must have one item per sequence.")
+		mapping <- selfmatch(geneticCode)
+		mapping <- tapply(seq_along(mapping), mapping, c)
+		group <- as.integer(names(mapping))
+	} else { # all identifiers use the same geneticCode
+		geneticCode <- list(geneticCode)
+		mapping <- list(seq_along(myXStringSet))
+		group <- 1L
+	}
 	
 	if (sense=="-")
 		myXStringSet <- reverseComplement(myXStringSet)
@@ -59,7 +70,7 @@ AlignTranslation <- function(myXStringSet,
 	
 	index <- c(0:2, 0) # circle back around to the first reading frame
 	AA <- AAStringSet(rep("", length(myXStringSet)))
-	for (i in 1:length(index)) {
+	for (i in seq_along(index)) {
 		w <- which(((readingFrame - 1)==index[i] & # (specified reading frame AND
 			i != length(index)) | # not the last possible reading frame) OR
 			is.na(readingFrame)) # reading frame is unspecified
@@ -67,18 +78,29 @@ AlignTranslation <- function(myXStringSet,
 			next
 		
 		start <- index[i] + 1
+		for (j in seq_along(group)) {
+			W <- w[w %in% mapping[[j]]]
+			if (length(W)==0)
+				next
+			
+			end <- width(myXStringSet)[W]
+			offset <- end - start + 1
+			end <- end - offset %% 3
+			end <- ifelse(end < start - 1,
+				start - 1,
+				end)
+			AA[W] <- translate(subseq(myXStringSet[W],
+					start,
+					end),
+				genetic.code=geneticCode[[group[j]]],
+				if.fuzzy.codon="solve")
+		}
 		end <- width(myXStringSet)[w]
 		offset <- end - start + 1
 		end <- end - offset %% 3
 		end <- ifelse(end < start - 1,
 			start - 1,
 			end)
-		
-		AA[w] <- translate(subseq(myXStringSet[w],
-				start,
-				end),
-			genetic.code=geneticCode,
-			if.fuzzy.codon="solve")
 		
 		# mask missing positions
 		AA[w] <- xscat(ifelse(start > 1, "+", ""),
@@ -117,7 +139,7 @@ AlignTranslation <- function(myXStringSet,
 	starts <- list()
 	maxRF <- max(readingFrame)
 	Ls <- numeric(length(myXStringSet))
-	for (i in 1:length(myXStringSet)) {
+	for (i in seq_along(myXStringSet)) {
 		start <- start(gaps[[i]])
 		if (length(start) > 0) {
 			w <- which(start + (length(start) - 1):0==width(AA)[i])
@@ -137,7 +159,7 @@ AlignTranslation <- function(myXStringSet,
 	
 	# add trailing gaps
 	maxWidth <- max(Ls)
-	for (i in 1:length(myXStringSet)) {
+	for (i in seq_along(myXStringSet)) {
 		starts[[i]] <- c(starts[[i]],
 			rep(width(myXStringSet)[i] + 1, maxWidth - Ls[i]))
 	}

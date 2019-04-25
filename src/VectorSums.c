@@ -24,6 +24,9 @@
 #include <omp.h>
 #endif
 
+// for calloc/free
+#include <stdlib.h>
+
 // DECIPHER header file
 #include "DECIPHER.h"
 
@@ -99,7 +102,7 @@ SEXP parallelMatch(SEXP x, SEXP y, SEXP indices, SEXP z, SEXP a, SEXP b, SEXP nT
 		int *w = ptrs[k];
 		
 		// temp = x %in% y
-		int *temp = Calloc(size_x, int); // initialized to zero
+		int *temp = (int *) calloc(size_x, sizeof(int)); // initialized to zero (thread-safe on Windows)
 		int s = 0;
 		for (i = 0; i < size_x; i++) {
 			for (j = s; j < size_y[k]; j++) {
@@ -123,7 +126,7 @@ SEXP parallelMatch(SEXP x, SEXP y, SEXP indices, SEXP z, SEXP a, SEXP b, SEXP nT
 				j = 0;
 		}
 		
-		Free(temp);
+		free(temp);
 	}
 	
 	Free(ptrs);

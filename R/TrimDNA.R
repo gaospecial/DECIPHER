@@ -179,7 +179,7 @@ TrimDNA <- function(myDNAStringSet,
 	rights <- width(myDNAStringSet)
 	for (k in which(nchar(rightPatterns) >= minOverlap)) {
 		if (verbose) {
-			cat("\nFinding right pattern",
+			cat("Finding right pattern",
 				ifelse(length(rightPatterns) > 1,
 					paste(" (#", k, "): ", sep=""),
 					": "),

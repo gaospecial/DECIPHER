@@ -130,7 +130,7 @@ unique(desc)
 Now that we have unique names for our four variants, we must add them to the database as the identifier of each sequence.
 
 <<expr4,eval=TRUE>>=
-Add2DB(data.frame(identifier=desc), dbConn)
+Add2DB(data.frame(identifier=desc, stringsAsFactors=FALSE), dbConn)
 @
 
 %------------------------------------------------------------

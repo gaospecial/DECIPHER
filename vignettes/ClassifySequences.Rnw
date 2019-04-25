@@ -97,13 +97,13 @@ Once \Rpackage{DECIPHER} is installed, the code in this tutorial can be obtained
 
 \setlength{\parindent}{1cm}
 
-The training process only needs to occur once per training set, and results in an object that can be reused for testing as many sequences as desired.  If you already have the output of training the classifier (an object of \term{class} \code{Taxa} and subclass \code{Train}), then you can skip to subsection \ref{viewing} (\nameref{viewing}) (below).  Otherwise follow along with this section to learn how to create the training object.
+The training process only needs to occur once per training set, and results in an object that can be reused for testing as many sequences as desired.  If you already have the output of training the classifier (an object of \term{class} \code{Taxa} and subclass \code{Train}), then you can skip to subsection \ref{viewing} (\nameref{viewing}) below.  Otherwise follow along with this section to learn how to create the training object.
 
 The training process begins with a set of sequence representatives assigned to a taxonomic hierarchy, called a ``training set''.  Typically taxonomic assignments for a gene of interest are obtained from an authoritative source, but they can also be automatically created (e.g., with \Rfunction{IdClusters}).  Here we describe the general training process, where the classifier iteratively learns about the reference taxonomy.
 
 \subsection{Importing the training set}
 
-The first step is to set filepaths to the sequences (in FASTA format) and the ``taxid'' file containing information about the taxonomic ranks.  The ``taxid'' file is optional, but is often provided (along with training sequences) in a standard 5-column, asterisks (``*'') delimited, text format used by many classifiers.  Be sure to change the path names to those on your system by replacing all of the text inside quotes labeled ``$<<$path to ...$>>$'' with the actual path on your system.
+The first step is to set filepaths to the sequences (in FASTA format) and the ``taxid'' file containing information about the taxonomic ranks.  The ``taxid'' file is optional, but is often provided (along with training sequences) in a standard 5-column, asterisks (``*'') delimited, text format used by many classifiers.  To create your own ``taxid'' file, see \ref{taxid} (\nameref{taxid}) below.  Be sure to change the path names to those on your system by replacing all of the text inside quotes labeled ``$<<$path to ...$>>$'' with the actual path on your system.
 
 <<expr1,eval=FALSE>>=
 # specify the path to your file of training sequences:
@@ -278,7 +278,7 @@ test
 
 \subsection{Assigning classifications}
 
-Now, for the moment we have been waiting for:  it's time to classify some test sequences!  It's important to have read the help file for \Rfunction{IdTaxa} to acquaint yourself with the available options before performing this step.  The most important (optional) arguments are the \Rfunarg{type} of output, the \Rfunarg{strand} used in testing, the confidence \Rfunarg{threshold} of assignments, and the number of \Rfunarg{processors} to use.  Here, we are going to request the \code{"extended"} (default) output \Rfunarg{type} that allows for plotting the results, but there is also a \code{"collapsed"} \Rfunarg{type} that might be easier to export (see section \ref{export} below).  Also, we know that all of the test sequences are in the same (``+'' strand) orientation as the training sequences, so we can specify to only look at the \code{"top"} strand rather than the default of \code{"both"} strands (i.e., both ``+'' and ``-'' strands).  This makes the classification process about twice as fast.  We could also set \term{processors} to \code{NULL} to use all available processors.
+Now, for the moment we have been waiting for:  it's time to classify some test sequences!  It's important to have read the help file for \Rfunction{IdTaxa} to acquaint yourself with the available options before performing this step.  The most important (optional) arguments are the \Rfunarg{type} of output, the \Rfunarg{strand} used in testing, the confidence \Rfunarg{threshold} of assignments, and the number of \Rfunarg{processors} to use.  Here, we are going to request the \code{"extended"} (default) output \Rfunarg{type} that allows for plotting the results, but there is also a \code{"collapsed"} \Rfunarg{type} that might be easier to export (see section \ref{export} below).  Also, we know that all of the test sequences are in the same (``+'' strand) orientation as the training sequences, so we can specify to only look at the \code{"top"} strand rather than the default of \code{"both"} strands (i.e., both ``+'' and ``-'' strands).  This makes the classification process over twice as fast.  We could also set \term{processors} to \code{NULL} to use all available processors.
 
 <<expr12,eval=TRUE,results=hide>>=
 ids <- IdTaxa(test,
@@ -412,6 +412,108 @@ set.seed(123) # choose a whole number as the random seed
 # then classify sequences with IdTaxa (not shown)
 set.seed(NULL) # return to the original state by unsetting the seed
 @
+
+%------------------------------------------------------------
+\section{Creating a ``taxid'' file} \label{taxid}
+%------------------------------------------------------------
+
+The ``taxid'' file format supplies a table that can be used by \Rfunction{LearnTaxa} to specify taxonomic ranks (e.g., phylum, class, order, etc.) associated with each taxon.  Previously we imported the rank information from a plain text file containing 5 columns separate by asterisks (``*'').  An example of the contents of this file is:
+
+\begin{verbatim}
+    0*Root*-1*0*rootrank
+    1*Bacteria*0*1*domain
+    2*Actinobacteria*1*2*phylum
+    3*Acidimicrobiales*2*3*order
+    4*Acidimicrobiaceae*3*4*family
+    5*Acidimicrobium*4*5*genus
+    6*Ferrimicrobium*4*5*genus
+    ...
+\end{verbatim}
+
+\setlength{\parindent}{1cm}
+
+The leftmost column is simply an index starting at zero.  Next, there is a column with each unique taxonomic name in the training set.  The third column contains a pointer to the index of each line's parent.  The fourth column gives the rank level starting from ``Root'' at level 0.  The last column provides the taxonomic rank information that is used by \Rfunction{LearnTaxa}.
+
+The first line is always the same, and specifies that the ``Root'' rank is index 0, has no parent (-1), and points to itself (index 0).  The rest of the lines must point to a positive index for their parent.  For example, the line for index 6 states that the genus ``Ferrimicrobium'' exist within the family ``Acidimicrobiaceae'' (index 4) at rank level 5.
+
+If you would like to create a custom ``taxid'' file for your training set, the easiest way is to start with a set of taxonomic labels preceded by prefixes indicating their rank.  For example, the above ``taxid'' file could be generated from these lines of text:
+
+\setlength{\parindent}{0pt}
+
+\begin{verbatim}
+    d__Bacteria;p__Actinobacteria;o__Acidimicrobiales;f__Acidimicrobiaceae;g__Acidimicrobium
+    d__Bacteria;p__Actinobacteria;o__Acidimicrobiales;f__Acidimicrobiaceae;g__Ferrimicrobium
+    ...
+\end{verbatim}
+
+Then the following code will convert this text into the fields required for the ``taxid'' file:
+
+<<expr22,eval=FALSE>>=
+ranks <- readLines("<<path to lines of text>>")
+taxa <- setNames(c("domain", "phylum", "order", "family", "genus"),
+		c("d__", "p__", "o__", "f__", "g__"))
+
+ranks <- strsplit(ranks, ";", fix=T)
+count <- 1L
+groups <- "Root"
+index <- -1L
+level <- 0L
+rank <- "rootrank"
+pBar <- txtProgressBar(style=3)
+for (i in seq_along(ranks)) {
+	for (j in seq_along(ranks[[i]])) {
+		rank_level <- taxa[substring(ranks[[i]][j], 1, 3)]
+		group <- substring(ranks[[i]][j], 4)
+		w <- which(groups==group & rank==rank_level)
+		if (length(w) > 0) {
+			parent <- match(substring(ranks[[i]][j - 1], 4),
+				groups)
+			if (j==1 || any((parent - 1L)==index[w]))
+				next # already included
+		}
+		
+		count <- count + 1L
+		groups <- c(groups, group)
+		if (j==1) {
+			index <- c(index, 0)
+		} else {
+			parent <- match(substring(ranks[[i]][j - 1], 4),
+				groups)
+			index <- c(index,
+				parent - 1L)
+		}
+		level <- c(level, j)
+		rank <- c(rank, taxa[j])
+	}
+	
+	setTxtProgressBar(pBar, i/length(ranks))
+}
+groups <- gsub("^[ ]+", "", groups)
+groups <- gsub("[ ]+$", "", groups)
+
+taxid <- paste(0:(length(index) - 1L), groups, index, level, rank, sep="*")
+head(taxid, n=10)
+@
+
+\begin{Schunk}
+\begin{Sinput}
+[1] "0*Root*-1*0*rootrank"          
+[2] "1*Bacteria*0*1*domain"         
+[3] "2*Actinobacteria*1*2*phylum"   
+[4] "3*Acidimicrobiales*2*3*order"  
+[5] "4*Acidimicrobiaceae*3*4*family"
+[6] "5*Acidimicrobium*4*5*genus"    
+[7] "6*Ferrimicrobium*4*5*genus"
+\end{Sinput}
+\end{Schunk}
+
+Now these lines of text can be written to a file to be imported as the ``taxid'' file above.
+
+<<expr23,eval=FALSE>>=
+writeLines(taxid,
+	con="<<path to taxid file>>")
+@
+
 
 %------------------------------------------------------------
 \section{Session Information}

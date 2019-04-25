@@ -267,7 +267,7 @@ BrowseSeqs <- function(myXStringSet,
 		stop("No sequence information to display.")
 	if (colWidth > maxW)
 		colWidth <- maxW
-	for (i in 1:l) {
+	for (i in seq_len(l)) {
 		html[i] <- paste(html[i],
 			paste(rep(" ", maxW - nchar(html[i])), collapse=""),
 			sep="")
@@ -344,19 +344,21 @@ BrowseSeqs <- function(myXStringSet,
 			}
 			html <- sapply(s, paste, collapse="")
 		} else {
+			patterns <- paste("(",
+				patterns,
+				ifelse(nchar(patterns)==1, "+)", ")"),
+				sep="")
+			classes <- paste("<span class=\"_",
+				seq_along(patterns),
+				"\">\\1</span>",
+				sep="")
 			if (is.numeric(colorPatterns)) {
 				htm <- substring(html, 0, colorPatterns[1] - 1)
 				for (i in seq(1, length(colorPatterns), 2)) {
 					htmi <- substring(html, colorPatterns[i], colorPatterns[i + 1])
-					for (j in 1:length(colors)) {
-						htmi <- gsub(paste("(",
-								patterns[j],
-								ifelse(nchar(patterns[j]) == 1, "+)", ")"),
-								sep=""),
-							paste("<span class=\"_",
-								j,
-								"\">\\1</span>",
-								sep=""),
+					for (j in seq_along(colors)) {
+						htmi <- gsub(patterns[j],
+							classes[j],
 							htmi)
 					}
 					end <- ifelse(i==(length(colorPatterns) - 1),
@@ -367,18 +369,10 @@ BrowseSeqs <- function(myXStringSet,
 				}
 				html <- htm
 			} else {
-				if (length(colors) > 0) {
-					for (j in 1:length(colors)) {
-						html <- gsub(paste("(",
-								patterns[j],
-								ifelse(nchar(patterns[j]) == 1, "+)", ")"),
-								sep=""),
-							paste("<span class=\"_",
-								j,
-								"\">\\1</span>",
-								sep=""),
-							html)
-					}
+				for (j in seq_along(colors)) {
+					html <- gsub(patterns[j],
+						classes[j],
+						html)
 				}
 			}
 		}
@@ -395,14 +389,12 @@ BrowseSeqs <- function(myXStringSet,
 			sep="    ")
 		
 		styles <- character()
-		if (length(colors) > 0) {
-			for (i in 1:length(colors)) {
-				styles <- paste(styles,
-					"span._", i,
-					" {background:", colors[i],
-					"; color:#FFF;} ",
-					sep="")
-			}
+		for (i in seq_along(colors)) {
+			styles <- paste(styles,
+				"span._", i,
+				" {background:", colors[i],
+				"; color:#FFF;} ",
+				sep="")
 		}
 		styles <- paste("<style type=text/css> ",
 			styles,

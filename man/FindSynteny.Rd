@@ -13,13 +13,13 @@ FindSynteny(dbFile,
             useFrames = TRUE,
             alphabet = AA_REDUCED[[1]],
             geneticCode = GENETIC_CODE,
-            sepCost = -0.01,
-            gapCost = -0.1,
+            sepCost = 0,
+            gapCost = -0.01,
             shiftCost = 0,
             codingCost = 0,
             maxSep = 2000,
-            maxGap = 200,
-            minScore = 20,
+            maxGap = 500,
+            minScore = 40,
             dropScore = -100,
             maskRepeats = TRUE,
             storage = 0.5,
@@ -64,7 +64,7 @@ Maximal separation (in nucleotides) between hits in the same block.
 The maximum number of gaps between hits in the same block.
 }
   \item{minScore}{
-The minimum score required for a chain of hits to become a block.  Higher values of \code{minScore} are less likely to yield false positive hits.  Recommended values are between \code{20} (the default) and \code{40}.
+The minimum score required for a chain of hits to become a block.  Higher values of \code{minScore} are less likely to yield false positives.
 }
   \item{dropScore}{
 The change from maximal score required to stop extending blocks.
@@ -83,13 +83,16 @@ Logical indicating whether to display progress.
 }
 }
 \details{
-Long nucleotide sequences, such as genomes, are often not collinear, or may be composed of many smaller segments (e.g., contigs).  \code{FindSynteny} searches for ``hits'' between sequences that can be chained into collinear ``blocks'' of synteny.  Hits are defined as k-mer exact nucleotide matches or k-mer matches in a reduced amino acid alphabet (if \code{useFrames} is \code{TRUE}).  Hits are chained into blocks as long as they are:  (1) within the same sequence, (2) within \code{maxSep} and \code{maxGap} distance, and (3) help maintain the score above \code{minScore}.  Blocks are extended from their first and last hit until their score drops below \code{dropScore} from the maximum that was reached.  This process results in a set of hits and blocks stored in an object of class ``Synteny''.
+Long nucleotide sequences, such as genomes, are often not collinear or may be composed of many smaller segments (e.g., contigs).  \code{FindSynteny} searches for ``hits'' between sequences that can be chained into collinear ``blocks'' of synteny.  Hits are defined as k-mer exact nucleotide matches or k-mer matches in a reduced amino acid alphabet (if \code{useFrames} is \code{TRUE}).  Hits are chained into blocks as long as they are:  (1) within the same sequence, (2) within \code{maxSep} and \code{maxGap} distance, and (3) help maintain the score above \code{minScore}.  Blocks are extended from their first and last hit until their score drops below \code{dropScore} from the maximum that was reached.  This process results in a set of hits and blocks stored in an object of class ``Synteny''.
 }
 \value{
 An object of class ``Synteny''.
 }
 \author{
 Erik Wright \email{eswright@pitt.edu}
+}
+\note{
+\code{FindSynteny} is intended to be used on sets of sequences with up to ~100 million nucleotides total per identifier.  For this reason, better performance can sometimes be achieved by assigning a unique identifier to each chromosome belonging to a large genome.
 }
 \seealso{
 \code{\link{AlignSynteny}}, \code{\link{Synteny-class}}

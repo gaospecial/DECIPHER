@@ -795,8 +795,10 @@ DesignSignatures <- function(dbFile,
 		
 		# add hits normalized by max achieved
 		max_hits <- max(p.f + hits.f, p.r + hits.r)
-		names(f.primers) <- as.numeric(names(f.primers)) + (p.f + hits.f)/max_hits
-		names(r.primers) <- as.numeric(names(r.primers)) + (p.r + hits.r)/max_hits
+		if (max_hits > 0) {
+			names(f.primers) <- as.numeric(names(f.primers)) + (p.f + hits.f)/max_hits
+			names(r.primers) <- as.numeric(names(r.primers)) + (p.r + hits.r)/max_hits
+		}
 		
 		if (verbose)
 			setTxtProgressBar(pBar, i/length(identifier))

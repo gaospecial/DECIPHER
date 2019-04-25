@@ -122,6 +122,21 @@ p # pairs are denoted by (), and (optionally) pseudoknots by [], {}, and <>
 p <- PredictDBN(rna, "pairs") # paired positions in the alignment
 head(p) # matrix giving the pairs and their pseudoknot order (when > 0)
 
+# plot an arc diagram with the base pairings
+plot(NA, xlim=c(0, 1), ylim=c(0, 1),
+	xaxs="i", yaxs="i",
+	xlab="Alignment position", ylab="",
+	bty="n", xaxt="n", yaxt="n")
+ticks <- pretty(seq_len(width(rna)[1]))
+axis(1, ticks/width(rna)[1], ticks)
+rs <- c(seq(0, pi, len=100), NA)
+r <- (p[, 2] - p[, 1] + 1)/width(rna)[1]/2
+r <- rep(r, each=101)
+x <- (p[, 1] + p[, 2])/2/width(rna)[1]
+x <- rep(x, each=101) + r*cos(rs)
+y <- r*sin(rs)/max(r, na.rm=TRUE)
+lines(x, y, xpd=TRUE)
+
 # show all available evidence of base pairing
 p <- PredictDBN(rna, "evidence") # all pairs with scores >= threshold
 head(p) # matrix giving the pairs and their scores
