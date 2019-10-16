@@ -7,7 +7,7 @@ PredictDBN <- function(myXStringSet,
 	shift=1.3,
 	threshold=0.7,
 	pseudoknots=1,
-	weight=1,
+	weight=NA,
 	processors=1,
 	verbose=TRUE) {
 	
@@ -74,16 +74,6 @@ PredictDBN <- function(myXStringSet,
 		stop("pseudoknots must be a numeric.")
 	if (pseudoknots < 0 || pseudoknots > 3)
 		stop("pseudoknots must be between zero and three.")
-	if (!is.numeric(weight))
-		stop("weight must be a numeric.")
-	if (length(weight)!=1 && length(weight)!=length(myXStringSet))
-		stop("Length of weight must equal one or the length of the myXStringSet.")
-	if (length(weight)==1) {
-		weight <- rep(1, length(myXStringSet))
-	} else {
-		if (!isTRUE(all.equal(1, mean(weight))))
-			stop("The mean of weight must be 1.")
-	}
 	if (!is.logical(verbose))
 		stop("verbose must be a logical.")
 	if (!is.null(processors) && !is.numeric(processors))
@@ -97,9 +87,108 @@ PredictDBN <- function(myXStringSet,
 	} else {
 		processors <- as.integer(processors)
 	}
+	if (length(weight)==1) {
+		if (is.numeric(weight)) {
+			weight <- rep(1, length(myXStringSet))
+		} else if (is.na(weight)) {
+			if (verbose) {
+				cat("Determining distance matrix based on alignment:\n")
+				flush.console()
+			}
+			d <- DistanceMatrix(myXStringSet,
+				type="dist",
+				verbose=verbose,
+				processors=processors)
+			
+			if (verbose) {
+				cat("Determining sequence weights:\n")
+				flush.console()
+			}
+			suppressWarnings(guideTree <- IdClusters(d,
+				method="UPGMA",
+				type="dendrogram",
+				verbose=verbose,
+				processors=processors))
+			
+			.weights <- function(guideTree) {
+				# initialize a stack of maximum length (l)
+				stack <- vector("list", l)
+				visit <- logical(l) # node already visited
+				parent <- integer(l) # index of parent node
+				index <- integer(l) # index in parent node
+				pos <- 1L # current position in the stack
+				stack[[pos]] <- guideTree
+				while (pos > 0L) { # more nodes to visit
+					if (visit[pos]) { # ascending tree
+						visit[pos] <- FALSE # reset visit
+						dend <- stack[[pos]]
+						
+						# align subtrees
+						treeLengths <- numeric(length(dend))
+						inherit <- attr(dend, "inherit")
+						if (length(dend) > 1) {
+							for (i in seq_len(length(dend))) {
+								h <- attr(dend[[i]], "treeLength")
+								if (!is.null(h))
+									treeLengths[i] <- h
+							}
+							
+							h <- attr(dend, "height")
+							members <- vector("list", length(dend))
+							for (i in seq_len(length(dend))) {
+								m <- unlist(dend[i])
+								treeLengths[i] <- treeLengths[i] + h - height[m[1]]
+								weight[m] <<- weight[m] + (h - height[m])/length(m)
+								height[m] <<- h
+								members[[i]] <- m
+							}
+						} else if (is.leaf(dend)) {
+							height[unlist(dend)] <- attr(dend, "height")
+						} else { # inherit from subtree
+							treeLengths[1] <- attr(dend[[1]], "treeLength")
+						}
+						
+						attr(stack[[pos]], "treeLength") <- sum(treeLengths)
+						# replace self in parent
+						if (parent[pos] > 0)
+							stack[[parent[pos]]][[index[pos]]] <- stack[[pos]]
+						pos <- pos - 1L # pop off of stack
+					} else { # descending tree
+						visit[pos] <- TRUE
+						p <- pos
+						for (i in seq_along(stack[[p]])) {
+							if (!is.leaf(stack[[p]][[i]])) {
+								# push subtree onto stack
+								pos <- pos + 1L
+								stack[[pos]] <- stack[[p]][[i]]
+								parent[[pos]] <- p
+								index[[pos]] <- i
+							}
+						}
+					}
+				}
+				
+				return(attr(stack[[1]], "treeLength"))
+			}
+			
+			weight <- height <- numeric(l)
+			.weights(guideTree)
+			weight <- weight/mean(weight)
+		} else {
+			stop("weight must be a numeric or NA.")
+		}
+	} else {
+		if (length(weight)!=length(myXStringSet))
+			stop("Length of weight must equal one or the length of the myXStringSet.")
+		if (any(is.na(weight)))
+			stop("weight must be a numeric.")
+		if (!isTRUE(all.equal(1, mean(weight))))
+			stop("The mean of weight must be 1.")
+	}
 	
 	# initialize a progress bar
 	if (verbose) {
+		cat("Computing RNA Secondary Structures:\n")
 		pBar <- txtProgressBar(min=0, max=100, initial=0, style=ifelse(interactive(), 3, 1))
 		time.1 <- Sys.time()
 	} else {

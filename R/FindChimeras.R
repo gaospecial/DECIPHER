@@ -180,6 +180,7 @@ FindChimeras <- function(dbFile,
 	
 	# initialize fragment variables
 	offset <- 5
+	min_hits_in <- 5
 	fragments <- DNAStringSet()
 	all_hits_in <- integer()
 	all_results <- NULL
@@ -314,7 +315,7 @@ FindChimeras <- function(dbFile,
 						hits_in <- t[m_fragments]
 						
 						# remove fragments with too many hits in group
-						w <- which(hits_in < 5)
+						w <- which(hits_in < min_hits_in)
 					} else { # no hits
 						hits_in <- integer(length(temp_fragments))
 						w <- seq_along(temp_fragments)
@@ -335,7 +336,7 @@ FindChimeras <- function(dbFile,
 						hits_in <- t[m_fragments]
 						
 						# remove fragments with too many hits in group
-						w <- which(hits_in < 5)
+						w <- which(hits_in < min_hits_in)
 					} else { # no hits
 						hits_in <- integer(length(temp_fragments))
 						w <- seq_along(temp_fragments)
@@ -367,7 +368,7 @@ FindChimeras <- function(dbFile,
 							hits_in <- hits_in + hits_in2
 						
 							# remove fragments with too many hits in group
-							w <- which(hits_in < 5)
+							w <- which(hits_in < min_hits_in)
 						} else { # no hits
 							w <- seq_along(temp_fragments)
 						}

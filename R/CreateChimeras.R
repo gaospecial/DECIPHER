@@ -179,7 +179,7 @@ CreateChimeras <- function(myDNAStringSet,
 		}
 		
 		chimera <- DNAStringSet(chimera)
-		aF <- sum(alphabetFrequency(chimera)[,1:15])
+		aF <- sum(alphabetFrequency(chimera)[, 1:15])
 		if ((aF < minLength) || (aF > maxLength))
 			next
 		

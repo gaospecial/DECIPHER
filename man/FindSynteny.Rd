@@ -18,10 +18,11 @@ FindSynteny(dbFile,
             shiftCost = 0,
             codingCost = 0,
             maxSep = 2000,
-            maxGap = 500,
-            minScore = 40,
+            maxGap = 5000,
+            minScore = 30,
             dropScore = -100,
             maskRepeats = TRUE,
+            allowOverlap = FALSE,
             storage = 0.5,
             processors = 1,
             verbose = TRUE)
@@ -71,6 +72,9 @@ The change from maximal score required to stop extending blocks.
 }
   \item{maskRepeats}{
 Logical specifying whether to ``soft'' mask repeats when searching for hits.
+}
+  \item{allowOverlap}{
+Logical specifying whether to permit blocks to overlap on the same sequence.
 }
   \item{storage}{
 Excess gigabytes available to store objects so that they do not need to be recomputed in later steps.  This should be a number between zero and a (modest) fraction of the available system memory.  Note that more than \code{storage} gigabytes may be required, but will not be stored for later reuse.

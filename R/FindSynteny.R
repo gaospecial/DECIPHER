@@ -9,10 +9,11 @@ FindSynteny <- function(dbFile,
 	shiftCost=0,
 	codingCost=0,
 	maxSep=2000,
-	maxGap=500,
-	minScore=40,
+	maxGap=5000,
+	minScore=30,
 	dropScore=-100,
 	maskRepeats=TRUE,
+	allowOverlap=FALSE,
 	storage=0.5,
 	processors=1,
 	verbose=TRUE) {
@@ -58,6 +59,8 @@ FindSynteny <- function(dbFile,
 		stop("minScore must be greater than zero.")
 	if (!is.logical(maskRepeats))
 		stop("maskRepeats must be a logical.")
+	if (!is.logical(allowOverlap))
+		stop("allowOverlap must be a logical.")
 	if (!is.logical(verbose))
 		stop("verbose must be a logical.")
 	if (!is.numeric(storage))
@@ -1114,9 +1117,8 @@ FindSynteny <- function(dbFile,
 							"last_hit")))
 			
 			# remove overlap
-			nblocks <- length(strand)
-			if (nblocks > 1) {
-				remove <- logical(nblocks)
+			if (length(strand) > 1 && !allowOverlap) {
+				remove <- logical(length(strand))
 				hits <- list()
 				
 				ss1 <- result[, "start1"]
@@ -1133,7 +1135,7 @@ FindSynteny <- function(dbFile,
 					starts1,
 					-ends1)
 				last <- 1L
-				for (i in 2:nblocks) {
+				for (i in 2:length(strand)) { # each block
 					if (starts1[o[i]] <= ends1[o[last]] &&
 						index1[o[i]]==index1[o[last]] &&
 						index2[o[i]]==index2[o[last]]) {

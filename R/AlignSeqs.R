@@ -203,7 +203,7 @@ AlignSeqs <- function(myXStringSet,
 				w <- which(m=="structureMatrix")
 				if (length(w) > 0) {
 					structureMatrix <- args[[w]]
-					# assume thre matrix is in the correct order
+					# assume the matrix is in the correct order
 					if (!is.double(structureMatrix))
 						stop("structureMatrix must contain numerics.")
 					if (!is.matrix(structureMatrix))
@@ -213,7 +213,7 @@ AlignSeqs <- function(myXStringSet,
 					if (dim(structureMatrix)[1] != 3)
 						stop("structureMatrix must be 3 x 3 when structures is NULL.")
 				} else { # use the default structureMatrix
-					structureMatrix <- matrix(c(4, 2, 2, 2, 24, 0, 2, 0, 24),
+					structureMatrix <- matrix(c(6, 0, 0, 0, 30, -6, 0, -6, 30),
 						nrow=3) # order is ., (, )
 				}
 				replace <- FALSE
@@ -314,11 +314,11 @@ AlignSeqs <- function(myXStringSet,
 			!("misMatch" %in% m) &&
 			!("perfectMatch" %in% m)) {
 			subM <- TRUE
-			sM <- matrix(c(13, 4, 6, 4, 4, 14, 4, 6, 6, 4, 14, 4, 4, 6, 4, 13),
+			sM <- matrix(c(14, 4, 7, 4, 4, 15, 4, 7, 7, 4, 15, 4, 4, 7, 4, 14),
 				nrow=4,
 				ncol=4,
 				dimnames=list(bases, bases))
-			sM2 <- matrix(c(13, 4, 6, 4, 4, 14, 4, 6, 6, 4, 14, 4, 4, 6, 4, 13),
+			sM2 <- matrix(c(14, 4, 7, 4, 4, 15, 4, 7, 7, 4, 15, 4, 4, 7, 4, 14),
 				nrow=4,
 				ncol=4,
 				dimnames=list(DNA_BASES, DNA_BASES))
@@ -784,18 +784,13 @@ AlignSeqs <- function(myXStringSet,
 	}
 	
 	.RNAStructures <- function(seqs, weights) {
-		if (verbose) {
-			cat("\nComputing RNA Secondary Structures:\n")
-			flush.console()
-		}
-		
 		w <- which(weights <= 0)
 		if (length(w) > 0)
 			weights[w] <- 1
 		weights <- weights/mean(weights)
 		
 		if (replace) {
-			structureMatrix <- matrix(c(4, 2, 2, 2, 24, 0, 2, 0, 24),
+			structureMatrix <- matrix(c(6, 0, 0, 0, 30, -6, 0, -6, 30),
 				nrow=3) # order is ., (, )
 			replace <- FALSE
 		}

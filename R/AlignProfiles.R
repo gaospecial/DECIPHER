@@ -205,7 +205,7 @@ AlignProfiles <- function(pattern,
 				stop("substitutionMatrix must be NULL or a matrix.")
 			}
 		} else if (type==2L && missing(perfectMatch) && missing(misMatch)) {
-			sM <- matrix(c(13, 4, 6, 4, 4, 14, 4, 6, 6, 4, 14, 4, 4, 6, 4, 13),
+			sM <- matrix(c(14, 4, 7, 4, 4, 15, 4, 7, 7, 4, 15, 4, 4, 7, 4, 14),
 				nrow=4,
 				ncol=4,
 				dimnames=list(bases, bases))
@@ -235,7 +235,7 @@ AlignProfiles <- function(pattern,
 				structureMatrix <- matrix(c(6, 1, -2, 1, 13, 0, -2, 0, 1),
 					nrow=3) # order is H, E, C
 			} else {
-				structureMatrix <- matrix(c(4, 2, 2, 2, 24, 0, 2, 0, 24),
+				structureMatrix <- matrix(c(6, 0, 0, 0, 30, -6, 0, -6, 30),
 					nrow=3) # order is ., (, )
 			}
 		} else {

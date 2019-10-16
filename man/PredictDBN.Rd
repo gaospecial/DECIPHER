@@ -16,7 +16,7 @@ PredictDBN(myXStringSet,
            shift = 1.3,
            threshold = 0.7,
            pseudoknots = 1,
-           weight = 1,
+           weight = NA,
            processors = 1,
            verbose = TRUE)
 }
@@ -49,7 +49,7 @@ Numeric specifying the score threshold at which to consider positions for pairin
 Integer indicating the maximum order of pseudoknots that are acceptable.  A value of \code{0} will prevent pseudoknots in the structure, whereas \code{1} (the default) will search for first-order psuedoknots.  Only used if \code{type} is \code{"states"} or \code{"pairs"}.
 }
   \item{weight}{
-A numeric vector of weights for each sequence, or a single number implying equal weights.
+Either a numeric vector of weights for each sequence, a single number implying equal weights, or \code{NA} (the default) to automatically calculate sequence weights based on \code{myXStringSet}.
 }
   \item{processors}{
 The number of processors to use, or \code{NULL} to automatically detect and use all available processors.

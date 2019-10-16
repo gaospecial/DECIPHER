@@ -648,7 +648,7 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 		
 		// locate the largest value in each row/column
 		for (i = 0; i < (tot - 1); i++) {
-			for (j = i + 1; j < tot; j++) {
+			for (j = i + minLoop + 1; j < tot; j++) {
 				if (MI[i*tot + j] > MI[i*tot + leftMax[i]]) // same (; diff )
 					leftMax[i] = j; // index = (; value = )
 				if (MI[i*tot + j] > MI[rightMax[j]*tot + j]) // same ); diff (
@@ -792,7 +792,7 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 				int range1[2] = {0};
 				int range2[2] = {0};
 				for (i = 0; i < tot; i++) {
-					//Rprintf("\ni = %d anchor = %d nuc = %d nucanchor = %d pos1 = %d pos2 = %d", i, anchor[i], nucs[pos[i]], anchor[i] > 0 ? nucs[pos[anchor[i]]] : 0, pos[i], anchor[i] > 0 ? pos[anchor[i]] : (anchor[i] < 0 ? pos[-1*anchor[i]] : 0));
+					//Rprintf("\ni = %d anchor = %d nuc = %d nucanchor = %d pos1 = %d pos2 = %d outer loop", i, anchor[i], nucs[pos[i]], anchor[i] > 0 ? nucs[pos[anchor[i]]] : 0, pos[i], anchor[i] > 0 ? pos[anchor[i]] : (anchor[i] < 0 ? pos[-1*anchor[i]] : 0));
 					if (anchor[i] > 0) { // anchored
 						range1[0] = i;
 						range2[1] = -1; // flag as new anchor
@@ -803,7 +803,7 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 						
 						// commence search for anchor boundaries
 						for (i = i + 1; i < tot; i++) {
-							//Rprintf("\ni = %d anchor = %d nuc = %d nucanchor = %d pos1 = %d pos2 = %d", i, anchor[i], nucs[pos[i]], anchor[i] > 0 ? nucs[pos[anchor[i]]] : 0, pos[i], anchor[i] > 0 ? pos[anchor[i]] : (anchor[i] < 0 ? pos[-1*anchor[i]] : 0));
+							//Rprintf("\ni = %d anchor = %d nuc = %d nucanchor = %d pos1 = %d pos2 = %d inner loop", i, anchor[i], nucs[pos[i]], anchor[i] > 0 ? nucs[pos[anchor[i]]] : 0, pos[i], anchor[i] > 0 ? pos[anchor[i]] : (anchor[i] < 0 ? pos[-1*anchor[i]] : 0));
 							if (anchor[i] > 0) { // anchored
 								range1[1] = i;
 								
@@ -828,10 +828,10 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 								if (next==0) // pairing within the right boundaries
 									break;
 								
-								range1[0] = nucs[pos[range1[0]]] + 1;
-								range1[1] = nucs[pos[range1[1]]] - 1;
-								range2[0] = nucs[pos[prev]] + 1;
-								range2[1] = nucs[pos[next]] - 1;
+								range1[0] = nucs[pos[range1[0]]];// + 1;
+								range1[1] = nucs[pos[range1[1]]];// - 1;
+								range2[0] = nucs[pos[prev]];// + 1;
+								range2[1] = nucs[pos[next]];// - 1;
 								//Rprintf("\nBounds left: %d - %d right %d - %d", range1[0], range1[1], range2[0], range2[1]);
 								
 								// find stem loops in the region between range1 and range2
