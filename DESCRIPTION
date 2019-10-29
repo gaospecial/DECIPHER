@@ -1,7 +1,7 @@
 Package: DECIPHER
 Type: Package
 Title: Tools for curating, analyzing, and manipulating biological sequences
-Version: 2.14.0
+Version: 2.15.0
 Date: 2019-10-15
 Author: Erik Wright
 Maintainer: Erik Wright <eswright@pitt.edu>
