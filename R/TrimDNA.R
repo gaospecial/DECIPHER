@@ -14,26 +14,28 @@ TrimDNA <- function(myDNAStringSet,
 	verbose=TRUE) {
 	
 	# error checking:
-	if (class(myDNAStringSet) != "DNAStringSet")
+	if (!is(myDNAStringSet, "DNAStringSet"))
 		stop("myDNAStringSet must be a DNAStringSet.")
-	if (!(class(quality) %in% c("NULL",
-		"PhredQuality",
-		"SolexaQuality",
-		"IlluminaQuality")))
+	if (!(is(quality, "NULL") ||
+		is(quality, "PhredQuality") ||
+		is(quality, "SolexaQuality") ||
+		is(quality, "IlluminaQuality")))
 		stop("quality must be a PhredQuality, SolexaQuality, or IlluminaQuality object.")
 	if (!is.null(quality) &&
 		any(width(myDNAStringSet) != width(quality)))
 		stop("The widths of myDNAStringSet must match the widths of quality.")
 	if (length(leftPatterns)==0)
 		stop("leftPatterns must be at least length one.")
-	if (class(leftPatterns) %in% c("DNAString", "DNAStringSet")) {
+	if (is(leftPatterns, "DNAString") ||
+		is(leftPatterns, "DNAStringSet")) {
 		leftPatterns <- as.character(leftPatterns)
 	} else if (!is.character(leftPatterns)) {
 		stop("leftPatterns must be a DNAStringSet or character vector.")
 	}
 	if (length(rightPatterns)==0)
 		stop("rightPatterns must be at least length one.")
-	if (class(rightPatterns) %in% c("DNAString", "DNAStringSet")) {
+	if (is(rightPatterns, "DNAString") ||
+		is(rightPatterns, "DNAStringSet")) {
 		rightPatterns <- as.character(rightPatterns)
 	} else if (!is.character(rightPatterns)) {
 		stop("rightPatterns must be a DNAStringSet or character vector.")
@@ -200,7 +202,7 @@ TrimDNA <- function(myDNAStringSet,
 		}
 		bounds <- .Call("movAvg",
 			quality,
-			match(class(quality),
+			match(class(quality)[1],
 				c("PhredQuality",
 					"SolexaQuality",
 					"IlluminaQuality")),

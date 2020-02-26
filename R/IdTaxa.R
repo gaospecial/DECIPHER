@@ -10,8 +10,10 @@ IdTaxa <- function(test,
 	verbose=TRUE) {
 	
 	# error checking
-	if (!is(test, "DNAStringSet") && !is(test, "RNAStringSet"))
-		stop("test must be a DNAStringSet or RNAStringSet.")
+	if (!is(test, "DNAStringSet") && !is(test, "RNAStringSet") && !is(test, "AAStringSet"))
+		stop("test must be an AAStringSet, DNAStringSet, or RNAStringSet.")
+	if (is(test, "AAStringSet") && any(strand != "top"))
+		stop("strand must be 'top' when test is an AAStringSet.")
 	# de-replicate sequences
 	ns <- names(test)
 	d <- !duplicated(test)
@@ -31,9 +33,11 @@ IdTaxa <- function(test,
 	test <- test[d]
 	l <- length(test)
 	if (l < 1)
-		stop("At least test sequence is required.")
+		stop("At least one test sequence is required.")
 	if (!is(trainingSet, "Taxa") || !is(trainingSet, "Train"))
 		stop("trainingSet must be an object of class 'Taxa' (subclass 'Train').")
+	if (is(test, "AAStringSet") && is.null(trainingSet$alphabet))
+		stop("trainingSet was built from amino acid sequences but test contains nucleotide sequences.")
 	TYPES <- c("collapsed", "extended")
 	type <- pmatch(type[1], TYPES)
 	if (is.na(type))
@@ -110,7 +114,9 @@ IdTaxa <- function(test,
 	K <- trainingSet$K
 	counts <- trainingSet$IDFweights
 	decision_kmers <- trainingSet$decisionKmers
-	nKmers <- 4^K
+	nKmers <- ifelse(is(test, "AAStringSet"),
+		max(trainingSet$alphabet) + 1,
+		4)^K
 	B <- as.integer(bootstraps)
 	
 	if (verbose) {
@@ -119,10 +125,19 @@ IdTaxa <- function(test,
 	}
 	
 	# index and sort all unique (non-ambiguous) k-mers
-	testkmers <- .Call("enumerateSequence",
-		test,
-		K,
-		PACKAGE="DECIPHER")
+	if (is(test, "AAStringSet")) {
+		testkmers <- .Call("enumerateSequenceReducedAA",
+			test,
+			K,
+			trainingSet$alphabet,
+			PACKAGE="DECIPHER")
+	} else {
+		testkmers <- .Call("enumerateSequence",
+			test,
+			K,
+			PACKAGE="DECIPHER")
+	}
+	
 	# determine the total number of k-mers per sequence
 	notNAs <- unlist(lapply(testkmers,
 		function(x)

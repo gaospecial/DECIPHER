@@ -6,11 +6,15 @@ StaggerAlignment <- function(myXStringSet,
 	verbose=TRUE) {
 	
 	# error checking
-	type <- switch(class(myXStringSet),
-		`DNAStringSet` = 1L,
-		`RNAStringSet` = 2L,
-		`AAStringSet` = 3L,
-		stop("myXStringSet must be an AAStringSet, DNAStringSet, or RNAStringSet."))
+	if (is(myXStringSet, "DNAStringSet")) {
+		type <- 1L
+	} else if (is(myXStringSet, "RNAStringSet")) {
+		type <- 2L
+	} else if (is(myXStringSet, "AAStringSet")) {
+		type <- 3L
+	} else {
+		stop("myXStringSet must be an AAStringSet, DNAStringSet, or RNAStringSet.")
+	}
 	if (length(myXStringSet) < 3)
 		return(myXStringSet)
 	u <- unique(width(myXStringSet))
@@ -99,7 +103,7 @@ StaggerAlignment <- function(myXStringSet,
 			processors=processors,
 			verbose=verbose))
 	} else {
-		if (class(tree)!="dendrogram")
+		if (!is(tree, "dendrogram"))
 			stop("tree must be a dendrogram.")
 		if (!all(unlist(tree) %in% v))
 			stop("tree is incompatible with myXStringSet.")

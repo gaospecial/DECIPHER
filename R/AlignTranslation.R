@@ -36,6 +36,8 @@ AlignTranslation <- function(myXStringSet,
 		stop("Unknown characters ('.') must be removed before alignment.")
 	if (length(type)==0)
 		stop("No type specified.")
+	if (length(type) > 1)
+		stop("Only one type may be specified.")
 	TYPES <- c("DNAStringSet", "RNAStringSet", "AAStringSet", "both")
 	type <- pmatch(type, TYPES)
 	if (is.na(type))
@@ -43,10 +45,10 @@ AlignTranslation <- function(myXStringSet,
 	if (type==-1)
 		stop("Ambiguous type.")
 	if (type==1) {
-		if (class(myXStringSet) != "DNAStringSet")
+		if (!is(myXStringSet, "DNAStringSet"))
 			stop("type cannot be 'RNAStringSet' when myXStringSet is a DNAStringSet.")
 	} else if (type==2) {
-		if (class(myXStringSet) != "RNAStringSet")
+		if (!is(myXStringSet, "RNAStringSet"))
 			stop("type cannot be 'DNAStringSet' when myXStringSet is a RNAStringSet.")
 	}
 	if (is.list(geneticCode)) {

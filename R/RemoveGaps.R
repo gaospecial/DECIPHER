@@ -3,11 +3,15 @@ RemoveGaps <- function(myXStringSet,
 	processors=1) {
 	
 	# error checking
-	type <- switch(class(myXStringSet),
-		`DNAStringSet` = 1L,
-		`RNAStringSet` = 2L,
-		`AAStringSet` = 3L,
-		stop("myXStringSet must be an AAStringSet, DNAStringSet, or RNAStringSet."))
+	if (is(myXStringSet, "DNAStringSet")) {
+		type <- 1L
+	} else if (is(myXStringSet, "RNAStringSet")) {
+		type <- 2L
+	} else if (is(myXStringSet, "AAStringSet")) {
+		type <- 3L
+	} else {
+		stop("myXStringSet must be an AAStringSet, DNAStringSet, or RNAStringSet.")
+	}
 	GAPS <- c("none", "all", "common")
 	removeGaps <- pmatch(removeGaps[1], GAPS)
 	if (is.na(removeGaps))

@@ -201,6 +201,8 @@ to.dendrogram <- function(object) {
 		
 		coeff  <- integer(nBins + 1)
 		for (i in 0:nBins) {
+			n <- nBins + alpha
+			k <- nBins - i
 			coeff[i + 1] <- (-1)^i*choose(nBins + alpha, nBins - i)/factorial(i)
 		}
 		
@@ -1555,11 +1557,15 @@ IdClusters <- function(myDistMatrix=NULL,
 	}
 	
 	if (method == 7) {
-		typeX <- switch(class(myXStringSet),
-			`DNAStringSet` = 1L,
-			`RNAStringSet` = 2L,
-			`AAStringSet` = 3L,
-			stop("pattern must be an AAStringSet, DNAStringSet, or RNAStringSet."))
+		if (is(myXStringSet, "DNAStringSet")) {
+			typeX <- 1L
+		} else if (is(myXStringSet, "RNAStringSet")) {
+			typeX <- 2L
+		} else if (is(myXStringSet, "AAStringSet")) {
+			typeX <- 3L
+		} else {
+			stop("myXStringSet must be an AAStringSet, DNAStringSet, or RNAStringSet.")
+		}
 		a <- vcountPattern("-", myXStringSet)
 		if (any(a > 0))
 			stop("Gap characters ('-') must be removed before inexact clustering.")

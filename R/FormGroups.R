@@ -98,10 +98,10 @@ FormGroups <- function(dbFile,
 		pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 	
 	.change <- function(id) {
-		id <- .Call("replaceChar", id, '"', "", PACKAGE="DECIPHER")
-		id <- .Call("replaceChar", id, "'", "", PACKAGE="DECIPHER")
+		id <- .Call("replaceChar", id, '"', "_", PACKAGE="DECIPHER")
+		id <- .Call("replaceChar", id, "'", "_", PACKAGE="DECIPHER")
+		id <- .Call("replaceChar", id, ".", "_", PACKAGE="DECIPHER")
 		id <- gsub("^\\s+|\\s+$", "", id) # trim flanking white space
-		id <- gsub("\\.+$", "", id)
 		return(id)
 	}
 	

@@ -10,17 +10,18 @@ Trains a classifier based on a reference taxonomy containing sequence representa
 LearnTaxa(train,
           taxonomy,
           rank = NULL,
-          K = floor(log(100*quantile(width(train), 0.99), 4)),
+          K = NULL,
           minFraction = 0.01,
           maxFraction = 0.06,
           maxIterations = 10,
           multiplier = 100,
           maxChildren = 200,
+          alphabet = AA_REDUCED[[1]],
           verbose = TRUE)
 }
 \arguments{
   \item{train}{
-A \code{DNAStringSet} or \code{RNAStringSet} of unaligned sequences.
+An \code{AAStringSet}, \code{DNAStringSet}, or \code{RNAStringSet} of unaligned sequences.
 }
   \item{taxonomy}{
 Character string providing the reference taxonomic assignment for each sequence in \code{train}.  Taxonomic ranks are separated by semicolons (``;'') beginning with ``Root''.
@@ -29,7 +30,7 @@ Character string providing the reference taxonomic assignment for each sequence 
 Optionally, a \code{data.frame} with 5 named columns giving the ``Index'' (i.e., 0 to the number of unique taxa), ``Name'' (i.e., taxon name), ``Parent'' (i.e., ``Index'' of the parent taxon), ``Level'' (i.e., integer rank level), and ``Rank'' (e.g., ``genus'') of each taxonomic rank.  This information is often provided in a separate ``taxid'' file along with publicly available training sequence sets.
 }
   \item{K}{
-Integer specifying the k-mer size.  The default value of \code{K} is such that k-mer matches between sequences are rarely (~1\%) found by chance.
+Integer specifying the k-mer size or \code{NULL} (the default) to calculate the k-mer size automatically.  The default value of \code{K} is such that k-mer matches between sequences are rarely (~1\%) found by chance.
 }
   \item{minFraction}{
 Numeric giving the minimum fraction of k-mers to sample during the initial tree descent phase of the classification algorithm.  (See details section below.)
@@ -45,6 +46,9 @@ Numeric indicating the degree to which individual sequences have control over th
 }
   \item{maxChildren}{
 Integer giving the maximum number of child taxa of any taxon at which to consider further descending the taxonomic tree.  A value of \code{1} will prevent use of the tree descent algorithm altogether.  Lower values may decrease classification speed, but result in output objects that require less memory.
+}
+  \item{alphabet}{
+Character vector of amino acid groupings used to reduce the 20 standard amino acids into smaller groups.  Alphabet reduction helps to find more distant homologies between sequences.  A non-reduced amino acid alphabet can be used by setting \code{alphabet} equal to \code{AA_STANDARD}.
 }
   \item{verbose}{
 Logical indicating whether to display progress.
@@ -110,6 +114,9 @@ A \code{data.frame} providing the ``Index'', ``Expected'' label, and ``Predicted
   \item{problemGroups}{
 Character vector containing any taxonomic groups that repeatedly had problems with correctly re-classifying sequences in \code{train} during the initial tree descent phase of the classification algorithm.  Problem groups likely indicate that a number of the sequences (or an entire group of sequences) assigned to the problem group are incorrectly placed in the taxonomic tree.
 }
+  \item{alphabet}{
+The \code{alphabet} when \code{train} is an ``AAStringSet'', otherwise \code{NULL}.
+}
 }
 \references{
 Murali, A., et al. (2018). IDTAXA: a novel approach for accurate taxonomic classification of microbiome sequences. Microbiome, 6, 140. https://doi.org/10.1186/s40168-018-0521-5
@@ -138,4 +145,9 @@ trainingSet
 
 # view information about the classifier
 plot(trainingSet)
+
+# train the classifier with amino acid sequences
+aa <- translate(dna)
+trainingSetAA <- LearnTaxa(aa, taxonomy)
+trainingSetAA
 }

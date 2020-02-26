@@ -432,9 +432,9 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 				MI[i*tot + j] = 0;
 			} else if (o < 3 && MI[i*tot + j] < thresh) {
 				MI[i*tot + j] = 0;
-			} else if (o==6 &&  MI[i*tot + j] >= thresh) {
-				n++;
 			}
+			if (o==6 &&  MI[i*tot + j] >= thresh)
+				n++;
 			//Rprintf("\ni = %d j = %d MI = %1.2f", pos[i] + 1, pos[j] + 1, MI[i*tot + j]);
 		}
 	}

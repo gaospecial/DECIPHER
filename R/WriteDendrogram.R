@@ -7,7 +7,7 @@ WriteDendrogram <- function(x,
 	append=FALSE) {
 	
 	# error checking
-	if (class(x) != "dendrogram")
+	if (!is(x, "dendrogram"))
 		stop("x is not a dendrogram.")
 	if (!is.logical(quoteLabels))
 		stop("quoteLabels must be a logical.")

@@ -288,7 +288,7 @@ DesignPrimers <- function(tiles,
 	} else {
 		processors <- as.integer(processors)
 	}
-	if (class(try(system("hybrid-min -V", intern=TRUE), silent=TRUE))=="try-error")
+	if (is(try(system("hybrid-min -V", intern=TRUE), silent=TRUE), "try-error"))
 		stop("OligoArrayAux must be properly installed.  See the Note section in the help page for DesignPrimers (enter: ?DesignPrimers).")
 	
 	primers_all <- data.frame()

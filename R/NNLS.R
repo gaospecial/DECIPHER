@@ -25,7 +25,7 @@ NNLS <- function(A,
 		stop("b must be a numeric vector or matrix.")
 	if (!((length(b) %% length(A$dimnames[[1]]))==0))
 		stop("The length of b must be a multiple of the number of rows in A.")
-	if (class(b)=="matrix")
+	if (is(b, "matrix"))
 		if (nrow(b)!=length(A$dimnames[[1]]))
 			stop("The number of rows in b must equal the number of rows in A.")
 	if (!is.numeric(precision))

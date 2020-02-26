@@ -1,17 +1,18 @@
 LearnTaxa <- function(train,
 	taxonomy,
 	rank=NULL,
-	K=floor(log(100*quantile(width(train), 0.99), 4)),
+	K=NULL,
 	minFraction=0.01,
 	maxFraction=0.06,
 	maxIterations=10,
 	multiplier=100,
 	maxChildren=200,
+	alphabet=AA_REDUCED[[1]],
 	verbose=TRUE) {
 	
 	# error checking
-	if (!is(train, "DNAStringSet") && !is(train, "RNAStringSet"))
-		stop("train must be a DNAStringSet or RNAStringSet.")
+	if (!is(train, "DNAStringSet") && !is(train, "RNAStringSet") && !is(train, "AAStringSet"))
+		stop("train must be an AAStringSet, DNAStringSet, or RNAStringSet.")
 	l <- length(train)
 	if (l < 2)
 		stop("At least two training sequences are required.")
@@ -32,12 +33,63 @@ LearnTaxa <- function(train,
 	}
 	if (any(!grepl("Root;", taxonomy, fixed=TRUE)))
 		stop("All elements of taxonomy must contain 'Root;'.")
-	if (!is.numeric(K))
-		stop("K must be a numeric.")
-	if (K != floor(K))
-		stop("K must be a whole number.")
-	if (K < 1)
-		stop("K must be at least one.")
+	if (is(train, "AAStringSet")) {
+		if (any(alphabet==""))
+			stop("No elements of alphabet can be empty.")
+		r <- strsplit(alphabet, "", fixed=TRUE)
+		alphabet <- setNames(rep(0L, 20),
+			AA_STANDARD)
+		for (i in seq_along(r)) {
+			w <- which(!(r[[i]] %in% AA_STANDARD))
+			if (length(w) > 0)
+				stop("Unrecognized letter(s) found in alphabet:  ",
+					paste(r[[i]][w], collapse=", "),
+					".")
+			w <- which(alphabet[r[[i]]] != 0L)
+			if (length(w) > 0)
+				stop("Repeated amino acids found in alphabet:  ",
+					paste(r[[i]][w], collapse=", "),
+					".")
+			alphabet[r[[i]]] <- i
+		}
+		w <- which(alphabet==0L)
+		if (length(w) > 0)
+			stop("Standard amino acids missing from alphabet:  ",
+				paste(names(w), collapse=", "),
+				".")
+		size <- max(alphabet)
+		if (size==1)
+			stop("More than one grouping of amino acids is required in the alphabet.")
+		alphabet <- alphabet - 1L
+	} else {
+		alphabet <- NULL
+		size <- 4
+	}
+	if (is.null(K)) {
+		if (is(train, "AAStringSet")) {
+			K <- floor(log(100*quantile(width(train), 0.99),
+				.Call("alphabetSizeReducedAA",
+					train,
+					alphabet,
+					PACKAGE="DECIPHER")))
+		} else {
+			K <- floor(log(100*quantile(width(train), 0.99),
+				.Call("alphabetSize",
+					train,
+					PACKAGE="DECIPHER")))
+		}
+		if (K < 1)
+			K <- 1
+	} else {
+		if (!is.numeric(K))
+			stop("K must be a numeric.")
+		if (length(K) != 1)
+			stop("K must be a single numeric.")
+		if (K != floor(K))
+			stop("K must be a whole number.")
+		if (K < 1)
+			stop("K must be at least one.")
+	}
 	if (!is.numeric(minFraction))
 		stop("minFraction must be a numeric.")
 	if (minFraction <= 0)
@@ -80,7 +132,7 @@ LearnTaxa <- function(train,
 	}
 	
 	# set default values
-	nKmers <- 4^K
+	nKmers <- size^K
 	B <- 100L
 	
 	# get the full classification beginning from "Root"
@@ -96,10 +148,18 @@ LearnTaxa <- function(train,
 		sep="")
 	
 	# index and sort all unique (non-ambiguous) k-mers
-	kmers <- .Call("enumerateSequence",
-		train,
-		K,
-		PACKAGE="DECIPHER")
+	if (is(train, "AAStringSet")) {
+		kmers <- .Call("enumerateSequenceReducedAA",
+			train,
+			K,
+			alphabet,
+			PACKAGE="DECIPHER")
+	} else {
+		kmers <- .Call("enumerateSequence",
+			train,
+			K,
+			PACKAGE="DECIPHER")
+	}
 	kmers <- lapply(kmers,
 		function(x)
 			sort(unique(x + 1L), na.last=NA))
@@ -410,7 +470,8 @@ LearnTaxa <- function(train,
 		IDFweights=counts,
 		decisionKmers=decision_kmers,
 		problemSequences=problemSequences,
-		problemGroups=problemGroups)
+		problemGroups=problemGroups,
+		alphabet=alphabet)
 	class(result) <- c("Taxa", "Train")
 	
 	if (verbose) {

@@ -13,12 +13,17 @@ BrowseSeqs <- function(myXStringSet,
 		stop("myXStringSet must be an XStringSet.")
 	if (length(myXStringSet)==0)
 		stop("No sequence information to display.")
-	type <- switch(class(patterns),
-		`DNAStringSet` = 1L,
-		`RNAStringSet` = 2L,
-		`AAStringSet` = 3L,
-		`list` = -1L,
-		0L)
+	if (is(patterns, "DNAStringSet")) {
+		type <- 1L
+	} else if (is(patterns, "RNAStringSet")) {
+		type <- 2L
+	} else if (is(patterns, "AAStringSet")) {
+		type <- 3L
+	} else if (is(patterns, "list")) {
+		type <- -1L
+	} else {
+		type <- 0L
+	}
 	if (type > 0L) {
 		patterns <- as.character(patterns)
 		if (type==1L) { # DNAStringSet
@@ -139,6 +144,8 @@ BrowseSeqs <- function(myXStringSet,
 		if (any(grepl("=|\"|<|>|[1-9]|[a-z]", patterns)))
 			stop("patterns cannot contain numbers, lower case characters, or the characters (=, <, >, \").")
 	}
+	if (any(patterns==""))
+		stop("patterns cannot be empty (i.e., '').")
 	if (type < 0) {
 		if (length(myXStringSet) != length(patterns))
 			stop("patterns is not the same length as myXStringSet.")
@@ -153,8 +160,8 @@ BrowseSeqs <- function(myXStringSet,
 	if (is.character(htmlFile)) {
 		htmlfile <- file(htmlFile, "w")
 		on.exit(close(htmlfile))
-	} else {
-		stop("'htmlFile' must be a character string or connection.")
+	} else if (!inherits(htmlFile, "connection")) {
+		stop("htmlFile must be a character string or connection.")
 	}
 	if (!is.logical(openURL) || is.na(openURL))
 		stop("openURL must be TRUE or FALSE.")

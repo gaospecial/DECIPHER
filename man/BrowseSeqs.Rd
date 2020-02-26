@@ -97,6 +97,9 @@ BrowseSeqs(dna, colors=c("#1E90FF", "#32CD32", "#9400D3", "black", "#EE3300"))
 # only color the positions within certain positional ranges (100-200 & 250-500)
 BrowseSeqs(dna, colorPatterns=c(100, 200, 250, 500))
 
+# example of calling attention to letters by coloring gaps black
+BrowseSeqs(dna, patterns="-", colors="black")
+
 # color according to base-pairing by supplying the fraction RGB for every position
 dbn <- PredictDBN(dna, type="structures") # calculate the secondary structures
 # dbn now contains the scores for whether a base is paired (left/right) or unpaired
@@ -117,6 +120,15 @@ sites <- c(sites, rc_sites[w]) # append their reverse complement
 sites <- sites[order(nchar(sites))] # match shorter sites first
 BrowseSeqs(dna, patterns=sites)
 
+# color bases by quality score
+fastq <- system.file("extdata", "s_1_sequence.txt", package="Biostrings")
+reads <- readQualityScaledDNAStringSet(fastq, quality.scoring="solexa")
+colors <- colorRampPalette(c("red", "yellow", "green"))(42)
+colors <- col2rgb(colors)/255
+quals <- as(quality(reads), "IntegerList")
+quals <- lapply(quals, function(x) colors[, x])
+BrowseSeqs(DNAStringSet(reads), patterns=quals) # green = high quality, red = low quality
+
 # load the example protein coding sequences
 fas <- system.file("extdata", "50S_ribosomal_protein_L2.fas", package="DECIPHER")
 dna <- readDNAStringSet(fas)
@@ -131,6 +143,11 @@ BrowseSeqs(AA, highlight=0)
 
 # example of highlighting positions that differ from the majority consensus
 BrowseSeqs(AA, highlight=0, threshold=0.5)
+
+# example of coloring in a reduced amino acid alphabet
+alpha <- AA_REDUCED[[15]]
+alpha # clustering of amino acids based on similarity
+BrowseSeqs(AA, patterns=c("-", paste("[", alpha, "]", sep="")))
 
 # color amino acids according to their predicted secondary structure
 hec <- PredictHEC(AA, type="probabilities") # calculate the secondary structures

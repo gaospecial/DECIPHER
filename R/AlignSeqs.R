@@ -14,16 +14,20 @@ AlignSeqs <- function(myXStringSet,
 	...) {
 	
 	# error checking
-	type <- switch(class(myXStringSet),
-		`DNAStringSet` = 1L,
-		`RNAStringSet` = 2L,
-		`AAStringSet` = 3L,
-		stop("pattern must be an AAStringSet, DNAStringSet, or RNAStringSet."))
+	if (is(myXStringSet, "DNAStringSet")) {
+		type <- 1L
+	} else if (is(myXStringSet, "RNAStringSet")) {
+		type <- 2L
+	} else if (is(myXStringSet, "AAStringSet")) {
+		type <- 3L
+	} else {
+		stop("myXStringSet must be an AAStringSet, DNAStringSet, or RNAStringSet.")
+	}
 	l <- length(myXStringSet)
 	if (l < 2)
 		stop("At least two sequences are required in myXStringSet.")
 	if (!is.null(guideTree)) {
-		if (class(guideTree)=="dendrogram") {
+		if (is(guideTree, "dendrogram")) {
 			if (attr(guideTree, "height") > 0.501)
 				stop("Total height of guideTree can be at most 0.5.")
 			heights <- rapply(guideTree,
@@ -39,13 +43,14 @@ AlignSeqs <- function(myXStringSet,
 			labels <- match(labels, names(myXStringSet))
 			if (any(is.na(labels)))
 				stop("Leaf labels in guideTree must match names of myXStringSet.")
-			guideTree <- dendrapply(guideTree,
+			guideTree <- rapply(guideTree,
 				function(x) {
 					if (is.leaf(x))
 						x[1] <- match(attr(x, "label"),
 							names(myXStringSet))
 					return(x)
-				})
+				},
+				how="replace")
 		} else {
 			stop("guideTree must be a dendrogram object.")
 		}

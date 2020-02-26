@@ -18,13 +18,21 @@ AlignProfiles <- function(pattern,
 	processors=1) {
 	
 	# error checking
-	type <- switch(class(pattern),
-		`DNAStringSet` = 1L,
-		`RNAStringSet` = 2L,
-		`AAStringSet` = 3L,
-		stop("pattern must be an AAStringSet, DNAStringSet, or RNAStringSet."))
-	if (class(pattern) != class(subject))
-		stop("pattern and subject must be of the same class.")
+	if (is(pattern, "DNAStringSet")) {
+		type <- 1L
+		if (!is(subject, "DNAStringSet"))
+			stop("pattern and subject must be of the same class.")
+	} else if (is(pattern, "RNAStringSet")) {
+		type <- 2L
+		if (!is(subject, "RNAStringSet"))
+			stop("pattern and subject must be of the same class.")
+	} else if (is(pattern, "AAStringSet")) {
+		type <- 3L
+		if (!is(subject, "AAStringSet"))
+			stop("pattern and subject must be of the same class.")
+	} else {
+		stop("pattern must be an AAStringSet, DNAStringSet, or RNAStringSet.")
+	}
 	if (length(subject) < 1)
 		stop("At least one sequence is required in the subject.")
 	w.p <- unique(width(pattern))

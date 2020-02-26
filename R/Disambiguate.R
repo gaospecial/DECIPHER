@@ -1,10 +1,13 @@
 Disambiguate <- function(myXStringSet) {
 	
 	# error checking
-	type <- switch(class(myXStringSet),
-		`DNAStringSet` = 1L,
-		`RNAStringSet` = 2L,
-		stop("myXStringSet must be a DNAStringSet or RNAStringSet."))
+	if (is(myXStringSet, "DNAStringSet")) {
+		type <- 1L
+	} else if (is(myXStringSet, "RNAStringSet")) {
+		type <- 2L
+	} else {
+		stop("myXStringSet must be a DNAStringSet or RNAStringSet.")
+	}
 	
 	myXStringSet <- .Call("expandAmbiguities",
 		myXStringSet,

@@ -46,7 +46,7 @@
 }
 
 .switch <- function(x) {
-	if (class(x)=="DNAStringSet") {
+	if (is(x, "DNAStringSet")) {
 		ans <- new("RNAStringSet")
 	} else {
 		ans <- new("DNAStringSet")
