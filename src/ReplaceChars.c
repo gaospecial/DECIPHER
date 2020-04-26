@@ -305,6 +305,10 @@ SEXP replaceChars(SEXP x, SEXP r, SEXP t)
 						s[count] = 'B';
 						count++;
 						break;
+					case 'j':
+						s[count] = 'J';
+						count++;
+						break;
 					case 'z':
 						s[count] = 'Z';
 						count++;

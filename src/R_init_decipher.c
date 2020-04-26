@@ -33,7 +33,7 @@ static const R_CallMethodDef callMethods[] = { // method call, pointer, num args
 	{"cluster", (DL_FUNC) &cluster, 7},
 	{"reclusterNJ", (DL_FUNC) &reclusterNJ, 2},
 	{"reclusterUPGMA", (DL_FUNC) &reclusterUPGMA, 2},
-	{"clusterML", (DL_FUNC) &clusterML, 6},
+	{"clusterML", (DL_FUNC) &clusterML, 8},
 	{"distMatrix", (DL_FUNC) &distMatrix, 10},
 	{"gaps", (DL_FUNC) &gaps, 2},
 	{"designProbes", (DL_FUNC) &designProbes, 16},

@@ -46,7 +46,7 @@ SEXP adjustHeights(SEXP x);
 
 // ClusterML.c
 
-SEXP clusterML(SEXP x, SEXP y, SEXP model, SEXP branches, SEXP lengths, SEXP nThreads);
+SEXP clusterML(SEXP x, SEXP y, SEXP model, SEXP branches, SEXP lengths, SEXP states, SEXP type, SEXP nThreads);
 
 // DesignProbes.c
 

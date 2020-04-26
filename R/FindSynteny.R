@@ -1379,6 +1379,16 @@ FindSynteny <- function(dbFile,
 	}
 	results[l, l] <- list(widths=w2)
 	
+	for (i in seq_len(l)) {
+		names(results[i, i][[1]]) <- dbGetQuery(dbConn,
+			paste('select description from ',
+				tblName,
+				' where identifier is "',
+				identifier[i],
+				'"',
+				sep=''))$description
+	}
+	
 	if (verbose) {
 		setTxtProgressBar(pBar, 1)
 		close(pBar)

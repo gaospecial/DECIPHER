@@ -42,6 +42,7 @@ CalculateEfficiencyFISH  Predict Thermodynamic Parameters of Probe/Target
 CalculateEfficiencyPCR   Predict Amplification Efficiency of Primer Sequences
 Codec                    Compression/Decompression of Character Vectors
 ConsensusSequence        Create a Consensus Sequence
+Cophenetic               Compute cophenetic distances on dendrogram objects
 CorrectFrameshifts       Corrects Frameshift Errors In Protein Coding
                          Sequences
 CreateChimeras           Create Artificial Chimeras
@@ -76,6 +77,7 @@ IdLengths                Determine the Number of Bases, Nonbases, and Width
                          of Each Sequence
 IdTaxa                   Assign Sequences a Taxonomic Classification
 LearnTaxa                Train a Classifier for Assigning Taxonomy
+MapCharacters            Map Changes in Ancestral Character States
 MaskAlignment            Mask Highly Variable Regions of An Alignment
 MeltDNA                  Simulate Melting of DNA
 MIQS                     MIQS Amino Acid Substitution Matrix

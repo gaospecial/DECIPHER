@@ -182,9 +182,12 @@ BrowseSeqs <- function(myXStringSet,
 	}
 	if (is.numeric(colorPatterns) & !is.infinite(colWidth))
 		stop("colWidth must be Inf if colorPatterns is numeric.")
-	if (is.null(names(myXStringSet)))
+	if (is.null(names(myXStringSet))) {
 		names(myXStringSet) <- 1:length(myXStringSet)
-	names(myXStringSet) <- gsub("\t", " ", names(myXStringSet), fixed=TRUE)
+	} else {
+		names(myXStringSet) <- gsub("\t", " ", names(myXStringSet), fixed=TRUE)
+		names(myXStringSet) <- gsub("\n", " ", names(myXStringSet), fixed=TRUE)
+	}
 	if (!is.na(highlight)) {
 		if (highlight < 0 || highlight > length(myXStringSet))
 			stop("highlight must be 0 or the index of a sequence in myXStringSet.")

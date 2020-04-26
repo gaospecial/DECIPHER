@@ -89,7 +89,7 @@ static void L_known(const char *p, double *Ls, int *length)
 			*(Ls + *length) = (double)1/3; *(Ls + 2*(*length)) = (double)1/3; *(Ls + 3*(*length)) = (double)1/3; // CGT
 			break;
 		case 15: // N
-			//*(Ls) = .25; *(Ls + *length) = .25; *(Ls + 2*(*length)) = .25; *(Ls + 3*(*length)) = .25; // ACGT
+			*(Ls) = .25; *(Ls + *length) = .25; *(Ls + 2*(*length)) = .25; *(Ls + 3*(*length)) = .25; // ACGT
 			break;
 		case 16: // -
 			//*(Ls) = .25; *(Ls + *length) = .25; *(Ls + 2*(*length)) = .25; *(Ls + 3*(*length)) = .25; // all possible
@@ -366,16 +366,16 @@ static void ProbChange(double *m, double *P, double v)
 	*/
 }
 
-SEXP clusterML(SEXP x, SEXP y, SEXP model, SEXP branches, SEXP lengths, SEXP nThreads)
+SEXP clusterML(SEXP x, SEXP y, SEXP model, SEXP branches, SEXP lengths, SEXP states, SEXP type, SEXP nThreads)
 {
-	// input is the output tree from clusterNJ.c
+	// input is the NJ output tree from cluster.c
 	
 	// step 1:  figure out widths of each sequence
 	// step 2:  for each position calculate the likelihood(L)
 	// step 3:  for each node calculate L at the node
 	//      3a: if node is external (leaf) then L(base) is known
 	//          if base is ambigous then L(base) is split up
-	//          gaps and N are disregarded as unknowns L() = 0
+	//          non-letters are disregarded as unknowns L() = 0
 	//      3b: if node is internal then L must be calculated
 	//          L = probaility of changing over that branch length
 	//              times L of previous node
@@ -397,6 +397,8 @@ SEXP clusterML(SEXP x, SEXP y, SEXP model, SEXP branches, SEXP lengths, SEXP nTh
 	double *T = REAL(x); // Tree Topology
 	double *m = REAL(model); // Substitution Model [%A %C %G %T k1 k2 rate(s) probabilities]
 	int *widths = (int *) R_alloc(length, sizeof(int));
+	double s = asReal(states);
+	char TU = asInteger(type)==1 ? 'T' : 'U';
 	int nthreads = asInteger(nThreads);
 	
 	// alternative branch lengths
@@ -414,9 +416,16 @@ SEXP clusterML(SEXP x, SEXP y, SEXP model, SEXP branches, SEXP lengths, SEXP nTh
 		}
 	}
 	
+	double *node;
+	int count;
+	// matrix of base probabilities at each internal node (including the root)
+	// [node base site]
+	if (s)
+		node = (double *) calloc((length - 1)*4*maxWidth, sizeof(double)); // initialized to zero (thread-safe on Windows)
+	
 	double *sumL = Calloc(maxWidth*(altL + 1), double);
 	numRates = (length(model) - 6)/2; // number of bins for the gamma distribution
-	for (k = 0; k < numRates; k++) { // for each bin of the gamma distribution determined by alfa
+	for (k = 0; k < numRates; k++) { // for each bin of the gamma distribution determined by alpha
 		// P = [Paa Pac Pag Pat Pcc Pcg Pct Pgg Pgt Ptt Pca Pga Pta Pgc Ptc Ptg]
 		double *P = Calloc((length - 1)*32 + altL*16, double); // initialized to zero
 		#pragma omp parallel for private(i) schedule(guided) num_threads(nthreads)
@@ -429,11 +438,13 @@ SEXP clusterML(SEXP x, SEXP y, SEXP model, SEXP branches, SEXP lengths, SEXP nTh
 			ProbChange(m, (P + (length - 1)*32 + i*16), *(ls + i) * *(m + k + 6));
 		}
 		
-		#pragma omp parallel for private(i,j,y_i,row) schedule(guided) num_threads(nthreads)
+		#pragma omp parallel for private(i,j,y_i,row,count) schedule(guided) num_threads(nthreads)
 		for (i = 0; i < maxWidth; i++) { // for each position
 			//double *Ls = (double *) R_alloc(length*8, sizeof(double));
 			//double *Ls = Calloc(length*8*(altL + 1), double); // initialized to zero
 			double *Ls = (double *) calloc(length*8*(altL + 1), sizeof(double)); // initialized to zero (thread-safe on Windows)
+			if (s)
+				count = 0;
 			
 			for (j = 0; j < (length - 1); j++) { // for each node
 				// if first branch is leaf then its base L is 1
@@ -492,7 +503,7 @@ SEXP clusterML(SEXP x, SEXP y, SEXP model, SEXP branches, SEXP lengths, SEXP nTh
 					}
 				}
 				// if the second branch is a node then L must be calculated
-				if ((int)T[7*(length - 1) + j] > 0) { // first branch is a node
+				if ((int)T[7*(length - 1) + j] > 0) { // second branch is a node
 					// L is probability(branch lengths) * L(previous nodes)
 					row = (int)T[7*(length - 1) + j] - 1;
 					
@@ -520,12 +531,75 @@ SEXP clusterML(SEXP x, SEXP y, SEXP model, SEXP branches, SEXP lengths, SEXP nTh
 						}
 					}
 				}
+				
+				// apply three-way parsimony to resolve gaps
+				if ((int)T[6*(length - 1) + j] > 0) { // first branch is a node
+					row = (int)T[6*(length - 1) + j] - 1;
+					if ((*(Ls + 0*length + row)==0 &&
+						*(Ls + 1*length + row)==0 &&
+						*(Ls + 2*length + row)==0 &&
+						*(Ls + 3*length + row)==0) ^
+						(*(Ls + 4*length + row)==0 &&
+						*(Ls + 5*length + row)==0 &&
+						*(Ls + 6*length + row)==0 &&
+						*(Ls + 7*length + row)==0) &&
+						((*(Ls + 4*length + j)==0 &&
+						*(Ls + 5*length + j)==0 &&
+						*(Ls + 6*length + j)==0 &&
+						*(Ls + 7*length + j)==0))) { // gap/letter and outgroup is a gap
+						*(Ls + 0*length + j) = 0;
+						*(Ls + 1*length + j) = 0;
+						*(Ls + 2*length + j) = 0;
+						*(Ls + 3*length + j) = 0;
+					}
+					if (s) {
+						node[count*maxWidth*4 + i*4 + 0] += *(Ls + 0*length + j);
+						node[count*maxWidth*4 + i*4 + 1] += *(Ls + 1*length + j);
+						node[count*maxWidth*4 + i*4 + 2] += *(Ls + 2*length + j);
+						node[count*maxWidth*4 + i*4 + 3] += *(Ls + 3*length + j);
+						count++;
+					}
+				}
+				if ((int)T[7*(length - 1) + j] > 0) { // second branch is a node
+					row = (int)T[7*(length - 1) + j] - 1;
+					if ((*(Ls + 0*length + row)==0 &&
+						*(Ls + 1*length + row)==0 &&
+						*(Ls + 2*length + row)==0 &&
+						*(Ls + 3*length + row)==0) ^
+						(*(Ls + 4*length + row)==0 &&
+						*(Ls + 5*length + row)==0 &&
+						*(Ls + 6*length + row)==0 &&
+						*(Ls + 7*length + row)==0) &&
+						((*(Ls + 0*length + j)==0 &&
+						*(Ls + 1*length + j)==0 &&
+						*(Ls + 2*length + j)==0 &&
+						*(Ls + 3*length + j)==0))) { // gap/letter and outgroup is a gap
+						*(Ls + 4*length + j) = 0;
+						*(Ls + 5*length + j) = 0;
+						*(Ls + 6*length + j) = 0;
+						*(Ls + 7*length + j) = 0;
+					}
+					if (s) {
+						node[count*maxWidth*4 + i*4 + 0] += *(Ls + 4*length + j);
+						node[count*maxWidth*4 + i*4 + 1] += *(Ls + 5*length + j);
+						node[count*maxWidth*4 + i*4 + 2] += *(Ls + 6*length + j);
+						node[count*maxWidth*4 + i*4 + 3] += *(Ls + 7*length + j);
+						count++;
+					}
+				}
 			}
 			
 			// calculate Likelihood of each base at final node
 			row = length - 2;  // final node: j = length - 1
 			
 			L_unknown(Ls, 0, j, row, length, (P + row*32), (P + row*32 + 16));
+			
+			if (s) {
+				node[count*maxWidth*4 + i*4 + 0] += *(Ls + 0*length + j);
+				node[count*maxWidth*4 + i*4 + 1] += *(Ls + 1*length + j);
+				node[count*maxWidth*4 + i*4 + 2] += *(Ls + 2*length + j);
+				node[count*maxWidth*4 + i*4 + 3] += *(Ls + 3*length + j);
+			}
 			
 			for (int o = 0; o < altL; o++) {
 				if (*(bs + o)==(row + 1)) { // first branch was adjusted
@@ -536,27 +610,6 @@ SEXP clusterML(SEXP x, SEXP y, SEXP model, SEXP branches, SEXP lengths, SEXP nTh
 					L_unknown(Ls, 0, j + length*8*(o + 1), row + length*8*(o + 1), length, (P + row*32), (P + row*32 + 16));
 				}
 			}
-			/* // Prints last common ancestor:
-			if (*(Ls + 0*length + j)==0 &&
-				*(Ls + 1*length + j)==0 &&
-				*(Ls + 2*length + j)==0 &&
-				*(Ls + 3*length + j)==0) {
-				if (i==0) Rprintf("\n");
-				Rprintf("-");
-				continue;
-			} else if (*(Ls + 0*length + j) > *(Ls + 1*length + j) &&
-				*(Ls + 0*length + j) > *(Ls + 2*length + j) &&
-				*(Ls + 0*length + j) > *(Ls + 3*length + j)) {
-				Rprintf("A");
-			} else if (*(Ls + 1*length + j) > *(Ls + 2*length + j) &&
-					   *(Ls + 1*length + row) > *(Ls + 3*length + j)) {
-				Rprintf("C");
-			} else if (*(Ls + 2*length + j) > *(Ls + 3*length + j)) {
-				Rprintf("G");
-			} else {
-				Rprintf("T");
-			}
-			*/
 			
 			// sum likelihoods of tree for every position
 			for (int o = 0; o <= altL; o++) {
@@ -573,13 +626,63 @@ SEXP clusterML(SEXP x, SEXP y, SEXP model, SEXP branches, SEXP lengths, SEXP nTh
 	}
 	
 	SEXP ans;
-	PROTECT(ans = allocVector(REALSXP, altL + 1));
-	double *rans = REAL(ans);
-	for (int o = 0; o <= altL; o++) {
-		rans[o] = 0;
-		for (i = 0; i < maxWidth; i++) {
-			if (*(sumL + i + o*maxWidth) > 0) {
-				rans[o] -= log(*(sumL + i + o*maxWidth));
+	if (s) { // return character states
+		PROTECT(ans = allocVector(STRSXP, length - 1));
+		for (j = 0; j < (length - 1); j++) {
+			char *rans = Calloc(maxWidth + 1, char);
+			for (i = 0; i < maxWidth; i++) {
+				double La = node[j*maxWidth*4 + i*4 + 0];
+				double Lc = node[j*maxWidth*4 + i*4 + 1];
+				double Lg = node[j*maxWidth*4 + i*4 + 2];
+				double Lt = node[j*maxWidth*4 + i*4 + 3];
+				if (La==0 && Lc==0 && Lg==0 && Lt==0) {
+					rans[i] = '-';
+				} else if (s*La > Lc && s*La > Lg && s*La > Lt) {
+					rans[i] = 'A';
+				} else if (s*Lc > La && s*Lc > Lg && s*Lc > Lt) {
+					rans[i] = 'C';
+				} else if (s*Lg > La && s*Lg > Lc && s*Lg > Lt) {
+					rans[i] = 'G';
+				} else if (s*Lt > La && s*Lt > Lc && s*Lt > Lg) {
+					rans[i] = TU;
+				} else if (s*La > Lg && s*La > Lt && s*Lc > Lg && s*Lc > Lt) { // M = A or C
+					rans[i] = 'M';
+				} else if (s*La > Lc && s*La > Lt && s*Lg > Lc && s*Lg > Lt) { // R = A or G
+					rans[i] = 'R';
+				} else if (s*La > Lc && s*La > Lg && s*Lt > Lc && s*Lt > Lg) { // W = A or T
+					rans[i] = 'W';
+				} else if (s*Lc > La && s*Lc > Lt && s*Lg > La && s*Lg > Lt) { // S = C or G
+					rans[i] = 'S';
+				} else if (s*Lc > La && s*Lc > Lg && s*Lt > La && s*Lt > Lg) { // Y = C or T
+					rans[i] = 'Y';
+				} else if (s*Lg > La && s*Lg > Lc && s*Lt > La && s*Lt > Lc) { // K = G or T
+					rans[i] = 'K';
+				} else if (s*La > Lt && s*Lc > Lt && s*Lg > Lt) { // V = A or C or G
+					rans[i] = 'V';
+				} else if (s*La > Lg && s*Lc > Lg && s*Lt > Lg) { // H = A or C or T
+					rans[i] = 'H';
+				} else if (s*La > Lc && s*Lg > Lc && s*Lt > Lc) { // D = A or G or T
+					rans[i] = 'D';
+				} else if (s*Lc > La && s*Lg > La && s*Lt > La) { // B = C or G or T
+					rans[i] = 'B';
+				} else { // N = A or C or G or T
+					rans[i] = 'N';
+				}
+			}
+			rans[i] = '\0'; // end (null terminate) the string
+			SET_STRING_ELT(ans, j, mkChar(rans));
+			Free(rans);
+		}
+		free(node);
+	} else { // return -LnL
+		PROTECT(ans = allocVector(REALSXP, altL + 1));
+		double *rans = REAL(ans);
+		for (int o = 0; o <= altL; o++) {
+			rans[o] = 0;
+			for (i = 0; i < maxWidth; i++) {
+				if (*(sumL + i + o*maxWidth) > 0) {
+					rans[o] -= log(*(sumL + i + o*maxWidth));
+				}
 			}
 		}
 	}

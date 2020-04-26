@@ -15,6 +15,7 @@ IdClusters(myDistMatrix = NULL,
            myXStringSet = NULL,
            model = MODELS,
            collapse = 0,
+           reconstruct = FALSE,
            processors = 1,
            verbose = TRUE)
 }
@@ -37,11 +38,14 @@ Character string indicating the type of output desired.  This should be (an abbr
   \item{myXStringSet}{
 If \code{method} is \code{"ML"}, the \code{DNAStringSet} or \code{RNAStringSet} used in the creation of \code{myDistMatrix}.  If \code{method} is \code{"inexact"}, the \code{DNAStringSet}, \code{RNAStringSet}, or \code{AAStringSet} to cluster.  Not applicable for other methods.
 }
+  \item{model}{
+One or more of the available \code{MODELS} of evolution.  Only applicable if \code{method} is \code{"ML"} or \code{reconstruct} is \code{TRUE}.
+}
   \item{collapse}{
 Numeric controlling which internal edges of the tree are removed by collapsing their nodes.  If \code{collapse} is zero (the default) then nodes at the same height will be collapsed to a single node, resulting in a multifurcating tree.  When \code{collapse} is greater than zero, nodes that are within \code{collapse} difference in height are made into a single node.  A value of \code{collapse} less than zero will ensure that the \code{dendrogram} is purely bifurcating.  Note that \code{collapse} has no effect on cluster numbers or \code{cutoff}.
 }
-  \item{model}{
-One or more of the available \code{MODELS} of DNA evolution.  Only applicable if \code{method} is \code{"ML"}.
+  \item{reconstruct}{
+Logical or numeric determining whether to perform ancestral state reconstruction. If \code{TRUE}, maximum likelihood character states are determined at internal nodes of the \code{dendrogram} and provided as the \code{"state"} attribute.  A numeric value between zero and one (exclusive) can be provided, in which case that fraction of the likelihood for a state must be greater than the likelihood of all alternative states.  Requires specification of a \code{DNAStringSet} or \code{RNAStringSet} via \code{myXStringSet}. Only applicable if \code{type} is \code{"dendrogram"} or \code{"both"}.
 }
   \item{processors}{
 The number of processors to use, or \code{NULL} to automatically detect and use all available processors.
@@ -77,7 +81,7 @@ Saitou, N. and Nei, M. (1987) The neighbor-joining method: a new method for reco
 Erik Wright \email{eswright@pitt.edu}
 }
 \seealso{
-\code{\link{DistanceMatrix}}, \code{\link{Add2DB}}, \code{\link{MODELS}}
+\code{\link{Cophenetic}}, \code{\link{DistanceMatrix}}, \code{\link{Add2DB}}, \code{\link{MODELS}}
 }
 \examples{
 # using the matrix from the original paper by Saitou and Nei

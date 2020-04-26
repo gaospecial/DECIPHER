@@ -61,9 +61,11 @@ LearnTaxa <- function(train,
 		if (size==1)
 			stop("More than one grouping of amino acids is required in the alphabet.")
 		alphabet <- alphabet - 1L
+		maxK <- as.integer(floor(log(4294967295, size)))
 	} else {
 		alphabet <- NULL
 		size <- 4
+		maxK <- 15
 	}
 	if (is.null(K)) {
 		if (is(train, "AAStringSet")) {
@@ -78,8 +80,11 @@ LearnTaxa <- function(train,
 					train,
 					PACKAGE="DECIPHER")))
 		}
-		if (K < 1)
+		if (K < 1) {
 			K <- 1
+		} else if (K > maxK) {
+			K <- maxK
+		}
 	} else {
 		if (!is.numeric(K))
 			stop("K must be a numeric.")

@@ -229,7 +229,7 @@ SearchDB <- function(dbFile,
 		}
 		
 		if (type!=4 && type!=8) {
-			# replace characters that are not in the DNA_ALPHABET
+			# replace characters that are not in the alphabet
 			searchResult$sequence <- .Call("replaceChars",
 				searchResult$sequence,
 				replaceChar,

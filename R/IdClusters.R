@@ -1,5 +1,5 @@
 # below function modified from stats package
-to.dendrogram <- function(object) {
+to.dendrogram <- function(object, states=NULL) {
 	
 	z <- list()
 	oHgts <- object$lengths
@@ -8,11 +8,11 @@ to.dendrogram <- function(object) {
 	if (nMerge != nrow(object$merge))
 		stop("'merge' and 'height' do not fit!")
 	hMax <- oHgt[nMerge]
-	cMax <- max(object$clusters)
 	
+	count <- 1L
 	one <- 1L
 	two <- 2L
-	for (k in 1L:nMerge) {
+	for (k in seq_len(nMerge)) {
 		x <- as.integer(object$merge[k, ])
 		neg <- x < 0
 		if (all(neg)) { # two leaves
@@ -39,16 +39,23 @@ to.dendrogram <- function(object) {
 			attr(zk[[2 - isL]], "height") <- oHgt[k] - oHgts[k, 2 - isL]
 			attr(zk[[2 - isL]], "label") <- object$labels[-x[2 - isL]]
 			attr(zk[[2 - isL]], "leaf") <- TRUE
+			attr(zk[[1 + isL]], "state") <- states[count]
+			count <- count + 1L
 		} else { # two nodes
 			x <- as.character(x)
 			zk <- list(z[[x[1L]]], z[[x[2L]]])
 			attr(zk, "members") <- attr(z[[x[1L]]], "members") + attr(z[[x[2L]]], "members")
+			attr(zk[[1L]], "state") <- states[count]
+			count <- count + 1L
+			attr(zk[[2L]], "state") <- states[count]
+			count <- count + 1L
 		}
 		attr(zk, "height") <- oHgt[k]
 		k <- as.character(k)
 		z[[k]] <- zk
 	}
 	z <- z[[k]]
+	attr(z, "state") <- states[count]
 	class(z) <- "dendrogram"
 	z
 }
@@ -82,6 +89,8 @@ to.dendrogram <- function(object) {
 				# make multifurcating
 				m1 <- attr(stack[[pos]][[1]], "members")
 				m2 <- attr(stack[[pos]][[2]], "members")
+				states <- c(attr(stack[[pos]][[1]], "state"),
+					attr(stack[[pos]][[2]], "state"))
 				m <- m1 + m2
 				if ((h - h1) <= collapse && (h - h2) <= collapse) {
 					l1 <- length(stack[[pos]][[1]])
@@ -108,6 +117,7 @@ to.dendrogram <- function(object) {
 				
 				attr(stack[[pos]], "height") <- h
 				attr(stack[[pos]], "members") <- m
+				attr(stack[[pos]], "state") <- unique(states)
 				
 				class(stack[[pos]]) <- "dendrogram"
 			}
@@ -140,12 +150,12 @@ to.dendrogram <- function(object) {
 	l <- length(dNames)
 	clusters <- data.frame(cluster=integer(l),
 		row.names=dNames)
-	w <- which(myClusters[, 1] < 0)
+	w <- which(myClusters[, 7] < 0)
 	if (length(w) > 0)
-		clusters$cluster[-1*myClusters[w, 1]] <- as.integer(myClusters[w, 9])
-	w <- which(myClusters[, 2] < 0)
+		clusters$cluster[-1*myClusters[w, 7]] <- as.integer(myClusters[w, 9])
+	w <- which(myClusters[, 8] < 0)
 	if (length(w) > 0)
-		clusters$cluster[-1*myClusters[w, 2]] <- as.integer(myClusters[w, 10])
+		clusters$cluster[-1*myClusters[w, 8]] <- as.integer(myClusters[w, 10])
 	
 	# order the cluster numbers to match
 	# the order of the dendrogram
@@ -177,10 +187,10 @@ to.dendrogram <- function(object) {
 	l <- length(dNames)
 	clusters <- data.frame(cluster=integer(l),
 		row.names=dNames)
-	w <- which(myClusters[, 1] < 0)
+	w <- which(myClusters[, 7] < 0)
 	if (length(w) > 0)
 		clusters$cluster[-1*myClusters[w, 1]] <- as.integer(myClusters[w, 9])
-	w <- which(myClusters[, 2] < 0)
+	w <- which(myClusters[, 8] < 0)
 	if (length(w) > 0)
 		clusters$cluster[-1*myClusters[w, 2]] <- as.integer(myClusters[w, 10])
 	
@@ -249,6 +259,8 @@ to.dendrogram <- function(object) {
 			c(0.25, 0.25, 0.25, 0.25, 1, 1, 1, 1),
 			integer(),
 			numeric(),
+			0,
+			1L,
 			processors,
 			PACKAGE="DECIPHER")
 		K <- 2*dim(myClusters)[1] - 1
@@ -263,6 +275,8 @@ to.dendrogram <- function(object) {
 				c(0.25, 0.25, 0.25, 0.25, 1, 1, .rates(params, rates)),
 				integer(),
 				numeric(),
+				0,
+				1L,
 				processors,
 				PACKAGE="DECIPHER")
 		}
@@ -279,6 +293,8 @@ to.dendrogram <- function(object) {
 				c(0.25, 0.25, 0.25, 0.25, params, params, 1, 1),
 				integer(),
 				numeric(),
+				0,
+				1L,
 				processors,
 				PACKAGE="DECIPHER")
 		}
@@ -292,6 +308,8 @@ to.dendrogram <- function(object) {
 					c(0.25, 0.25, 0.25, 0.25, o$minimum, o$minimum, .rates(params, rates)),
 					integer(),
 					numeric(),
+					0,
+					1L,
 					processors,
 					PACKAGE="DECIPHER")
 			}
@@ -308,138 +326,27 @@ to.dendrogram <- function(object) {
 		AICc <- 2*K + 2*LnL + 2*K*(K + 1)/(N - K - 1)
 		BIC <- 2*LnL + K*log(N)
 		return(c(NA, NA, NA, NA, rep(o$minimum, 2), a, LnL, AICc, BIC))
-	} else if (model=="F81") {
-		baseFreqs <- colSums(alphabetFrequency(myDNAStringSet))[1:4]
-		baseFreqs <- baseFreqs/sum(baseFreqs)
-#		f <- function(params) {
-#			if (sum(params) > 0.99)
-#				return(1e9)
-#			LnL <- .Call("clusterML",
-#				myClusters,
-#				myDNAStringSet,
-#				c(params[1], params[2], params[3], 1 - sum(params), 1, 1, 1, 1),
-#				integer(),
-#				numeric(),
-#				processors,
-#				PACKAGE="DECIPHER")
-#			o <- optimize(adjustTreeHeight,
-#				c(0.001, 1000),
-#				tol=1e-2,
-#				params=params)
-#			return(o$minimum)
-#		}
-#		o <- nlminb(rep(0.25, 3),
-#			f,
-#			upper=rep(0.99, 3),
-#			lower=rep(0.01, 3),
-#			control=list(rel.tol=1e-4))
-		
-		if (!is.na(rates)) {
-			f <- function(params) {
-				LnL <- .Call("clusterML",
-					myClusters,
-					myDNAStringSet,
-					c(baseFreqs, 1, 1, .rates(params, rates)),
-					integer(),
-					numeric(),
-					processors,
-					PACKAGE="DECIPHER")
-			}
-			a <- optimize(f, c(0.001, 500), tol=1e-4)
-			LnL <- a$objective
-			a <- a$minimum
-			K <- 2*dim(myClusters)[1] + 3
-		} else {
-			K <- 2*dim(myClusters)[1] + 2
-			a <- NA
-			LnL <- .Call("clusterML",
-				myClusters,
-				myDNAStringSet,
-				c(baseFreqs, 1, 1, 1, 1),
-				integer(),
-				numeric(),
-				processors,
-				PACKAGE="DECIPHER")
-		}
-		
-		AICc <- 2*K + 2*LnL + 2*K*(K + 1)/(N - K - 1)
-		BIC <- 2*LnL + K*log(N)
-		return(c(baseFreqs, NA, NA, a, LnL, AICc, BIC))
-	} else if (model=="HKY85") {
-		baseFreqs <- colSums(alphabetFrequency(myDNAStringSet))[1:4]
-		baseFreqs <- baseFreqs/sum(baseFreqs)
-#		f <- function(params) {
-#			if (sum(params) > 0.99)
-#				return(1e9)
-#			LnL <- .Call("clusterML",
-#				myClusters,
-#				myDNAStringSet,
-#				c(params[1], params[2], params[3], 1 - sum(params[1:3]), 1, 1, 1, 1),
-#				integer(),
-#				numeric(),
-#				processors,
-#				PACKAGE="DECIPHER")
-#		}
-#		baseFreqs <- nlminb(rep(0.25, 3),
-#			f,
-#			upper=rep(0.99, 3),
-#			lower=rep(0.01, 3),
-#			control=list(rel.tol=1e-4))$par
-		
-		f <- function(params) {
-			LnL <- .Call("clusterML",
-				myClusters,
-				myDNAStringSet,
-				c(baseFreqs, params, params, 1, 1),
-				integer(),
-				numeric(),
-				processors,
-				PACKAGE="DECIPHER")
-		}
-		o <- nlminb(1,
-			f,
-			upper=10,
-			lower=0.01,
-			control=list(rel.tol=1e-4))
-		
-		if (!is.na(rates)) {
-			f <- function(params) {
-				LnL <- .Call("clusterML",
-					myClusters,
-					myDNAStringSet,
-					c(baseFreqs, o$par[1], o$par[1], .rates(params, rates)),
-					integer(),
-					numeric(),
-					processors,
-					PACKAGE="DECIPHER")
-			}
-			a <- optimize(f, c(0.001, 500), tol=1e-4)
-			LnL <- a$objective
-			a <- a$minimum
-			K <- 2*dim(myClusters)[1] + 4
-		} else {
-			a <- NA
-			LnL <- o$objective
-			K <- 2*dim(myClusters)[1] + 3
-		}
-		
-		AICc <- 2*K + 2*LnL + 2*K*(K + 1)/(N - K - 1)
-		BIC <- 2*LnL + K*log(N)
-		return(c(baseFreqs, o$par[1], o$par[1], a, LnL, AICc, BIC))
 	} else if (model=="T92") {
-		baseFreqs <- colSums(alphabetFrequency(myDNAStringSet))[1:4]
+		baseFreqs <- alphabetFrequency(myDNAStringSet,
+			baseOnly=TRUE,
+			as.prob=TRUE,
+			collapse=TRUE)[1:4]
+		baseFreqs <- ifelse(baseFreqs < 0.01, 0.01, baseFreqs)
+		baseFreqs <- baseFreqs/sum(baseFreqs)
 		baseFreqs <- c((baseFreqs[1] + baseFreqs[4])/(2*sum(baseFreqs)),
 			(baseFreqs[2] + baseFreqs[3])/(2*sum(baseFreqs)))
 		baseFreqs <- c(baseFreqs[1], baseFreqs[2], baseFreqs[2], baseFreqs[1])
 #		f <- function(params) {
 #			if (params[1] > 0.49)
-#				return(1e9)
+#				return(Inf)
 #			LnL <- .Call("clusterML",
 #				myClusters,
 #				myDNAStringSet,
 #				c(params, rep((1 - 2*params)/2, 2), params, 1, 1, 1, 1),
 #				integer(),
 #				numeric(),
+#				0,
+#				1L,
 #				processors,
 #				PACKAGE="DECIPHER")
 #		}
@@ -457,6 +364,8 @@ to.dendrogram <- function(object) {
 				c(baseFreqs, params, params, 1, 1),
 				integer(),
 				numeric(),
+				0,
+				1L,
 				processors,
 				PACKAGE="DECIPHER")
 		}
@@ -474,6 +383,8 @@ to.dendrogram <- function(object) {
 					c(baseFreqs, o$par[1], o$par[1], .rates(params, rates)),
 					integer(),
 					numeric(),
+					0,
+					1L,
 					processors,
 					PACKAGE="DECIPHER")
 			}
@@ -490,68 +401,162 @@ to.dendrogram <- function(object) {
 		AICc <- 2*K + 2*LnL + 2*K*(K + 1)/(N - K - 1)
 		BIC <- 2*LnL + K*log(N)
 		return(c(baseFreqs, o$par[1], o$par[1], a, LnL, AICc, BIC))
-	} else if (model=="TN93") {
-		baseFreqs <- colSums(alphabetFrequency(myDNAStringSet))[1:4]
+	} else {
+		baseFreqs <- alphabetFrequency(myDNAStringSet,
+			baseOnly=TRUE,
+			as.prob=TRUE,
+			collapse=TRUE)[1:4]
+		baseFreqs <- ifelse(baseFreqs < 0.01, 0.01, baseFreqs)
 		baseFreqs <- baseFreqs/sum(baseFreqs)
-#		f <- function(params) {
-#			if (sum(params[1:3]) > 0.99)
-#				return(1e9)
+#	f <- function(params) {
+#			if (any(params > 0.8) ||
+#				any(params < 0.05) ||
+#				sum(params) > 0.95)
+#				return(Inf)
 #			LnL <- .Call("clusterML",
 #				myClusters,
 #				myDNAStringSet,
-#				c(params[1], params[2], params[3], 1 - sum(params[1:3]), 1, 1, 1, 1),
+#				c(params[1], params[2], params[3], 1 - sum(params), 1, 1, 1, 1),
 #				integer(),
 #				numeric(),
+#				0,
+#				1L,
 #				processors,
 #				PACKAGE="DECIPHER")
 #		}
-#		o <- nlminb(rep(0.25, 3),
+#		o <- optim(baseFreqs[1:3],
 #			f,
-#			upper=rep(0.99, 3),
-#			lower=rep(0.01, 3),
-#			control=list(rel.tol=1e-4))
-#		baseFreqs <- c(o$par, 1 - sum(o$par))
+#			control=list(reltol=1e-3))
+#		baseFreqs[1:3] <- o$par
+#		baseFreqs[4] <- 1 - sum(baseFreqs[1:3])
 		
-		f <- function(params) {
-			LnL <- .Call("clusterML",
-				myClusters,
-				myDNAStringSet,
-				c(baseFreqs, params[1], params[2], 1, 1),
-				integer(),
-				numeric(),
-				processors,
-				PACKAGE="DECIPHER")
-		}
-		o <- nlminb(c(1, 1),
-			f,
-			upper=c(10, 10),
-			lower=c(0.01, 0.01),
-			control=list(rel.tol=1e-4))
-		
-		if (!is.na(rates)) {
+		if (model=="F81") {
+			if (!is.na(rates)) {
+				f <- function(params) {
+					LnL <- .Call("clusterML",
+						myClusters,
+						myDNAStringSet,
+						c(baseFreqs, 1, 1, .rates(params, rates)),
+						integer(),
+						numeric(),
+						0,
+						1L,
+						processors,
+						PACKAGE="DECIPHER")
+				}
+				a <- optimize(f, c(0.001, 500), tol=1e-4)
+				LnL <- a$objective
+				a <- a$minimum
+				K <- 2*dim(myClusters)[1] + 3
+			} else {
+				K <- 2*dim(myClusters)[1] + 2
+				a <- NA
+				LnL <- .Call("clusterML",
+					myClusters,
+					myDNAStringSet,
+					c(baseFreqs, 1, 1, 1, 1),
+					integer(),
+					numeric(),
+					0,
+					1L,
+					processors,
+					PACKAGE="DECIPHER")
+			}
+			
+			AICc <- 2*K + 2*LnL + 2*K*(K + 1)/(N - K - 1)
+			BIC <- 2*LnL + K*log(N)
+			return(c(baseFreqs, NA, NA, a, LnL, AICc, BIC))
+		} else if (model=="HKY85") {
 			f <- function(params) {
 				LnL <- .Call("clusterML",
 					myClusters,
 					myDNAStringSet,
-					c(baseFreqs, o$par[1], o$par[2], .rates(params, rates)),
+					c(baseFreqs, params, params, 1, 1),
 					integer(),
 					numeric(),
+					0,
+					1L,
 					processors,
 					PACKAGE="DECIPHER")
 			}
-			a <- optimize(f, c(0.001, 500), tol=1e-4)
-			LnL <- a$objective
-			a <- a$minimum
-			K <- 2*dim(myClusters)[1] + 5
-		} else {
-			a <- NA
-			LnL <- o$objective
-			K <- 2*dim(myClusters)[1] + 4
+			o <- nlminb(1,
+				f,
+				upper=10,
+				lower=0.01,
+				control=list(rel.tol=1e-4))
+			
+			if (!is.na(rates)) {
+				f <- function(params) {
+					LnL <- .Call("clusterML",
+						myClusters,
+						myDNAStringSet,
+						c(baseFreqs, o$par[1], o$par[1], .rates(params, rates)),
+						integer(),
+						numeric(),
+						0,
+						1L,
+						processors,
+						PACKAGE="DECIPHER")
+				}
+				a <- optimize(f, c(0.001, 500), tol=1e-4)
+				LnL <- a$objective
+				a <- a$minimum
+				K <- 2*dim(myClusters)[1] + 4
+			} else {
+				a <- NA
+				LnL <- o$objective
+				K <- 2*dim(myClusters)[1] + 3
+			}
+			
+			AICc <- 2*K + 2*LnL + 2*K*(K + 1)/(N - K - 1)
+			BIC <- 2*LnL + K*log(N)
+			return(c(baseFreqs, o$par[1], o$par[1], a, LnL, AICc, BIC))
+		} else if (model=="TN93") {
+			f <- function(params) {
+				LnL <- .Call("clusterML",
+					myClusters,
+					myDNAStringSet,
+					c(baseFreqs, params[1], params[2], 1, 1),
+					integer(),
+					numeric(),
+					0,
+					1L,
+					processors,
+					PACKAGE="DECIPHER")
+			}
+			o <- nlminb(c(1, 1),
+				f,
+				upper=c(10, 10),
+				lower=c(0.01, 0.01),
+				control=list(rel.tol=1e-4))
+			
+			if (!is.na(rates)) {
+				f <- function(params) {
+					LnL <- .Call("clusterML",
+						myClusters,
+						myDNAStringSet,
+						c(baseFreqs, o$par[1], o$par[2], .rates(params, rates)),
+						integer(),
+						numeric(),
+						0,
+						1L,
+						processors,
+						PACKAGE="DECIPHER")
+				}
+				a <- optimize(f, c(0.001, 500), tol=1e-4)
+				LnL <- a$objective
+				a <- a$minimum
+				K <- 2*dim(myClusters)[1] + 5
+			} else {
+				a <- NA
+				LnL <- o$objective
+				K <- 2*dim(myClusters)[1] + 4
+			}
+			
+			AICc <- 2*K + 2*LnL + 2*K*(K + 1)/(N - K - 1)
+			BIC <- 2*LnL + K*log(N)
+			return(c(baseFreqs, o$par[1], o$par[2], a, LnL, AICc, BIC))
 		}
-		
-		AICc <- 2*K + 2*LnL + 2*K*(K + 1)/(N - K - 1)
-		BIC <- 2*LnL + K*log(N)
-		return(c(baseFreqs, o$par[1], o$par[2], a, LnL, AICc, BIC))
 	}
 }
 
@@ -908,478 +913,168 @@ MODELS <- c("JC69",
 	return(X)
 }
 
-.midpointRoot <- function(dendrogram, dim) {
+.midpointRoot <- function(x1) {
 	
 	# mid-point root the tree based on which
-	# leaf is furthest from the leaf at zero
+	# leaf is furthest from the lowest leaf
+	# (note: columns 1:3 are not corrected)
 	
-	# find the tip that is at zero height
-	.zeroFound <- FALSE
-	.containsZero <- function(dend) {
-		# initialize a stack of maximum length (dim)
-		stack <- vector("list", dim)
-		visit <- logical(dim) # node already visited
-		parent <- integer(dim) # index of parent node
-		index <- integer(dim) # index in parent node
-		pos <- 1L # current position in the stack
-		stack[[pos]] <- dend
-		while (pos > 0L) { # more nodes to visit
-			if (visit[pos]) { # ascending tree
-				visit[pos] <- FALSE # reset visit
-				
-				if (attr(stack[[pos]][[1]], "containsZero") ||
-					attr(stack[[pos]][[2]], "containsZero")) {
-					attr(stack[[pos]], "containsZero") <- TRUE
-				} else {
-					attr(stack[[pos]], "containsZero") <- FALSE
-				}
-				
-				# replace self in parent
-				if (parent[pos] > 0)
-					stack[[parent[pos]]][[index[pos]]] <- stack[[pos]]
-				pos <- pos - 1L # pop off of stack
-			} else { # descending tree
-				visit[pos] <- TRUE
-				p <- pos
-				for (i in seq_along(stack[[p]])) {
-					if (is.leaf(stack[[p]][[i]])) {
-						if (!.zeroFound &&
-							isTRUE(all.equal(attr(stack[[p]][[i]], "height"), 0))) {
-							.zeroFound <<- TRUE
-							attr(stack[[p]][[i]], "containsZero") <- TRUE
-						} else {
-							attr(stack[[p]][[i]], "containsZero") <- FALSE
-						}
-					} else {
-						# push subtree onto stack
-						pos <- pos + 1L
-						stack[[pos]] <- stack[[p]][[i]]
-						parent[[pos]] <- p
-						index[[pos]] <- i
-					}
-				}
+	# find the leaf at minimum height
+	r1 <- which(x1[, 7] < 0)
+	h1 <- x1[r1, 6] - x1[r1, 4]
+	r2 <- which(x1[, 8] < 0)
+	h2 <- x1[r2, 6] - x1[r2, 5]
+	r <- c(r1, r2) # row number of leaf
+	z <- rep(c(7L, 8L), c(length(r1), length(r2)))
+	h <- c(h1, h2) # height of leaf
+	
+	# reorder by sequence number
+	o <- order(x1[cbind(r, z)],
+		decreasing=TRUE)
+	h <- h[o]
+	minH <- which.min(h) # index of lowest leaf
+	
+	# find most distant leaf from lowest leaf
+	n <- nrow(x1)
+	longest <- numeric(n) # length of longest path
+	merged <- logical(n) # whether merged yet
+	index <- numeric(n) # column back to lowest leaf
+	for (i in seq_len(n)) {
+		b1 <- x1[i, 7]
+		if (b1 < 0) { # merged with leaf
+			if (b1==-minH) {
+				merged[i] <- TRUE
+				b1 <- NA_real_
+			} else {
+				l1 <- x1[i, 4]
+			}
+		} else { # merged with node
+			if (merged[b1]) {
+				merged[i] <- TRUE
+				b1 <- NA_real_
+			} else {
+				l1 <- longest[b1] + x1[i, 4]
 			}
 		}
-		return(stack[[1L]])
-	}
-	
-	dendrogram <- .containsZero(dendrogram)
-	
-	# find the tip with maximum distance to the zeroth tip
-	.maxDist <- 0
-	.maxLeaf <- NA
-	.findMax <- function(dend) {
-		# initialize a stack of maximum length (dim)
-		stack <- vector("list", dim)
-		visit <- logical(dim) # node already visited
-		parent <- integer(dim) # index of parent node
-		index <- integer(dim) # index in parent node
-		pos <- 1L # current position in the stack
-		stack[[pos]] <- dend
-		height <- rep(NA_real_, dim)
-		while (pos > 0L) { # more nodes to visit
-			if (visit[pos]) { # ascending tree
-				visit[pos] <- FALSE # reset visit
-				
-				# replace self in parent
-				if (parent[pos] > 0)
-					stack[[parent[pos]]][[index[pos]]] <- stack[[pos]]
-				pos <- pos - 1L # pop off of stack
-			} else { # descending tree
-				visit[pos] <- TRUE
-				p <- pos
-				for (i in seq_along(stack[[p]])) {
-					if (is.leaf(stack[[p]][[i]])) {
-						if (is.na(height[p]) &&
-							!attr(stack[[p]][[i]], "containsZero")) {
-							dist <- 2*attr(stack[[p]], "height") - attr(stack[[p]][[i]], "height")
-						} else {
-							dist <- 2*height[p] - attr(stack[[p]][[i]], "height")
-						}
-						
-						if (!is.na(dist) &&
-							(dist > .maxDist ||
-							isTRUE(all.equal(dist, .maxDist)))) {
-							.maxDist <<- dist
-							.maxLeaf <<- as.integer(stack[[p]][[i]])
-						}
-					} else {
-						# push subtree onto stack
-						pos <- pos + 1L
-						stack[[pos]] <- stack[[p]][[i]]
-						parent[[pos]] <- p
-						index[[pos]] <- i
-						if (is.na(height[p])) {
-							if (attr(stack[[pos]], "containsZero")) {
-								height[pos] <- NA_real_
-							} else {
-								height[pos] <- attr(stack[[p]], "height")
-							}
-						} else {
-							height[pos] <- height[p]
-						}
-					}
-				}
+		
+		b2 <- x1[i, 8]
+		if (b2 < 0) { # merged with leaf
+			if (b2==-minH) {
+				merged[i] <- TRUE
+				b2 <- NA_real_
+			} else {
+				l2 <- x1[i, 5]
+			}
+		} else { # merged with node
+			if (merged[b2]) {
+				merged[i] <- TRUE
+				b2 <- NA_real_
+			} else {
+				l2 <- longest[b2] + x1[i, 5]
 			}
 		}
-		return(stack[[1L]])
+		
+		if (is.na(b1)) { # b1 contains lowest leaf
+			longest[i] <- l2
+			# leave index[i] at zero
+		} else if (is.na(b2)) { # b2 contains lowest leaf
+			longest[i] <- l1
+			index[i] <- 1
+		} else if (l1 >= l2) {
+			longest[i] <- l1
+			# index[i] not needed
+		} else { # l2 > l1
+			longest[i] <- l2
+			# index[i] not needed
+		}
 	}
 	
-	dendrogram <- .findMax(dendrogram)
+	# determine height of the midpoint
+	w <- which(merged)
+	longest <- longest + x1[, 6] - h[minH]
+	m <- w[which.max(longest[w])]
+	midH <- longest[m]/2
+	if (isTRUE(all.equal(x1[n, 6], midH)))
+		return(x1) # already midpoint rooted
 	
-	# find paths that contain the most distant tips
-	.containsMax <- function(dend) {
-		# initialize a stack of maximum length (dim)
-		stack <- vector("list", dim)
-		visit <- logical(dim) # node already visited
-		parent <- integer(dim) # index of parent node
-		index <- integer(dim) # index in parent node
-		pos <- 1L # current position in the stack
-		stack[[pos]] <- dend
-		while (pos > 0L) { # more nodes to visit
-			if (visit[pos]) { # ascending tree
-				visit[pos] <- FALSE # reset visit
-				
-				if (attr(stack[[pos]][[1]], "containsMax") ||
-					attr(stack[[pos]][[2]], "containsMax")) {
-					attr(stack[[pos]], "containsMax") <- TRUE
-				} else {
-					attr(stack[[pos]], "containsMax") <- FALSE
-				}
-				
-				# replace self in parent
-				if (parent[pos] > 0)
-					stack[[parent[pos]]][[index[pos]]] <- stack[[pos]]
-				pos <- pos - 1L # pop off of stack
-			} else { # descending tree
-				visit[pos] <- TRUE
-				p <- pos
-				for (i in seq_along(stack[[p]])) {
-					if (is.leaf(stack[[p]][[i]])) {
-						if (stack[[p]][[i]]==.maxLeaf) {
-							attr(stack[[p]][[i]], "containsMax") <- TRUE
-						} else {
-							attr(stack[[p]][[i]], "containsMax") <- FALSE
-						}
-					} else {
-						# push subtree onto stack
-						pos <- pos + 1L
-						stack[[pos]] <- stack[[p]][[i]]
-						parent[[pos]] <- p
-						index[[pos]] <- i
-					}
-				}
+	# find the edge containing the midpoint
+	lowH <- x1[m, 6] - x1[m, 4 + index[m]]
+	while (lowH > midH) { # descend the tree
+		m <- x1[m, 7 + index[m]]
+		lowH <- x1[m, 6] - x1[m, 4 + index[m]]
+	}
+	
+	# invert and lower nodes above midpoint
+	.dropH <- function(i, delta) {
+		stack <- integer(n)
+		pos <- 1L
+		stack[pos] <- i
+		while (pos > 0) {
+			i <- stack[pos]
+			x1[i, 6] <<- x1[i, 6] - delta
+			pos <- pos - 1L
+			if (x1[i, 7] > 0) {
+				pos <- pos + 1L
+				stack[pos] <- x1[i, 7]
+			}
+			if (x1[i, 8] > 0) {
+				pos <- pos + 1L
+				stack[pos] <- x1[i, 8]
 			}
 		}
-		return(stack[[1L]])
 	}
-	
-	dendrogram <- .containsMax(dendrogram)
-	
-	# midpoint root the tree
-	.findMidpoint <- function(dend) {
-		# initialize a stack of maximum length (dim)
-		stack <- vector("list", dim)
-		visit <- logical(dim) # node already visited
-		parent <- integer(dim) # index of parent node
-		index <- integer(dim) # index in parent node
-		pos <- 1L # current position in the stack
-		stack[[pos]] <- dend
-		while (pos > 0L) { # more nodes to visit
-			if (visit[pos]) { # ascending tree
-				visit[pos] <- FALSE # reset visit
-				
-				if ((attr(stack[[pos]], "height") > .maxDist/2 ||
-					isTRUE(all.equal(attr(stack[[pos]], "height"), .maxDist/2))) &&
-					attr(stack[[pos]], "containsZero")) {
-					if (attr(stack[[pos]][[1]], "height") < .maxDist/2 &&
-						attr(stack[[pos]][[1]], "containsZero") &&
-						!attr(stack[[pos]][[1]], "containsMax")) {
-						attr(stack[[pos]], "containsRoot") <- TRUE
-						attr(stack[[pos]], "isRoot") <- TRUE
-					} else if (attr(stack[[pos]][[2]], "height") < .maxDist/2 &&
-						attr(stack[[pos]][[2]], "containsZero") &&
-						!attr(stack[[pos]][[2]], "containsMax")) {
-						attr(stack[[pos]], "containsRoot") <- TRUE
-						attr(stack[[pos]], "isRoot") <- TRUE
-					} else {
-						attr(stack[[pos]], "containsRoot") <- attr(stack[[pos]][[1]], "containsRoot") ||
-							attr(stack[[pos]][[2]], "containsRoot")
-					}
-				}
-				
-				# replace self in parent
-				if (parent[pos] > 0)
-					stack[[parent[pos]]][[index[pos]]] <- stack[[pos]]
-				pos <- pos - 1L # pop off of stack
-			} else { # descending tree
-				visit[pos] <- TRUE
-				p <- pos
-				
-				if (is.leaf(stack[[p]])) {
-					if (attr(stack[[p]], "containsZero")) {
-						attr(stack[[p]], "containsRoot") <- TRUE
-						attr(stack[[p]], "isRoot") <- TRUE
-					} else {
-						attr(stack[[p]], "containsRoot") <- FALSE
-					}
-				} else if ((attr(stack[[p]], "height") > .maxDist/2 ||
-					isTRUE(all.equal(attr(stack[[p]], "height"), .maxDist/2))) &&
-					attr(stack[[p]], "containsZero")) {
-					if (is.leaf(stack[[p]][[1]])) {
-						if (attr(stack[[p]][[1]], "containsZero")) {
-							attr(stack[[p]][[1]], "containsRoot") <- TRUE
-							attr(stack[[p]][[1]], "isRoot") <- TRUE
-						} else {
-							attr(stack[[p]][[1]], "containsRoot") <- FALSE
-						}
-					} else {
-						# push subtree onto stack
-						pos <- pos + 1L
-						stack[[pos]] <- stack[[p]][[1]]
-						parent[[pos]] <- p
-						index[[pos]] <- 1
-					}
-					if (is.leaf(stack[[p]][[2]])) {
-						if (attr(stack[[p]][[2]], "containsZero")) {
-							attr(stack[[p]][[2]], "containsRoot") <- TRUE
-							attr(stack[[p]][[2]], "isRoot") <- TRUE
-						} else {
-							attr(stack[[p]][[2]], "containsRoot") <- FALSE
-						}
-					} else {
-						# push subtree onto stack
-						pos <- pos + 1L
-						stack[[pos]] <- stack[[p]][[2]]
-						parent[[pos]] <- p
-						index[[pos]] <- 2
-					}
-				} else {
-					attr(stack[[p]], "containsRoot") <- FALSE
-				}
-			}
+	up <- integer(n) # pointers up tree
+	w <- which(x1[, 7:8] > 0, arr.ind=TRUE)
+	up[x1[, 7:8][w]] <- w[, "row"]
+	remove <- logical(n) # replaced nodes
+	x2 <- x1 # new midpoint rooted tree
+	count <- n # row in x2
+	# make new root node
+	delta <- x1[m, 6] - midH
+	x2[count, 4:10] <- c(x1[m, 4 + index[m]] - delta,
+		delta,
+		midH,
+		x1[m, 7 + index[m]],
+		count - 1,
+		x1[m, 9 + index[m]],
+		-1)
+	if (up[m]) {
+		while (up[m]) {
+			count <- count - 1
+			delta <- x1[m, 6] - midH
+			remove[m] <- TRUE
+			x2[count, 4:10] <- c(x1[m, 5 - index[m]],
+				x1[up[m], 4 + index[up[m]]],
+				midH - delta,
+				x1[m, 8 - index[m]],
+				count - 1,
+				x1[m, 10 - index[m]],
+				-1)
+			if (x1[m, 8 - index[m]] > 0)
+				.dropH(x1[m, 8 - index[m]], 2*delta)
+			m <- up[m]
 		}
-		return(stack[[1L]])
+		delta <- x1[m, 6] - midH
+		x2[count, 5] <- sum(x1[m, 4:5])
+	}
+	remove[m] <- TRUE
+	keep <- which(!remove)
+	x2[count, 8] <- x1[m, 8 - index[m]]
+	if (x2[count, 8] > 0)
+		x2[count, 8] <- match(x2[count, 8], keep)
+	x2[count, 10] <- x1[m, 10 - index[m]]
+	if (x1[m, 8 - index[m]] > 0)
+		.dropH(x1[m, 8 - index[m]], 2*delta)
+	if (length(keep) > 0) {
+		x2[1:(count - 1),] <- x1[keep,]
+		w <- which(x2[1:(count - 1), 7:8] > 0)
+		if (length(w) > 0)
+			x2[1:(count - 1), 7:8][w] <- match(x2[1:(count - 1), 7:8][w], keep)
+		w <- which(x2[n:count, 7] %in% keep)
+		x2[n:count, 7][w] <- match(x2[n:count, 7][w], keep)
 	}
 	
-	dendrogram <- .findMidpoint(dendrogram)
-	
-	lower <- list()
-	.adjustHeight <- function(dend) {
-		# initialize a stack of maximum length (2*dim - 1)
-		stack <- vector("list", 2*dim - 1)
-		visit <- logical(2*dim - 1) # node already visited
-		parent <- integer(2*dim - 1) # index of parent node
-		index <- integer(2*dim - 1) # index in parent node
-		pos <- 1L # current position in the stack
-		stack[[pos]] <- dend
-		diff <- rep(NA_real_, 2*dim - 1)
-		while (pos > 0L) { # more nodes to visit
-			if (visit[pos]) { # ascending tree
-				visit[pos] <- FALSE # reset visit
-				
-				# do something with stack[[pos]]
-				
-				if (!is.null(attr(stack[[pos]], "isRoot"))) {
-					if (is.leaf(stack[[pos]])) {
-						lower <<- stack[[pos]]
-						x <- NULL
-					} else if (attr(stack[[pos]][[1]], "containsZero")) {
-						lower <<- stack[[pos]][[1]]
-						stack[[pos]][[1]] <- NULL
-						x <- stack[[pos]]
-					} else {
-						lower <<- stack[[pos]][[2]]
-						stack[[pos]][[2]] <- NULL
-						x <- stack[[pos]]
-					}
-				} else {
-					x <- stack[[pos]]
-				}
-				
-				# replace self in parent
-				if (parent[pos] > 0)
-					stack[[parent[pos]]][[index[pos]]] <- x
-				diff[pos] <- NA_real_
-				pos <- pos - 1L # pop off of stack
-			} else { # descending tree
-				visit[pos] <- TRUE
-				p <- pos
-				
-				if (!is.null(attr(stack[[p]], "containsRoot")) &&
-					attr(stack[[p]], "containsRoot"))
-					diff[p] <- 2*attr(stack[[p]], "height") - .maxDist
-				
-				if (!is.na(diff[p])) {
-					attr(stack[[p]], "height") <- attr(stack[[p]], "height") - diff[p]
-					if (!is.leaf(stack[[p]])) {
-						if (is.null(attr(stack[[p]], "isRoot"))) {
-							for (i in seq_along(stack[[p]])) {
-								# push subtree onto stack
-								pos <- pos + 1L
-								stack[[pos]] <- stack[[p]][[i]]
-								parent[[pos]] <- p
-								index[[pos]] <- i
-								diff[pos] <- diff[p]
-							}
-						} else if (attr(stack[[p]][[1]], "containsZero")) {
-							# push subtree onto stack
-							pos <- pos + 1L
-							stack[[pos]] <- stack[[p]][[2]]
-							parent[[pos]] <- p
-							index[[pos]] <- 2L
-							diff[pos] <- diff[p]
-						} else {
-							# push subtree onto stack
-							pos <- pos + 1L
-							stack[[pos]] <- stack[[p]][[1]]
-							parent[[pos]] <- p
-							index[[pos]] <- 1L
-							diff[pos] <- diff[p]
-						}
-					}
-				}
-			}
-		}
-		return(stack[[1L]])
-	}
-	
-	upper <- .adjustHeight(dendrogram)
-	
-	# initalize a tree from the lower half
-	branch <- 0L
-	tree <- list(lower, list())
-	attr(tree, "height") <- .maxDist/2
-	attr(tree, "class") <- "dendrogram"
-	total <- attr(dendrogram, "members")
-	attr(tree, "members") <- total
-	total <- total - attr(lower, "members")
-	# reverse edges between original and new root
-	.revertList <- function(dend) {
-		# initialize a stack of maximum length (dim)
-		stack <- vector("list", dim)
-		visit <- logical(dim) # node already visited
-		pos <- 1L # current position in the stack
-		stack[[pos]] <- dend
-		while (pos > 0L) { # more nodes to visit
-			if (visit[pos]) { # ascending tree
-				visit[pos] <- FALSE # reset visit
-				
-				temp <- NULL
-				if (!is.null(attr(stack[[pos]][[1]], "containsRoot")) &&
-					attr(stack[[pos]][[1]], "containsRoot")) {
-					temp <- stack[[pos]][[2]]
-				} else if (length(stack[[pos]]) > 1 &&
-					!is.null(attr(stack[[pos]][[2]], "containsRoot")) &&
-					attr(stack[[pos]][[2]], "containsRoot")) {
-					temp <- stack[[pos]][[1]]
-				} else if (!is.null(attr(stack[[pos]], "isRoot")) &&
-					attr(stack[[pos]], "isRoot")) {
-					temp <- stack[[pos]] # last node
-					attr(temp, "members") <- attr(temp, "members") - attr(lower, "members")
-				}
-				if (!is.null(temp)) {
-					if (!is.leaf(temp) && length(temp)==1)
-						temp <- temp[[1L]] # remove node
-					branch <<- branch + 1L # go to next branch
-					index <- rep(2L, branch)
-					# initialize the subtree
-					tree[[index]] <<- list()
-					class(tree[[index]]) <<- "dendrogram"
-					attr(tree[[index]], "height") <<- attr(stack[[pos]], "height")
-					attr(tree[[index]], "members") <<- total
-					if (is.leaf(temp)) {
-						total <<- total - 1L
-					} else {
-						total <<- total - attr(temp, "members")
-					}
-					if (total > 0) {
-						tree[[c(index, 1L)]] <<- temp
-					} else { # last branch
-						tree[[index]] <<- temp
-					}
-				}
-				
-				pos <- pos - 1L # pop off of stack
-			} else { # descending tree
-				visit[pos] <- TRUE
-				p <- pos
-				
-				if (!is.null(attr(stack[[p]][[1]], "containsRoot")) &&
-					attr(stack[[p]][[1]], "containsRoot")) {
-					# push subtree onto stack
-					pos <- pos + 1L
-					stack[[pos]] <- stack[[p]][[1]]
-				} else if (length(stack[[p]]) > 1 &&
-					!is.null(attr(stack[[p]][[2]], "containsRoot")) &&
-					attr(stack[[p]][[2]], "containsRoot")) {
-					# push subtree onto stack
-					pos <- pos + 1L
-					stack[[pos]] <- stack[[p]][[2]]
-				}
-			}
-		}
-		return(stack[[1L]])
-	}
-	
-	.revertList(upper)
-	if (length(tree[[2]])==0)
-		tree[[2]] <- upper[[1]]
-	
-	.removeAttributes <- function(dend) {
-		# initialize a stack of maximum length (dim)
-		stack <- vector("list", dim)
-		visit <- logical(dim) # node already visited
-		parent <- integer(dim) # index of parent node
-		index <- integer(dim) # index in parent node
-		pos <- 1L # current position in the stack
-		stack[[pos]] <- dend
-		while (pos > 0L) { # more nodes to visit
-			if (visit[pos]) { # ascending tree
-				visit[pos] <- FALSE # reset visit
-				
-				if (!is.null(attr(stack[[pos]], "isRoot")))
-					attr(stack[[pos]], "isRoot") <- NULL
-				if (!is.null(attr(stack[[pos]], "containsRoot")))
-					attr(stack[[pos]], "containsRoot") <- NULL
-				if (!is.null(attr(stack[[pos]], "containsZero")))
-					attr(stack[[pos]], "containsZero") <- NULL
-				if (!is.null(attr(stack[[pos]], "containsMax")))
-					attr(stack[[pos]], "containsMax") <- NULL
-				
-				# replace self in parent
-				if (parent[pos] > 0)
-					stack[[parent[pos]]][[index[pos]]] <- stack[[pos]]
-				pos <- pos - 1L # pop off of stack
-			} else { # descending tree
-				visit[pos] <- TRUE
-				p <- pos
-				for (i in seq_along(stack[[p]])) {
-					if (!is.leaf(stack[[p]][[i]])) {
-						# push subtree onto stack
-						pos <- pos + 1L
-						stack[[pos]] <- stack[[p]][[i]]
-						parent[[pos]] <- p
-						index[[pos]] <- i
-					} else {
-						if (!is.null(attr(stack[[p]][[i]], "isRoot")))
-							attr(stack[[p]][[i]], "isRoot") <- NULL
-						if (!is.null(attr(stack[[p]][[i]], "containsRoot")))
-							attr(stack[[p]][[i]], "containsRoot") <- NULL
-						if (!is.null(attr(stack[[p]][[i]], "containsZero")))
-							attr(stack[[p]][[i]], "containsZero") <- NULL
-						if (!is.null(attr(stack[[p]][[i]], "containsMax")))
-							attr(stack[[p]][[i]], "containsMax") <- NULL
-					}
-				}
-			}
-		}
-		return(stack[[1L]])
-	}
-	
-	rooted <- .removeAttributes(tree)
-	
-	return(rooted)
+	return(x2)
 }
 
 .applyMidpoints <- function(dend, dim) {
@@ -1444,6 +1139,7 @@ IdClusters <- function(myDistMatrix=NULL,
 	myXStringSet=NULL,
 	model=MODELS,
 	collapse=0,
+	reconstruct=FALSE,
 	processors=1,
 	verbose=TRUE) {
 	
@@ -1515,6 +1211,11 @@ IdClusters <- function(myDistMatrix=NULL,
 	}
 	if (!is.numeric(collapse))
 		stop("collapse must be a numeric.")
+	if (!is.logical(reconstruct) &&
+		!is.numeric(reconstruct))
+		stop("reconstruct must be a logical or numeric.")
+	if (reconstruct < 0 || reconstruct > 1)
+		stop("reconstruct must be between zero and one (inclusive).")
 	if (!is.logical(verbose))
 		stop("verbose must be a logical.")
 	if (!is.null(processors) && !is.numeric(processors))
@@ -1544,16 +1245,23 @@ IdClusters <- function(myDistMatrix=NULL,
 		if (typeof(myDistMatrix)=="integer")
 			myDistMatrix[] <- as.numeric(myDistMatrix)
 	}
-	if (method == 3) {
-		if (!is(myXStringSet, "DNAStringSet") && !is(myXStringSet, "RNAStringSet"))
+	if (method == 3 ||
+		(reconstruct && type > 1)) {
+		if (is(myXStringSet, "DNAStringSet")) {
+			typeX <- 1L
+		} else if (is(myXStringSet, "RNAStringSet")) {
+			typeX <- 2L
+		} else {
 			stop("myXStringSet must be a DNAStringSet or RNAStringSet.")
+		}
 		if (length(myXStringSet)!=dim)
 			stop("myDistMatrix must have as many rows as the number of sequences.")
 		if (length(unique(width(myXStringSet))) != 1)
 			stop("All sequences in myXStringSet must be the same width (aligned).")
-		if (!is.null(attr(myDistMatrix, "correction")) &&
+		if (method==3 &&
+			!is.null(attr(myDistMatrix, "correction")) &&
 			attr(myDistMatrix, "correction") == "none")
-			stop('myDistMatrix must have a correction for method="ML".')
+			warning('myDistMatrix should probably have a correction for method="ML".')
 	}
 	
 	if (method == 7) {
@@ -1861,9 +1569,15 @@ IdClusters <- function(myDistMatrix=NULL,
 			pBar,
 			processors,
 			PACKAGE="DECIPHER")
+		if (verbose) {
+			setTxtProgressBar(pBar, 100)
+			close(pBar)
+		}
 		
-		if (method==3) {
-			myClusters <- .reorderClusters(myClusters)
+		if (method==3 ||
+			(reconstruct && type > 1)) {
+			myClusters <- .reorderClusters(myClusters,
+				all=method != 3)
 			
 			m <- matrix(NA,
 				nrow=length(model),
@@ -1873,24 +1587,14 @@ IdClusters <- function(myDistMatrix=NULL,
 						"A2G", "C2T", "alpha",
 						"-LnL", "AICc", "BIC")))
 			
-			if (!(length(model)==1 && model[1]=="JC69")) {
+			if (!(length(model)==1 && model=="JC69")) {
 				a <- apply(consensusMatrix(myXStringSet),
 					2,
 					function(x)
-						sum(x[1:14] > 0)) > 1
+						sum(x[1:15] > 0)) > 1
 				N <- sum(a)
 				
-				# remove invariant sites
-				#if (N > 0) {
-				#	myXStringSet <- as(lapply(extractAt(myXStringSet,
-				#				IRanges(start=which(a), width=1)),
-				#			unlist),
-				#		class(myXStringSet))
-				#}
-				
-				if (verbose)
-					cat("\n")
-				for (i in 1:length(model)) {
+				for (i in seq_along(model)) {
 					m[model[i],] <- .optimizeModel(myClusters,
 						model[i],
 						myXStringSet,
@@ -1910,15 +1614,12 @@ IdClusters <- function(myDistMatrix=NULL,
 			
 			if (length(model) > 1) { # choose the best model
 				w <- which.min(m[,"BIC"])
-				l <- logical(nrow(m))
-				l[w] <- TRUE
-				m <- subset(m, l)
-			}
-			
-			if (verbose) {
-				if (length(model) > 1)
+				m <- m[w,, drop=FALSE]
+				model <- model[w]
+				if (verbose)
 					cat("\n\nThe selected model was:  ",
-						rownames(m),
+						model,
+						"\n",
 						sep="")
 			}
 			
@@ -1935,174 +1636,182 @@ IdClusters <- function(myDistMatrix=NULL,
 			}
 			model_params <- .giveParams(as.numeric(m[1:7]))
 			
-			# given myClusters return adjusted heights
-			adjustTreeHeights <- function(myClusters) {
-				cumHeight <- numeric(max(myClusters[, 3]))
-				for (i in 1:dim(myClusters)[1]) {
-					if (myClusters[i, 1] < 0 && myClusters[i, 2] < 0) {
-						cumHeight[myClusters[i, 3]] <- max(myClusters[i, 4], myClusters[i, 5])
-						myClusters[i, 6] <- cumHeight[myClusters[i, 3]]
-					} else if (myClusters[i, 1] > 0 && myClusters[i, 2] > 0) {
-						cumHeight[myClusters[i, 3]] <- max(myClusters[i, 4] + cumHeight[myClusters[i, 1]],
-							myClusters[i, 5] + cumHeight[myClusters[i, 2]])
-						myClusters[i, 6] <- cumHeight[myClusters[i, 3]]
-					} else if (myClusters[i, 1] > 0) {
-						cumHeight[myClusters[i, 3]] <- cumHeight[myClusters[i, 1]] + myClusters[i, 4]
-						if (myClusters[i, 5] > cumHeight[myClusters[i, 3]])
-							cumHeight[myClusters[i, 3]] <- myClusters[i, 5]
-						myClusters[i, 6] <- cumHeight[myClusters[i, 3]]
-					} else {
-						cumHeight[myClusters[i, 3]] <- cumHeight[myClusters[i, 2]] + myClusters[i, 5]
-						if (myClusters[i, 4] > cumHeight[myClusters[i, 3]])
-							cumHeight[myClusters[i, 3]] <- myClusters[i, 4]
-						myClusters[i, 6] <- cumHeight[myClusters[i, 3]]
+			if (method==3) {
+				# given myClusters return adjusted heights
+				adjustTreeHeights <- function(myClusters) {
+					cumHeight <- numeric(max(myClusters[, 3]))
+					for (i in 1:dim(myClusters)[1]) {
+						if (myClusters[i, 1] < 0 && myClusters[i, 2] < 0) {
+							cumHeight[myClusters[i, 3]] <- max(myClusters[i, 4], myClusters[i, 5])
+							myClusters[i, 6] <- cumHeight[myClusters[i, 3]]
+						} else if (myClusters[i, 1] > 0 && myClusters[i, 2] > 0) {
+							cumHeight[myClusters[i, 3]] <- max(myClusters[i, 4] + cumHeight[myClusters[i, 1]],
+								myClusters[i, 5] + cumHeight[myClusters[i, 2]])
+							myClusters[i, 6] <- cumHeight[myClusters[i, 3]]
+						} else if (myClusters[i, 1] > 0) {
+							cumHeight[myClusters[i, 3]] <- cumHeight[myClusters[i, 1]] + myClusters[i, 4]
+							if (myClusters[i, 5] > cumHeight[myClusters[i, 3]])
+								cumHeight[myClusters[i, 3]] <- myClusters[i, 5]
+							myClusters[i, 6] <- cumHeight[myClusters[i, 3]]
+						} else {
+							cumHeight[myClusters[i, 3]] <- cumHeight[myClusters[i, 2]] + myClusters[i, 5]
+							if (myClusters[i, 4] > cumHeight[myClusters[i, 3]])
+								cumHeight[myClusters[i, 3]] <- myClusters[i, 4]
+							myClusters[i, 6] <- cumHeight[myClusters[i, 3]]
+						}
 					}
+					
+					myClusters <- .Call("adjustHeights",
+						myClusters,
+						PACKAGE="DECIPHER")
+					return(myClusters)
 				}
 				
-				myClusters <- .Call("adjustHeights",
-					myClusters,
-					PACKAGE="DECIPHER")
-				return(myClusters)
-			}
-			
-			# print progress of likelihood maximization
-			.startLnL <- Inf
-			.bestLnL <- Inf
-			.NNIs <- 0L
-			if (verbose) {
-				setTxtProgressBar(pBar,100)
-				close(pBar)
-				cat("\nMaximizing Likelihood of Tree:\n")
-				flush.console()
-				printLine <- function(value, percentComplete) {
-					cat("\r-ln(Likelihood) = ",
-						formatC(round(value, 0),
-							digits=0,
-							format="f"),
-						" (",
-						formatC(round(-100*(value - .startLnL)/.startLnL,
-								2),
-							digits=2,
-							format="f"),
-						"% improvement), ",
-						.NNIs,
-						ifelse(.NNIs==1, " NNI  ", " NNIs "),
-						sep="")
+				# print progress of likelihood maximization
+				.startLnL <- Inf
+				.bestLnL <- Inf
+				.NNIs <- 0L
+				if (verbose) {
+					cat("\nMaximizing Likelihood of Tree:\n")
 					flush.console()
-					invisible(value)
-				}
-			}
-			
-			# given branch lengths return -LnL
-			maximizeLikelihood <- function(x, branches=integer(), lengths=numeric()) {
-				myClusters[, 4:5] <- x
-				LnL <- .Call("clusterML",
-					myClusters,
-					myXStringSet,
-					model_params,
-					branches,
-					lengths,
-					processors,
-					PACKAGE="DECIPHER")
-				
-				w <- which.min(LnL)
-				if (LnL[w] < .bestLnL) {
-					if (w > 1) {
-						x[branches[w - 1]] <- lengths[w - 1]
-						params <<- x
-					} else {
-						params <<- x
-					}
-					.bestLnL <<- LnL[w]
-					if (verbose) {
-						if (is.infinite(.startLnL))
-							.startLnL <<- LnL[1]
-						printLine(LnL[w])
+					printLine <- function(value, percentComplete) {
+						cat("\r-ln(Likelihood) = ",
+							formatC(round(value, 0),
+								digits=0,
+								format="f"),
+							" (",
+							formatC(abs(round(100*(value - .startLnL)/.startLnL,
+									2)),
+								digits=2,
+								format="f"),
+							"% improvement), ",
+							.NNIs,
+							ifelse(.NNIs==1, " NNI  ", " NNIs "),
+							sep="")
+						flush.console()
+						invisible(value)
 					}
 				}
 				
-				return(LnL)
-			}
-			
-			maximizeLikelihood2 <- function(myClusters, NNIs, tol) {
-				LnL <- .Call("clusterML",
-					myClusters,
-					myXStringSet,
-					model_params,
-					integer(),
-					numeric(),
-					processors,
-					PACKAGE="DECIPHER")
-				
-				if (LnL < .bestLnL - tol) {
-					.bestLnL <<- LnL
-					if (verbose) {
-						.NNIs <<- NNIs
-						if (is.infinite(.startLnL))
-							.startLnL <<- LnL
-						printLine(LnL)
-					}
-				}
-				
-				return(LnL)
-			}
-			
-			# maximize likelihood of tree
-			index <- rep(TRUE, 2*dim(myClusters)[1])
-			repeat {
-				currentLnL <- .bestLnL
-				currentNNIs <- .NNIs
-				params <- as.numeric(myClusters[, 4:5])
-				tempClusters <- paste(myClusters[, 7], myClusters[, 8])
-				.simultaneousBrent(maximizeLikelihood,
-					ifelse(index, 0, params),
-					params,
-					ifelse(index, 10*params, params))
-				myClusters[, 4:5] <- params
-				
-				myClusters <- .NNI(myClusters,
-					.bestLnL,
-					.NNIs,
-					maximizeLikelihood2)
-				
-				if (abs(.bestLnL - currentLnL) < 1e0 &&
-					currentNNIs==.NNIs) {
-					temp_params <- model_params
-				} else if (!(length(model)==1 && model[1]=="JC69")) {
-					m[1,] <- .optimizeModel(myClusters,
-						rownames(m),
+				# given branch lengths return -LnL
+				maximizeLikelihood <- function(x, branches=integer(), lengths=numeric()) {
+					myClusters[, 4:5] <- x
+					LnL <- .Call("clusterML",
+						myClusters,
 						myXStringSet,
-						N,
-						processors=processors)
-					temp_params <- .giveParams(as.numeric(m[1:7]))
-				} else {
-					temp_params <- .giveParams(as.numeric(m[1:7]))
+						model_params,
+						branches,
+						lengths,
+						0,
+						1L,
+						processors,
+						PACKAGE="DECIPHER")
+					
+					w <- which.min(LnL)
+					if (LnL[w] < .bestLnL) {
+						if (w > 1) {
+							x[branches[w - 1]] <- lengths[w - 1]
+							params <<- x
+						} else {
+							params <<- x
+						}
+						.bestLnL <<- LnL[w]
+						if (verbose) {
+							if (is.infinite(.startLnL))
+								.startLnL <<- LnL[1]
+							printLine(LnL[w])
+						}
+					}
+					
+					return(LnL)
 				}
 				
-				if ((abs(.bestLnL - currentLnL) < 1e0 || # negligible improvement in likelihood
-					currentNNIs==.NNIs) && # no new nearest neighbor interchanges (NNIs)
-					all(abs(temp_params - model_params) < 0.01)) # negligible change in model_params
-					break
-				model_params <- temp_params
-				index <- rep(!(paste(myClusters[, 7], myClusters[, 8]) %in% tempClusters), 2)
+				maximizeLikelihood2 <- function(myClusters, NNIs, tol) {
+					LnL <- .Call("clusterML",
+						myClusters,
+						myXStringSet,
+						model_params,
+						integer(),
+						numeric(),
+						0,
+						1L,
+						processors,
+						PACKAGE="DECIPHER")
+					
+					if (LnL < .bestLnL - tol) {
+						.bestLnL <<- LnL
+						if (verbose) {
+							.NNIs <<- NNIs
+							if (is.infinite(.startLnL))
+								.startLnL <<- LnL
+							printLine(LnL)
+						}
+					}
+					
+					return(LnL)
+				}
+				
+				# maximize likelihood of tree
+				index <- rep(TRUE, 2*dim(myClusters)[1])
+				repeat {
+					currentLnL <- .bestLnL
+					currentNNIs <- .NNIs
+					params <- as.numeric(myClusters[, 4:5])
+					tempClusters <- paste(myClusters[, 7], myClusters[, 8])
+					.simultaneousBrent(maximizeLikelihood,
+						ifelse(index, 0, params),
+						params,
+						ifelse(index, 10*params, params))
+					myClusters[, 4:5] <- params
+					
+					myClusters <- .NNI(myClusters,
+						.bestLnL,
+						.NNIs,
+						maximizeLikelihood2)
+					
+					if (abs(.bestLnL - currentLnL) < 1e0 &&
+						currentNNIs==.NNIs) {
+						temp_params <- model_params
+					} else if (model != "JC69") {
+						m[1,] <- .optimizeModel(myClusters,
+							rownames(m),
+							myXStringSet,
+							N,
+							processors=processors)
+						temp_params <- .giveParams(as.numeric(m[1:7]))
+					} else {
+						temp_params <- .giveParams(as.numeric(m[1:7]))
+					}
+					
+					if ((abs(.bestLnL - currentLnL) < 1e0 || # negligible improvement in likelihood
+						currentNNIs==.NNIs) && # no new nearest neighbor interchanges (NNIs)
+						all(abs(temp_params - model_params) < 0.01)) # negligible change in model_params
+						break
+					model_params <- temp_params
+					index <- rep(!(paste(myClusters[, 7], myClusters[, 8]) %in% tempClusters), 2)
+				}
+				
+				myClusters <- .reorderClusters(myClusters, all=TRUE)
+				myClusters <- adjustTreeHeights(myClusters)
+				myClusters <- .Call("reclusterNJ",
+					myClusters,
+					cutoff[1],
+					PACKAGE="DECIPHER")
+				
+				if (verbose) {
+					printLine(.bestLnL, 100)
+					cat("\n")
+					flush.console()
+				}
 			}
-			
-			myClusters <- .reorderClusters(myClusters, all=TRUE)
-			myClusters <- adjustTreeHeights(myClusters)
-			myClusters <- .Call("reclusterNJ",
-				myClusters,
-				cutoff[1],
-				PACKAGE="DECIPHER")
 			
 			if (verbose) {
-				printLine(.bestLnL, 100)
-				flush.console()
 				params <- formatC(round(m, 3),
 					digits=3,
 					format="f")
-				cat(ifelse(any(grepl("NA", params[1], fixed=TRUE)),
+				cat(ifelse(grepl("NA", params[1], fixed=TRUE),
 						"",
-						"\n\nModel parameters:"),
+						"\nModel parameters:"),
 					ifelse(grepl("NA", params[1], fixed=TRUE),
 						"",
 						ifelse(grepl("T92", rownames(m), fixed=TRUE),
@@ -2127,12 +1836,22 @@ IdClusters <- function(myDistMatrix=NULL,
 					ifelse(grepl("NA", params[7], fixed=TRUE),
 						"",
 						paste("\nAlpha = ", params[7], sep="")),
+					ifelse(grepl("NA", params[1], fixed=TRUE),
+						"",
+						"\n"),
 					sep="")
-				cat("\n")
 			}
+			params <- m[, 1:7]
+		} else {
+			model <- NULL
+			params <- NULL
 		}
 		
 		if (showPlot || type > 1) {
+			# midpoint root the dendrogram
+			if (method==1 || method==3)
+				myClusters <- .midpointRoot(myClusters)
+			
 			# create a dendrogram object
 			myClustersList <- list()
 			dNames <- labels(myDistMatrix)
@@ -2157,7 +1876,6 @@ IdClusters <- function(myDistMatrix=NULL,
 			myClustersList$merge <- matrix(myClusters[,7:8], ncol=2)
 			myClustersList$height <- matrix(myClusters[,6], ncol=1)
 			myClustersList$lengths <- matrix(myClusters[,4:5], ncol=2)
-			myClustersList$clusters <- matrix(myClusters[,9:10], ncol=2)
 			if (dim > 100) {
 				fontSize <- 0.6
 			} else if (dim > 70) {
@@ -2173,15 +1891,38 @@ IdClusters <- function(myDistMatrix=NULL,
 				leaves <- "perpendicular"
 			}
 			
-			d <- to.dendrogram(myClustersList)
-			
-			# midpoint root the dendrogram
-			if (method==1 || method==3)
-				d <- .midpointRoot(d, dim)
+			if (reconstruct && type > 1) {
+				# perform ancestral state reconstruction
+				states <- .Call("clusterML",
+					myClusters,
+					myXStringSet,
+					model_params,
+					integer(),
+					numeric(),
+					reconstruct,
+					typeX,
+					processors,
+					PACKAGE="DECIPHER")
+				d <- to.dendrogram(myClustersList,
+					states)
+				myXStringSet <- unname(as.character(myXStringSet))
+				d <- rapply(d,
+					function(x) {
+						attr(x, "state") <- myXStringSet[x]
+						x
+					},
+					how="replace")
+			} else {
+				d <- to.dendrogram(myClustersList)
+			}
 			
 			# convert bifurcating tree to multifurcating
 			if (collapse >= 0)
 				d <- .collapse(d, collapse, dim)
+			
+			attr(d, "method") <- METHODS[method]
+			attr(d, "model") <- model
+			attr(d, "parameters") <- params
 			
 			# specify the order of clusters that
 			# will match the plotted dendrogram
@@ -2189,22 +1930,54 @@ IdClusters <- function(myDistMatrix=NULL,
 			
 			c <- .organizeClusters(myClusters, myClustersList$labels, orderDendrogram)
 			
-			# create a visibily different vector of colors
-			cl <- colors()
-			v1 <- c(117,254,73,69,152,51,26,450,503,596,652,610,563,552,97)
-			r <- cl[v1]
-			
-			# color edges by cluster
-			colEdge <- function(n, myClusters, colors) {
-				if (is.leaf(n)) {
-					a <- attributes(n)
-					num <- myClusters$cluster[which(myClustersList$labels==as.character(a$label))]
-					attr(n, "edgePar") <- list(col=colors[num %% 15 + 1])
-				}
-				n
-			}
 			if (is.finite(cutoff[1])) {
-				d <- dendrapply(d, colEdge, c, r)
+				# create a visibily different vector of colors
+				cl <- colors()
+				v1 <- c(117,254,73,69,152,51,26,450,503,596,652,610,563,552,97)
+				r <- cl[v1]
+				
+				# color edges by cluster
+				.colEdge <- function(dend) {
+					# initialize a stack of maximum length (dim)
+					stack <- vector("list", dim)
+					visit <- logical(dim) # node already visited
+					parent <- integer(dim) # index of parent node
+					index <- integer(dim) # index in parent node
+					pos <- 1L # current position in the stack
+					stack[[pos]] <- dend
+					while (pos > 0L) { # more nodes to visit
+						if (visit[pos]) { # ascending tree
+							visit[pos] <- FALSE # reset visit
+							
+							for (i in seq_along(stack[[pos]])) {
+								if (is.leaf(stack[[pos]][[i]])) {
+									a <- attributes(stack[[pos]][[i]])
+									num <- c$cluster[which(myClustersList$labels==as.character(a$label))]
+									attr(stack[[pos]][[i]], "edgePar") <- list(col=r[num %% 15 + 1])
+								}
+							}
+							
+							# replace self in parent
+							if (parent[pos] > 0)
+								stack[[parent[pos]]][[index[pos]]] <- stack[[pos]]
+							pos <- pos - 1L # pop off of stack
+						} else { # descending tree
+							visit[pos] <- TRUE
+							p <- pos
+							for (i in seq_along(stack[[p]])) {
+								if (!is.leaf(stack[[p]][[i]])) {
+									# push subtree onto stack
+									pos <- pos + 1L
+									stack[[pos]] <- stack[[p]][[i]]
+									parent[[pos]] <- p
+									index[[pos]] <- i
+								}
+							}
+						}
+					}
+					return(stack[[1L]])
+				}
+				d <- .colEdge(d)
 				
 				.reorder <- function(dend) {
 					# initialize a stack of maximum length (dim)
@@ -2312,11 +2085,6 @@ IdClusters <- function(myDistMatrix=NULL,
 	}
 	
 	if (verbose) {
-		if (method != 3) { # already closed pBar
-			setTxtProgressBar(pBar, 100)
-			close(pBar)
-		}
-		
 		time.2 <- Sys.time()
 		cat("\n")
 		print(round(difftime(time.2,
