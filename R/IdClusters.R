@@ -1330,7 +1330,7 @@ IdClusters <- function(myDistMatrix=NULL,
 			pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 		}
 		if (typeX==3L) { # AAStringSet
-			wordSize <- ceiling(log(100*quantile(width(myXStringSet), 0.99),
+			wordSize <- ceiling(log(500*quantile(width(myXStringSet), 0.99),
 				.Call("alphabetSizeReducedAA",
 					myXStringSet,
 					0:19,
@@ -1341,7 +1341,7 @@ IdClusters <- function(myDistMatrix=NULL,
 				wordSize <- 1
 			words <- 20^wordSize
 		} else { # DNAStringSet or RNAStringSet
-			wordSize <- ceiling(log(100*quantile(width(myXStringSet), 0.99),
+			wordSize <- ceiling(log(500*quantile(width(myXStringSet), 0.99),
 				.Call("alphabetSize",
 					myXStringSet,
 					PACKAGE="DECIPHER")))
@@ -1389,9 +1389,7 @@ IdClusters <- function(myDistMatrix=NULL,
 		t <- tabulate(x, length(x))[u]
 		
 		cutoff <- cutoff/2 # cluster radius is half the diameter
-		# probability of chance match is (1 - cutoff)^N
-		# N is wordSize - 1 to correct for chance matches
-		threshold <- (1 - cutoff)^(wordSize - 1)
+		threshold <- (1 - cutoff)^wordSize # probability of k-mer match
 		for (i in seq_len(lc)) {
 			if (!ASC && i > 1) {
 				o <- u[order(c[u, i - 1],
@@ -1406,31 +1404,25 @@ IdClusters <- function(myDistMatrix=NULL,
 			
 			if (typeX==3L) { # AAStringSet
 				v <- .Call("enumerateSequenceAA",
-					.subset(myXStringSet, o[1:ifelse(l > 999, 999, l)]),
+					.subset(myXStringSet, o),
 					wordSize,
 					PACKAGE="DECIPHER")
 			} else { # DNAStringSet or RNAStringSet
 				v <- .Call("enumerateSequence",
-					.subset(myXStringSet, o[1:ifelse(l > 999, 999, l)]),
+					.subset(myXStringSet, o),
 					wordSize,
 					PACKAGE="DECIPHER")
 			}
 			v <- lapply(v,
-				sort.int,
-				method="radix")
+				sort,
+				na.last=NA)
 			
 			cluster_num <- 1L
 			offset <- 0L
-			c[o[cluster_num], i] <- cluster_num
+			c[o[1L], i] <- 1L
+			seeds.index <- integer(l)
+			seeds.index[1] <- 1L
 			
-			nGroups <- 1L
-			seeds.reps <- v[1L]
-			seeds.nums <- list(v[1L])
-			seeds.seqs <- list(.subset(myXStringSet, o[1]))
-			seeds.clust <- list(1L)
-			seeds.index <- list(o[1])
-			
-			index <- 1L
 			for (j in seq_along(o)[-1]) {
 				if (verbose) {
 					value <- round(((i - 1)*l + j)/lc/l, 2)
@@ -1440,38 +1432,13 @@ IdClusters <- function(myDistMatrix=NULL,
 					}
 				}
 				
-				if (j %% 1000 == 0) {
-					index <- 1L
-					if (typeX==3L) { # AAStringSet
-						v <- .Call("enumerateSequenceAA",
-							.subset(myXStringSet, o[j:ifelse(j + 999 > l, l, j + 999)]),
-							wordSize,
-							PACKAGE="DECIPHER")
-					} else { # DNAStringSet or RNAStringSet
-						v <- .Call("enumerateSequence",
-							.subset(myXStringSet, o[j:ifelse(j + 999 > l, l, j + 999)]),
-							wordSize,
-							PACKAGE="DECIPHER")
-					}
-					v <- lapply(v,
-						sort.int,
-						method="radix")
-				} else {
-					index <- index + 1L
-				}
-				
 				if (!ASC && i > 1) {
 					if (c[o[j], i - 1] != c[o[j - 1], i - 1]) {
 						# different clusters in last cutoff
 						offset <- offset + cluster_num
 						cluster_num <- 1L
 						c[o[j], i] <- cluster_num + offset
-						nGroups <- 1L
-						seeds.reps <- v[index]
-						seeds.nums <- list(v[index])
-						seeds.seqs <- list(.subset(myXStringSet, o[j]))
-						seeds.clust <- list(cluster_num)
-						seeds.index <- list(o[j])
+						seeds.index[1] <- j
 						next
 					} else if (c[o[j], i] > 0) { # cluster pre-assigned
 						c[o[j], i] <- c[c[o[j], i], i]
@@ -1479,105 +1446,27 @@ IdClusters <- function(myDistMatrix=NULL,
 					}
 				}
 				
-				# Split the sequences into "alignable" groups
 				m <- .Call("matchListsDual",
-					v[index],
-					seeds.reps,
+					v[j],
+					v[seeds.index[seq_len(cluster_num)]],
 					FALSE, # verbose
 					NULL, # pBar
 					processors,
 					PACKAGE="DECIPHER")
+				w <- which.max(m)
 				
-				# Determine to which group does the sequence belong
-				# expected number of occurrences of a random word
-				probs <- lengths(seeds.reps)/words
-				probs <- ifelse(probs > 1, 1, probs)
-				# probability of >= `q` matches in `size` trials
-				prob <- 1 - pbinom(q=m*length(v[[index]]),
-					size=length(v[[index]]),
-					prob=probs)
-				group <- which(prob < 0.01) # < 1% likelihood by chance
-				
-				if (length(group)==0) {
-					# form a new group
+				if (length(w)==0 ||
+					m[w] < threshold[i]) { # form a new group
 					cluster_num <- cluster_num + 1L
 					c[o[j], i] <- cluster_num
-					nGroups <- nGroups + 1L
-					seeds.reps[nGroups] <- v[index]
-					seeds.nums[[nGroups]] <- v[index]
-					seeds.seqs[[nGroups]] <- .subset(myXStringSet, o[j])
-					seeds.clust[[nGroups]] <- cluster_num
-					seeds.index[[nGroups]] <- o[j]
+					seeds.index[cluster_num] <- j
 				} else { # part of an existing group
-					if (length(group) > 1)
-						group <- group[which.max(m[group])]
-					
-					# Try to place into a cluster based on k-mers
-					m <- .Call("matchListsDual",
-						v[index],
-						seeds.nums[[group]],
-						FALSE, # verbose
-						NULL, # pBar
-						processors,
-						PACKAGE="DECIPHER")
-					
-					# percent identity >= threshold
-					w <- which(m >= threshold[i])
-					if (length(w) > 0) {
-						w <- w[which.max(m[w])]
-						c[o[j], i] <- seeds.clust[[group]][w] + offset
-						if (!ASC && i < lc) {
-							cols <- (i + 1):lc
-							cols <- cols[which(m[w] >= threshold[cols])]
-							if (length(cols) > 0) # assign forward
-								c[o[j], cols] <- seeds.index[[group]][w]
-						}
-					} else { # need to align to determine cluster
-						pattern <- .subset(myXStringSet, o[j])
-						
-						weights <- m^3 # emphasize closest sequences
-						weights <- weights/mean(weights)
-						if (any(!is.finite(weights)))
-							weights <- 1
-						
-						# pairwise alignment
-						temp <- AlignProfiles(pattern,
-							seeds.seqs[[group]],
-							s.weight=weights,
-							processors=processors)
-						d <- .Call("distMatrix",
-							temp,
-							typeX,
-							FALSE, # includeTerminalGaps
-							FALSE, # penalizeGapGapMatches
-							TRUE, # penalizeGapLetterMatches
-							FALSE, # full matrix
-							1L, # matrix
-							FALSE, # verbose
-							NULL, # pBar
-							processors,
-							PACKAGE="DECIPHER")[-1L]
-						w <- which(d <= cutoff[i])
-						if (length(w) > 0) {
-							w <- w[which.min(d[w])]
-							c[o[j], i] <- seeds.clust[[group]][w] + offset
-							if (!ASC && i < lc) {
-								cols <- (i + 1):lc
-								cols <- cols[which(d[w] <= cutoff[cols])]
-								if (length(cols) > 0) # assign forward
-									c[o[j], cols] <- seeds.index[[group]][w]
-							}
-						} else { # form a new cluster
-							cluster_num <- cluster_num + 1L
-							c[o[j], i] <- cluster_num + offset
-							seeds.nums[[group]] <- c(v[index],
-								seeds.nums[[group]])
-							seeds.seqs[[group]] <- temp
-							seeds.clust[[group]] <- c(cluster_num,
-								seeds.clust[[group]])
-							seeds.index[[group]] <- c(o[j],
-								seeds.index[[group]])
-						}
+					c[o[j], i] <- w + offset
+					if (!ASC && i < lc) {
+						cols <- (i + 1):lc
+						cols <- cols[which(m[w] >= threshold[cols])]
+						if (length(cols) > 0) # assign forward
+							c[o[j], cols] <- o[seeds.index[w]]
 					}
 				}
 			}

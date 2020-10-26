@@ -1,0 +1,129 @@
+WriteGenes <- function(x,
+	file="",
+	format="gbk",
+	append=FALSE) {
+	
+	# error checking
+	if (!is(x, "Genes"))
+		stop("x must be an object of class 'Genes'.")
+	FORMATS <- c("gbk", "gff")
+	if (length(format)==0)
+		stop("No format specified.")
+	format <- pmatch(format, FORMATS)
+	if (is.na(format))
+		stop("Invalid format.")
+	if (format==-1)
+		stop("Ambiguous format.")
+	if (!is.logical(append))
+		stop("append must be a logical.")
+	
+	if (is.character(file)) {
+		if (file == "") {
+			file <- stdout()
+		} else if (substring(file, 1L, 1L) == "|") {
+			file <- pipe(substring(file, 2L), "w")
+			on.exit(close(file))
+		} else {
+			file <- file(file, "w")
+			on.exit(close(file))
+		}
+	}
+	
+	ns <- names(attr(x, "widths"))
+	sn <- strsplit(ns , " ", fixed=TRUE)
+	sn <- sapply(sn, head, n=1)
+	
+	w <- which(x[, "Gene"]==1)
+	if (length(w)==0L)
+		stop("No genes specified by x.")
+	w <- w[order(x[w, "Index"], x[w, "Begin"])]
+	x <- x[w,]
+	
+	if (format==1L) { # gbk
+		if (!append) # overwrite the file
+			cat("", file=file)
+		t <- tapply(seq_len(nrow(x)),
+			x[, "Index"],
+			c)
+		for (i in seq_along(t)) {
+			cat("DEFINITION  ",
+				ns[as.numeric(names(t)[i])],
+				"\nFEATURES             Location/Qualifiers\n",
+				sep="",
+				file=file,
+				append=TRUE)
+			for (j in seq_along(t[[i]])) {
+				if (x[t[[i]][j], "Strand"]==1L) {
+					cat("     CDS             complement(",
+						x[t[[i]][j], "Begin"],
+						"..",
+						x[t[[i]][j], "End"],
+						")",
+						sep="",
+						file=file,
+						append=TRUE)
+				} else {
+					cat("     CDS             ",
+						x[t[[i]][j], "Begin"],
+						"..",
+						x[t[[i]][j], "End"],
+						sep="",
+						file=file,
+						append=TRUE)
+				}
+				cat("\n                     /note=\"ID=",
+					names(t)[i],
+					"_",
+					j,
+					";\"\n",
+					sep="",
+					file=file,
+					append=TRUE)
+			}
+		}
+	} else { # gff
+		cat("##gff-version 3\n",
+			file=file,
+			append=append)
+		t <- tapply(seq_len(nrow(x)),
+			x[, "Index"],
+			c)
+		for (i in seq_along(t)) {
+			j <- as.numeric(names(t)[i])
+			cat("##sequence-region ",
+				sn[j],
+				" 1 ",
+				attr(x, "widths")[j],
+				"\n",
+				sep="",
+				file=file,
+				append=TRUE)
+			tab <- cbind(sn[j],
+				paste("DECIPHER_v",
+					packageVersion("DECIPHER"),
+					sep=""),
+				"CDS",
+				x[t[[i]], "Begin"],
+				x[t[[i]], "End"],
+				round(100*x[t[[i]], "FractionReps"]),
+				ifelse(x[t[[i]], "Strand"]==1L,
+					"-",
+					"+"),
+				"0",
+				paste("ID=",
+					x[t[[i]], "Index"],
+					"_",
+					seq_along(t[[i]]),
+					sep=""))
+			write.table(tab,
+				file=file,
+				sep="\t",
+				quote=FALSE,
+				row.names=FALSE,
+				col.names=FALSE,
+				append=TRUE)
+		}
+	}
+	
+	invisible(NULL)
+}

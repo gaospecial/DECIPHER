@@ -2,10 +2,10 @@
 \alias{deltaHrules}
 \docType{data}
 \title{
-Change in Enthalpy of Hybridization of Primer/Target Quadruplets in Solution
+Change in Enthalpy of Hybridization of DNA/DNA Quadruplets in Solution
 }
 \description{
-An 8D array with four adjacent base pairs of the primer and target sequences at a time.  Each dimension has five elements defining the residue at that position ("A", "C", "G", "T", or "-").  The array contains the standard enthalpy change of probe binding (dH, [kcal/mol]) for every quadruple base pairing.
+An 8D array with four adjacent base pairs of the DNA duplex.  Each dimension has five elements defining the residue at that position ("A", "C", "G", "T", or "-").  The array contains the standard enthalpy change of probe binding (dH, [kcal/mol]) for every quadruple base pairing.
 }
 \usage{data(deltaHrules)}
 \format{
@@ -22,7 +22,7 @@ An 8D array with four adjacent base pairs of the primer and target sequences at 
   ..$ : chr [1:5] "A" "C" "G" "T" ...
 }
 \details{
-The first four dimensions correspond to the 4 primer positions from 5' to 3'.  The fifth to eighth dimensions correspond to the 4 positions from 5' to 3' of the target sequence.
+The first four dimensions correspond to the four top strand positions from 5' to 3'.  The fifth to eighth dimensions correspond to the four bottom strand positions from 5' to 3'.
 }
 \source{
 Data from a variety of publications by SantaLucia \emph{et al}.
@@ -32,7 +32,7 @@ SantaLucia, J., Jr., & Hicks, D. (2004) The Thermodynamics of DNA Structural Mot
 }
 \examples{
 data(deltaHrules)
-# dH of primer = AGCT / target = A-CT pairing
+# dH of the duplex AGCT / A-CT pairing
 deltaHrules["A", "G", "C", "T", "A", "-", "C", "T"]
 }
 \keyword{datasets}

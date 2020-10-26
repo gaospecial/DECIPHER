@@ -107,4 +107,20 @@ plot(as.numeric(names(changes)),
      changes,
      xlab="Position",
      ylab="Total independent changes")
+
+# count cases of potential compensatory mutations
+compensatory <- dendrapply(tree,
+    function(x) {
+        change <- attr(x, "change")
+        pos <- as.numeric(gsub(".*?([0-9]+).*", "\\\\1", change))
+        e <- expand.grid(seq_along(pos), seq_along(pos))
+        e <- e[pos[e[, 1]] < pos[e[, 2]],]
+        list(paste(change[e[, 1]], change[e[, 2]], sep=" & "))
+    })
+compensatory <- unlist(compensatory)
+u <- unique(compensatory)
+m <- match(compensatory, u)
+m <- tabulate(m, length(u))
+compensatory <- sort(setNames(m, u), decreasing=TRUE)
+head(compensatory) # ranked list of concurrent mutations
 }

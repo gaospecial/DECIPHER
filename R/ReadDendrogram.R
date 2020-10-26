@@ -199,5 +199,21 @@ ReadDendrogram <- function(file,
 			x
 		})
 	
+	# reorder numbers by label
+	labs <- rapply(x,
+		function(x)
+			attr(x, "label"))
+	if (any(duplicated(labs))) {
+		warning("Leaf numbering is unordered because of duplicated leaf labels.")
+	} else {
+		o <- order(order(labs))
+		x <- rapply(x,
+			function(x) {
+				x[] <- o[x]
+				x
+			},
+			how="replace")
+	}
+	
 	return(x)
 }

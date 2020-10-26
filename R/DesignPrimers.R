@@ -643,7 +643,7 @@ DesignPrimers <- function(tiles,
 			empty <- which(is.na(primers$forward_primer))
 			if (length(empty)==0) {
 				n <- nchar(primers$forward_primer)
-				nt <- strsplit(toString(reverseComplement(DNAStringSet(primers$forward_primer))),
+				nt <- strsplit(toString(reverseComplement(DNAStringSet(as.vector(primers$forward_primer)))),
 					", ",
 					fixed=TRUE)[[1]]
 				X <- substr(primers$forward_primer, n - pos + 1, n - pos + 1)
@@ -729,7 +729,7 @@ DesignPrimers <- function(tiles,
 			empty <- which(is.na(primers$reverse_primer))
 			if (length(empty)==0) {
 				n <- nchar(primers$reverse_primer)
-				nt <- strsplit(toString(reverseComplement(DNAStringSet(primers$reverse_primer))),
+				nt <- strsplit(toString(reverseComplement(DNAStringSet(as.vector(primers$reverse_primer)))),
 					", ",
 					fixed=TRUE)[[1]]
 				X <- substr(primers$reverse_primer, n - pos + 1, n - pos + 1)

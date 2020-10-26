@@ -91,11 +91,18 @@ SEXP parallelMatch(SEXP x, SEXP y, SEXP indices, SEXP z, SEXP a, SEXP b, SEXP nT
 	}
 	
 	SEXP ans;
-	PROTECT(ans = allocMatrix(REALSXP, n, size));
+	PROTECT(ans = allocMatrix(REALSXP, size, n));
 	double *rans;
 	rans = REAL(ans);
 	for (i = 0; i < n*size; i++)
 		rans[i] = 0;
+	
+	SEXP cSums;
+	PROTECT(cSums = allocVector(REALSXP, n));
+	double *cS;
+	cS = REAL(cSums);
+	for (i = 0; i < n; i++)
+		cS[i] = 0;
 	
 	#pragma omp parallel for private(i, j, k) schedule(guided) num_threads(nthreads)
 	for (k = 0; k < n; k++) {
@@ -104,10 +111,12 @@ SEXP parallelMatch(SEXP x, SEXP y, SEXP indices, SEXP z, SEXP a, SEXP b, SEXP nT
 		// temp = x %in% y
 		int *temp = (int *) calloc(size_x, sizeof(int)); // initialized to zero (thread-safe on Windows)
 		int s = 0;
+		int c = 0;
 		for (i = 0; i < size_x; i++) {
 			for (j = s; j < size_y[k]; j++) {
 				if (v[i] == w[j]) {
 					temp[i] = 1;
+					c = 1;
 					break;
 				} else if (v[i] < w[j]) {
 					break;
@@ -116,14 +125,21 @@ SEXP parallelMatch(SEXP x, SEXP y, SEXP indices, SEXP z, SEXP a, SEXP b, SEXP nT
 			s = j;
 		}
 		
-		// sum temp[m]*weights by rows
-		j = 0;
-		for (i = 0; i < l; i++) {
-			rans[j*n + k] += temp[m[i] - 1]*weights[i];
+		if (c > 0) { // at least one match
+			// sum temp[m]*weights by rows
+			j = 0;
+			for (i = 0; i < l; i++) {
+				if (temp[m[i] - 1] > 0)
+					rans[k*size + j] += weights[i];
+				
+				j++;
+				if (j==size)
+					j = 0;
+			}
 			
-			j++;
-			if (j==size)
-				j = 0;
+			// compute the row sum
+			for (i = 0; i < size; i++)
+				cS[k] += rans[k*size + i];
 		}
 		
 		free(temp);
@@ -132,7 +148,12 @@ SEXP parallelMatch(SEXP x, SEXP y, SEXP indices, SEXP z, SEXP a, SEXP b, SEXP nT
 	Free(ptrs);
 	Free(size_y);
 	
-	UNPROTECT(1);
+	SEXP ret_list;
+	PROTECT(ret_list = allocVector(VECSXP, 2));
+	SET_VECTOR_ELT(ret_list, 0, ans);
+	SET_VECTOR_ELT(ret_list, 1, cSums);
 	
-	return ans;
+	UNPROTECT(3);
+	
+	return ret_list;
 }

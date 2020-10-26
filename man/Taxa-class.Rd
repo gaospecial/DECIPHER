@@ -19,6 +19,8 @@ Taxonomic classification is the process of assigning an organism a label that is
 
 \method{print}{Taxa}(x,
      \dots)
+
+\method{[}{Taxa}(x, i, j, threshold)
 }
 \arguments{
   \item{x}{
@@ -35,6 +37,15 @@ Numeric vector giving the frequency of each classification if \code{x} or \code{
 }
   \item{\dots}{
 Other optional parameters.
+}
+  \item{i}{
+Numeric or character vector of indices to extract from objects of class \code{Taxa} with subclass \code{Test}.
+}
+  \item{j}{
+Numeric or character vector of rank levels to extract from objects of class \code{Taxa} with subclass \code{Test}.
+}
+  \item{threshold}{
+Numeric specifying the confidence \code{threshold} at which to truncate the output taxonomic classifications. Note that \code{threshold} must be higher than the original for the classifications to change.
 }
 }
 \details{
@@ -55,4 +66,20 @@ Erik Wright \email{eswright@pitt.edu}
 \examples{
 data("TrainingSet_16S")
 plot(TrainingSet_16S)
+
+# import test sequences
+fas <- system.file("extdata", "Bacteria_175seqs.fas", package="DECIPHER")
+dna <- readDNAStringSet(fas)
+
+# remove any gaps in the sequences
+dna <- RemoveGaps(dna)
+
+# classify the test sequences
+ids <- IdTaxa(dna, TrainingSet_16S, strand="top")
+ids
+
+plot(ids) # plot all rank levels
+plot(ids[, 1:4]) # plot the first rank levels
+plot(ids[j=c("rootrank", "class", "genus")]) # plot specific rank levels
+plot(ids[threshold=70]) # plot high confidence classifications
 }

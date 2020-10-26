@@ -166,11 +166,9 @@ CorrectFrameshifts <- function(myXStringSet,
 			PACKAGE="DECIPHER")
 		
 		v1 <- lapply(v1,
-			sort.int,
-			method="radix")
+			sort)
 		v2 <- lapply(v2,
-			sort.int,
-			method="radix")
+			sort)
 		
 		d <- .Call("matchListsDual",
 			v1,

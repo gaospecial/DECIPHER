@@ -27,7 +27,7 @@ Logical specifying whether to keep the root node (if one is present) as a dendro
 }
 }
 \details{
-\code{ReadDendrogram} will create a dendrogram object from a Newick formatted tree.  Note that all edge lengths must be specified, but labels are optional.
+\code{ReadDendrogram} will create a dendrogram object from a Newick formatted tree.  Note that all edge lengths must be specified, but labels are optional.  Leaves will be numbered by their labels in alphabetical order.
 }
 \value{
 An object of class \code{dendrogram}.
@@ -50,9 +50,6 @@ dend2 <- ReadDendrogram(tf)
 layout(matrix(1:2))
 plot(dend1, main="Dendrogram Written")
 plot(dend2, main="Dendrogram Read")
-
-# Note that the ordering information is lost
-any(unlist(dend1) != unlist(dend2)) # TRUE
 
 unlink(tf)
 }

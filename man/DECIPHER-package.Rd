@@ -12,7 +12,7 @@ DECIPHER is a software toolset that can be used for deciphering and managing bio
 \tabular{ll}{
 Package: \tab DECIPHER\cr
 Type: \tab Package\cr
-Depends: \tab R (>= 2.13.0), Biostrings (>= 2.35.12), RSQLite (>= 1.1), stats, parallel\cr
+Depends: \tab R (>= 3.5.0), Biostrings (>= 2.35.12), RSQLite (>= 1.1), stats, parallel\cr
 Imports: \tab methods, DBI, S4Vectors, IRanges, XVector\cr
 LinkingTo: \tab Biostrings, RSQLite, S4Vectors, IRanges, XVector\cr
 License: \tab GPL-3\cr
@@ -49,9 +49,13 @@ CreateChimeras           Create Artificial Chimeras
 DB2Seqs                  Export Database Sequences to a FASTA or FASTQ File
 deltaGrules              Free Energy of Hybridization of Probe/Target
                          Quadruplets
-deltaHrules              Change in Enthalpy of Hybridization of Primer/Target
+deltaHrules              Change in Enthalpy of Hybridization of DNA/DNA
                          Quadruplets in Solution
-deltaSrules              Change in Entropy of Hybridization of Primer/Target
+deltaHrulesRNA           Change in Enthalpy of Hybridization of RNA/RNA
+                         Quadruplets in Solution
+deltaSrules              Change in Entropy of Hybridization of DNA/DNA
+                         Quadruplets in Solution
+deltaSrulesRNA           Change in Entropy of Hybridization of RNA/RNA
                          Quadruplets in Solution
 DesignArray              Design a Set of DNA Microarray Probes for Detecting
                          Sequences
@@ -65,9 +69,12 @@ DigestDNA                Simulate Restriction Digestion of DNA
 Disambiguate             Expand Ambiguities into All Permutations of a
                          DNAStringSet
 DistanceMatrix           Calculate the Distance Between Sequences
+ExtractGenes             Extract Predicted Genes from a Genome
 FindChimeras             Find Chimeras in a Sequence Database
+FindGenes                Find Genes in a Genome
 FindSynteny              Finds Synteny in a Sequence Database
 FormGroups               Forms Groups By Rank
+Genes-class              Genes objects and accessors
 HEC_MI                   Mutual Information for Protein Secondary Structure
                          Prediction
 IdClusters               Cluster Sequences By Distance or Sequence
@@ -105,6 +112,7 @@ TrainingSet_16S          Training Set for Classification of 16S rRNA Gene
 TrimDNA                  Trims DNA Sequences to the High Quality Region
                          Between Patterns
 WriteDendrogram          Write a Dendrogram to Newick Format
+WriteGenes               Write Genes to a File
 }
 }
 \author{

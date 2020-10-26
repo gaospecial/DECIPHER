@@ -14,7 +14,7 @@ Cophenetic <- function(x) {
 	labs <- rapply(x,
 		function(x)
 			attr(x, "label"))
-	attr(d, "Lables") <- labs[o]
+	attr(d, "Labels") <- labs[o]
 	
 	.dist <- function(dend) {
 		# initialize a stack of maximum length (n)

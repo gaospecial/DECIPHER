@@ -57,7 +57,7 @@ set.seed(123)
 \section{Introduction}
 %------------------------------------------------------------
 
-This document describes how to perform taxonomic classification of nucleotide sequences with the \Rpackage{DECIPHER} package using the \emph{IDTAXA} algorithm.  The algorithm is split into two phases:  a ``training'' phase where the classifier learns attributes of the training set, and a ``testing'' phase where sequences with unknown taxonomic assignments are classified.  The objective of sequence classification is to accurately assign a taxonomic label to as many sequences as possible, while refraining from labeling sequences belonging to taxonomic groups that are not represented in the training data.  As a case study, the tutorial focuses on classifying a set of 16S ribosomal RNA (rRNA) gene sequences using a training set of 16S rRNA sequences from organisms belonging to known taxonomic groups.  Despite the focus on the 16S rRNA gene, the \emph{IDTAXA} process is the same for any set of gene sequences where there exist a training set with known taxonomic assignments and a testing set with unknown taxonomic assignments.
+This document describes how to perform taxonomic classification of amino acid or nucleotide sequences with the \Rpackage{DECIPHER} package using the \emph{IDTAXA} algorithm.  By definition, the taxonomy can be any scheme of classification:  organismal, functional, or operational.  The \emph{IDTAXA} algorithm is split into two phases:  a ``training'' phase where the classifier learns attributes of the training set, and a ``testing'' phase where sequences with unknown taxonomic assignments are classified.  The objective of sequence classification is to accurately assign a taxonomic label to as many sequences as possible, while refraining from labeling sequences belonging to taxonomic groups that are not represented in the training data.  As a case study, the tutorial focuses on classifying a set of 16S ribosomal RNA (rRNA) gene sequences using a training set of 16S rRNA sequences from organisms belonging to known taxonomic groups.  Despite the focus on the 16S rRNA gene, the \emph{IDTAXA} process is the same for any set of sequences where there exist a training set with known taxonomic assignments and a testing set with unknown taxonomic assignments.
 
 %------------------------------------------------------------
 \section{Getting Started}
@@ -97,20 +97,20 @@ Once \Rpackage{DECIPHER} is installed, the code in this tutorial can be obtained
 
 \setlength{\parindent}{1cm}
 
-The training process only needs to occur once per training set, and results in an object that can be reused for testing as many sequences as desired.  If you already have the output of training the classifier (an object of \term{class} \code{Taxa} and subclass \code{Train}), then you can skip to subsection \ref{viewing} (\nameref{viewing}) below.  Otherwise follow along with this section to learn how to create the training object.
+The training process only needs to occur once per training set, and results in an object that can be reused for testing as many sequences as desired.  If you already have the output of training the classifier (an object of \term{class} \code{Taxa} and subclass \code{Train}), then you can skip to subsection \ref{viewing} (\nameref{viewing}) below.  Otherwise follow along with this section to learn how to train the classifier.
 
-The training process begins with a set of sequence representatives assigned to a taxonomic hierarchy, called a ``training set''.  Typically taxonomic assignments for a gene of interest are obtained from an authoritative source, but they can also be automatically created (e.g., with \Rfunction{IdClusters}).  Here we describe the general training process, where the classifier iteratively learns about the reference taxonomy.
+The training process begins with a set of sequence representatives assigned to a taxonomic hierarchy, called a ``training set''.  Typically taxonomic assignments are obtained from an authoritative source, but they can also be automatically created (e.g., with \Rfunction{IdClusters}).  Here we describe the general training process, where the classifier iteratively learns about the reference taxonomy.
 
 \subsection{Importing the training set}
 
-The first step is to set filepaths to the sequences (in FASTA format) and the ``taxid'' file containing information about the taxonomic ranks.  The ``taxid'' file is optional, but is often provided (along with training sequences) in a standard 5-column, asterisks (``*'') delimited, text format used by many classifiers.  To create your own ``taxid'' file, see \ref{taxid} (\nameref{taxid}) below.  Be sure to change the path names to those on your system by replacing all of the text inside quotes labeled ``$<<$path to ...$>>$'' with the actual path on your system.
+The first step is to set filepaths to the sequences (in FASTA format) and the ``taxid'' file containing information about taxonomic ranks.  The ``taxid'' file is optional, but is often provided (along with training sequences) in a standard 5-column, asterisks (``*'') delimited, text format used by many classifiers.  To create your own ``taxid'' file, see \ref{taxid} (\nameref{taxid}) below.  Be sure to change the path names to those on your system by replacing all of the text inside quotes labeled ``$<<$path to ...$>>$'' with the actual path on your system.
 
 <<expr1,eval=FALSE>>=
 # specify the path to your file of training sequences:
-seqs_path <- "<<path to training FASTA>>"
+seqs_path <- "<<path to training FASTA file>>"
 # read the sequences into memory
 seqs <- readDNAStringSet(seqs_path)
-# NOTE: use readRNAStringSet for RNA sequences
+# Alternatively use readAAStringSet or readRNAStringSet
 
 # (optionally) specify a path to the taxid file:
 rank_path <- "<<path to taxid text file>>"
@@ -235,10 +235,10 @@ trainingSet
 
 And, as shown in Figure \ref{f1}, we can plot the training set (\code{trainingSet}) to view a variety of information:
 \begin{enumerate}
-\item The first panel contains the taxonomic tree with the ``Root'' at the very top.  This training set contains different numbers of ranks for each group, which is why the leaves of the tree end at different heights.  Edges of the tree that are colored in red show putative ``problem groups'' that persist after the iterative removal of ``problem sequences'' (see above).  These red edges are problematic in that the classifier cannot descend below this edge on the tree during the initial ``tree descent'' phase of the algorithm.  This slows down the classification process for sequences belonging to a group below this edge, but does not affect the classifier's accuracy.
-\item The second panel of Fig. \ref{f1} shows the number of unique groups at each taxonomic rank, ordered from highest to lowest taxonomic rank in the dataset.  We can see that there are about 2.5 thousand genera, which is the lowest rank in this training set.
-\item The bottom left panel contains a histogram of the number of sequences per group.  The maximum group size is in accordance with the \term{maxGroupSize} set above.  Here, the pre-trained classified has only a single sequence per group so that it will take up minimal space.
-\item The bottom right panel displays the \emph{inverse document frequency} (IDF) weights associated with each k-mer.  We can see that there are many rare k-mers that have high weights (i.e., high information content), and a few common k-mers that have very low weights.  This highly-skewed distribution of information content among k-mers is typical among nucleotide sequence data.
+\item The first panel contains the taxonomic tree with the ``Root'' at the very top.  This training set contains different numbers of ranks for each group, which is why the leaves of the tree end at different heights.  Edges of the tree that are colored show putative ``problem groups'' that persist after the iterative removal of ``problem sequences'' (see above).  These colored edges are problematic in that the classifier cannot descend below this edge on the tree during the initial ``tree descent'' phase of the algorithm.  This slows down the classification process for sequences belonging to a group below this edge, but does not affect the classifier's accuracy.
+\item The second panel of Fig. \ref{f1} shows the number of unique groups at each taxonomic rank, ordered from highest to lowest taxonomic rank in the dataset.  We can see that there are about 2.5 thousand genera, where \emph{genus} is the lowest rank in this training set.
+\item The bottom left panel contains a histogram of the number of sequences per group.  The maximum group size is in accordance with the \term{maxGroupSize} set above.  Here, the pre-trained classified has only a single sequence per group so that it will take up minimal space.  Typically classifiers will have a wide distribution of the number of sequences per group.
+\item The bottom right panel displays the \emph{inverse document frequency} (IDF) weights associated with each k-mer.  We can see that there are many rare k-mers that have high weights (i.e., high information content), and a few common k-mers that have very low weights.  This highly-skewed distribution of information content among k-mers is typical among sequence data.
 \end{enumerate}
 
 \begin{centerfig}
@@ -265,7 +265,7 @@ fas <- system.file("extdata",
 
 # read the sequences into memory
 test <- readDNAStringSet(fas)
-# NOTE: use readRNAStringSet for RNA sequences
+# Alternatively use readAAStringSet or readRNAStringSet
 @
 
 As in training (above), the test sequences cannot contain gap (``-'' or ``.'') characters, which can easily be removed with the \Rfunction{RemoveGaps} function:
@@ -297,6 +297,8 @@ Time difference of 12.23 secs
 \end{Sinput}
 \end{Schunk}
 
+The \code{threshold} of 60\% is recommended at the default confidence threshold.  Confidence levels are informally defined as 70\% (stringent), 60\% (cautious), 50\% (sensible), and 40\% (lenient).  Using a \code{threshold} of 0\% will report classifications down to all rank levels.  Note that the test sequences should generally be fully-overlapped by the information in the training sequences.  In this way, the training sequences can be longer than the test sequences, but the reverse situation would result in lower confidences.
+
 Let's look at the results by printing the object (\term{ids}) that was returned:
 
 <<expr13,eval=TRUE>>=
@@ -310,6 +312,8 @@ ids[1:5] # summary results for the first 5 sequences
 ids[[1]] # results for the first sequence
 ids[c(10, 25)] # combining different sequences
 c(ids[10], ids[25]) # merge different sets
+ids[, c("rootrank", "domain", "class")] # only look at specific rank levels
+ids[threshold=70] # threshold the results at a higher confidence
 @
 
 The output can easily be converted to a character vector with taxonomic information assigned to each sequence:
@@ -324,7 +328,7 @@ head(assignment)
 
 \subsection{Plotting the results}
 
-We can also plot the results, as shown in Figure \ref{f2}.  This produces a pie chart showing the relative abundance of the taxonomic groups assigned to test sequences.  It also displays the training taxonomic tree, with edges colored where they match the taxonomic groups shown in the pie chart.  Note that we could also have only plotted the pie chart by omitting the \code{trainingSet}.  Also, it is possible to specify the parameter \Rfunarg{n} if each classification represents to a varying number of sequences, e.g., when only unique sequences were originally classified.
+We can also plot the results, as shown in Figure \ref{f2}.  This produces a pie chart showing the relative abundance of the taxonomic groups assigned to test sequences.  It also displays the training taxonomic tree, with edges colored where they match the taxonomic groups shown in the pie chart.  Note that we could also have only plotted the pie chart by omitting the \code{trainingSet}.  Also, it is possible to specify the parameter \Rfunarg{n} if each classification represents a varying number of sequences, e.g., when only unique sequences were originally classified.
 
 \begin{centerfig}
 <<expr16,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6>>=
@@ -514,6 +518,67 @@ writeLines(taxid,
 	con="<<path to taxid file>>")
 @
 
+%------------------------------------------------------------
+\section{Annotating Protein Sequences}
+%------------------------------------------------------------
+
+The \emph{IDTAXA} algorithm can also be used to classify amino acid sequences into a taxonomy of genes, functions, or organisms.  As an example, we can train the classifier on the set of named genes from the phylum Planctobacteria.  Sets such as this can be constructed from various databases, including \underline{\url{https://www.uniprot.org/uniprot/?query=reviewed}}{SwissProt}.  The example training sequences can be loaded with:
+
+<<expr24,eval=FALSE>>=
+fas <- system.file("extdata",
+	"PlanctobacteriaNamedGenes.fas.gz",
+	package="DECIPHER")
+aa <- readAAStringSet(fas)
+aa
+head(names(aa))
+@
+
+Here, protein sequences are named by their enzyme commission (EC) number and three or four-letter gene name.  Since this taxonomy contains widely disparate sequences, we would not expect tree descent to be useful.  We can disable tree descent by setting \Rfunarg{maxChildren} to \code{1} in \Rfunction{LearnTaxa}.
+
+<<expr25,eval=FALSE>>=
+trainingSet <- LearnTaxa(train=aa,
+	taxonomy=names(aa),
+	maxChildren=1)
+@
+
+Next we need a set of query sequences to classify.  To this end, we will use a representative genome of the \emph{Chlamydia trachomatis} species, a member of the Planctobacteria phylum.  We can find genes in the genome using the \Rpackage{DECIPHER} function \Rfunction{FindGenes}.
+
+<<expr26,eval=FALSE>>=
+fas <- system.file("extdata",
+	"Chlamydia_trachomatis_NC_000117.fas.gz",
+	package="DECIPHER")
+genome <- readDNAStringSet(fas)
+genes <- FindGenes(genome, verbose=FALSE)
+test <- Extract(genes, genome, type="AAStringSet")
+test
+@
+
+Now, we can take advantage of the fact that our training and testing sets are composed of full-length sequences by setting \Rfunarg{fullLength} to \code{0.99} in \Rfunction{IdTaxa}.  This will automatically infer the expected length variability among proteins, and filter potential classifications to only those within a reasonable length range.  Furthermore, we will lower the \Rfunarg{threshold} to 50\%, the recommended value for protein sequences.
+
+<<expr27,eval=FALSE>>=
+ids <- IdTaxa(test,
+	trainingSet,
+	fullLength=0.99,
+	threshold=50,
+	processors=1)
+ids
+@
+
+Since only about a third of the proteins are classifiable in this dataset, we can display the subset of genes that did not belong to ``unclassified_Root''.  To make the plot more interesting, we will subset to the first EC number.
+
+\begin{centerfig}
+<<expr28,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6>>=
+unclassified <- sapply(ids,
+	function(x)
+		"unclassified_Root" %in% x$taxon)
+plot(ids[!unclassified, 1:2])
+@
+\caption{\label{f4} Names of genes in the \emph{E. coli} genome.}
+\end{centerfig}
+
+We see that most genes either are not placed in a class with an EC number or belong to EC 2 (Transferases) or EC 3 (Hydrolases).
+
+\clearpage
 
 %------------------------------------------------------------
 \section{Session Information}

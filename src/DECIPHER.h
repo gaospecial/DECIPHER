@@ -241,3 +241,55 @@ SEXP informationContentAA(SEXP p, SEXP nS, SEXP correction);
 SEXP vectorSum(SEXP x, SEXP y, SEXP z, SEXP b);
 
 SEXP parallelMatch(SEXP x, SEXP y, SEXP indices, SEXP z, SEXP a, SEXP b, SEXP nThreads);
+
+// GeneFinding.c
+
+SEXP getORFs(SEXP x, SEXP start_codons, SEXP stop_codons, SEXP min_gene_length, SEXP allow_edges);
+
+SEXP codonModel(SEXP x, SEXP orftable, SEXP stop_codons, SEXP min_orf_length);
+
+SEXP scoreCodonModel(SEXP x, SEXP orftable, SEXP codon_scores);
+
+SEXP dicodonModel(SEXP x, SEXP orftable, SEXP stop_codons);
+
+SEXP startCodonModel(SEXP x, SEXP orftable, SEXP indices, SEXP start_codons);
+
+SEXP scoreStartCodonModel(SEXP x, SEXP orftable, SEXP start_scores);
+
+SEXP initialCodonModel(SEXP x, SEXP orftable, SEXP indices, SEXP initial_codons);
+
+SEXP scoreInitialCodonModel(SEXP x, SEXP orftable, SEXP ini_scores);
+
+SEXP getRegion(SEXP x, SEXP orftable, SEXP width, SEXP offset);
+
+SEXP autocorrelationModel(SEXP x, SEXP orftable, SEXP indices, SEXP aatable);
+
+SEXP scoreAutocorrelationModel(SEXP x, SEXP orftable, SEXP codon_scores, SEXP aatable);
+
+SEXP nucleotideBiasModel(SEXP x, SEXP orftable, SEXP indices, SEXP positions);
+
+SEXP scoreNucleotideBiasModel(SEXP x, SEXP orftable, SEXP nuc_scores);
+
+SEXP upstreamMotifModel(SEXP x, SEXP orftable, SEXP indices, SEXP begin, SEXP distance, SEXP size);
+
+SEXP scoreUpstreamMotifModel(SEXP x, SEXP orftable, SEXP motif_scores, SEXP begin, SEXP distance, SEXP size);
+
+SEXP runLengthModel(SEXP x, SEXP orftable, SEXP codon_scores);
+
+SEXP scoreRunLengthModel(SEXP x, SEXP orftable, SEXP codon_scores, SEXP run_scores);
+
+SEXP stopCodonModel(SEXP x, SEXP orftable, SEXP indices, SEXP stop_codons);
+
+SEXP scoreStopCodonModel(SEXP x, SEXP orftable, SEXP stop_scores);
+
+SEXP terminationCodonModel(SEXP x, SEXP orftable, SEXP indices, SEXP terminal_codons);
+
+SEXP scoreTerminationCodonModel(SEXP x, SEXP orftable, SEXP ter_scores);
+
+SEXP codonFrequencies(SEXP x, SEXP orftable, SEXP indices);
+
+SEXP unicodonModel(SEXP x, SEXP orftable, SEXP stop_codons);
+
+SEXP chainGenes(SEXP orftable, SEXP topScore, SEXP topLength, SEXP scoreIntergenic, SEXP maxOverlapSame, SEXP maxOverlapOpposite, SEXP maxFracOverlap, SEXP sameScores, SEXP oppoScores);
+
+SEXP longestORFs(SEXP orftable);

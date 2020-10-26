@@ -6,14 +6,15 @@ IdTaxa <- function(test,
 	bootstraps=100,
 	samples=L^0.47,
 	minDescend=0.98,
+	fullLength=0,
 	processors=1,
 	verbose=TRUE) {
 	
 	# error checking
 	if (!is(test, "DNAStringSet") && !is(test, "RNAStringSet") && !is(test, "AAStringSet"))
 		stop("test must be an AAStringSet, DNAStringSet, or RNAStringSet.")
-	if (is(test, "AAStringSet") && any(strand != "top"))
-		stop("strand must be 'top' when test is an AAStringSet.")
+	if (is(test, "AAStringSet"))
+		strand <- "top"
 	# de-replicate sequences
 	ns <- names(test)
 	d <- !duplicated(test)
@@ -62,12 +63,6 @@ IdTaxa <- function(test,
 		stop("threshold must be a numeric.")
 	if (threshold < 0 || threshold > 100)
 		stop("threshold must be between 0 and 100 (inclusive).")
-	if (!is.numeric(bootstraps))
-		stop("bootstraps must be a numeric.")
-	if (bootstraps != floor(bootstraps))
-		stop("bootstraps must be a whole number.")
-	if (bootstraps < 1)
-		stop("bootstraps must be at least one.")
 	if (!is.numeric(minDescend))
 		stop("minDescend must be a numeric.")
 	if (minDescend < 0.5 || minDescend > 1)
@@ -80,6 +75,29 @@ IdTaxa <- function(test,
 	    } else if (!(is.call(sexpr) && # call
 	   	 	"L" %in% all.vars(sexpr))) { # containing 'L'
 			stop("samples must be a call containing 'L'.")
+		}
+	}
+	if (!is.numeric(fullLength))
+		stop("fullLength should be a numeric.")
+	if (length(fullLength)==1L && fullLength==0) {
+		fullLength <- c(0, Inf)
+	} else {
+		if (any(fullLength < 0))
+			stop("fullLength must be greater than zero.")
+		if (length(fullLength)==1L) {
+			if (fullLength < 1L) { # upper/lower quantiles
+				fullLength <- sort(c(fullLength,
+					1 - fullLength))
+			} else { # fold-differences
+				fullLength <- c(1/fullLength,
+					fullLength)
+			}
+		} else if (length(fullLength)==2L) {
+			if (all.equal(fullLength[1], fullLength[2]))
+				stop("fullLength must be 2 different numerics.")
+			fullLength <- sort(fullLength)
+		} else {
+			stop("fullLength must be 1 or 2 numerics.")
 		}
 	}
 	if (!is.logical(verbose))
@@ -117,7 +135,24 @@ IdTaxa <- function(test,
 	nKmers <- ifelse(is(test, "AAStringSet"),
 		max(trainingSet$alphabet) + 1,
 		4)^K
-	B <- as.integer(bootstraps)
+	
+	Ls <- lengths(kmers) # number of k-mers per sequence
+	if (all(fullLength < 1)) { # infer length quantiles
+		t <- tapply(Ls,
+			crossIndex,
+			function(x) {
+				if (length(x)==1L) {
+					NA_real_
+				} else {
+					x/mean(x)
+				}
+			})
+		fullLength <- quantile(unlist(t),
+			fullLength,
+			na.rm=TRUE)
+		if (is.na(fullLength[1]))
+			stop("fullLength cannot be inferred from trainingSet.")
+	}
 	
 	if (verbose) {
 		time.1 <- Sys.time()
@@ -158,9 +193,37 @@ IdTaxa <- function(test,
 		stop("samples did not evaluate to a vector of length equal to the number of sequences in test.")
 	}
 	S <- ceiling(S)
+	
+	# require a minimum sample size
+	L <- quantile(Ls, 0.9)
+	for (minS in seq(2L, 100L, 2L)) {
+		# probability of observing half of k-mers by chance
+		P <- 1 - pbinom(minS*0.5 - 1,
+			minS,
+			L/nKmers)
+		# probability of occurrence in one or more sequences
+		P <- 1 - pbinom(0, # observed once or more
+			length(kmers), # number of sequences
+			P)
+		if (P < 0.01) # less than 1% of bootstrap replicates
+			break
+	}
+	S <- ifelse(S < minS, minS, S)
+	
 	testkmers <- lapply(testkmers,
 		function(x)
 			sort(unique(x + 1L), na.last=NA))
+	
+	if (!is.numeric(bootstraps))
+		stop("bootstraps must be a numeric.")
+	if (bootstraps != floor(bootstraps))
+		stop("bootstraps must be a whole number.")
+	if (bootstraps < 1)
+		stop("bootstraps must be at least one.")
+	# set B such that > 99% of k-mers are sampled
+	B <- 5*lengths(testkmers)/S # 1 - P(0) = 1 - exp(-5)
+	B <- ifelse(B > bootstraps, bootstraps, B)
+	B <- as.integer(B)
 	
 	boths <- which(strand==1)
 	if (length(boths) > 0) {
@@ -174,10 +237,30 @@ IdTaxa <- function(test,
 	}
 	
 	if (type==1L) {
-		results <- character(length(testkmers))
+		if (is.null(trainingSet$ranks)) {
+			results <- "Root [0%]; unclassified_Root [0%]"
+		} else {
+			results <- paste("Root [",
+				trainingSet$ranks[1],
+				", 0%]; unclassified_Root [",
+				trainingSet$ranks[2],
+				", 0%]",
+				sep="")
+		}
 	} else {
-		results <- vector("list", length(testkmers))
+		if (is.null(trainingSet$ranks)) {
+				results <- list(list(taxon=c("Root",
+						"unclassified_Root"),
+					confidence=rep(0, 2)))
+		} else {
+			results <- list(list(taxon=c("Root",
+					"unclassified_Root"),
+				confidence=rep(0, 2),
+				rank=c(trainingSet$ranks[1],
+					trainingSet$ranks[2])))
+		}
 	}
+	results <- rep(results, length(testkmers))
 	I <- c(seq_along(testkmers),
 		boths)
 	O <- c(rep(0L, length(testkmers)),
@@ -190,35 +273,8 @@ IdTaxa <- function(test,
 			mykmers <- testkmers[[I[i]]]
 		}
 		
-		if (length(mykmers) <= S[I[i]]) { # no k-mers to test
-			if (!O[i]) { # first attempt
-				if (type==1L) {
-					if (is.null(trainingSet$ranks)) {
-						results[I[i]] <- "Root [0%]; unclassified_Root [0%]"
-					} else {
-						results[I[i]] <- paste("Root [",
-							trainingSet$ranks[1],
-							", 0%]; unclassified_Root [",
-							trainingSet$ranks[2],
-							", 0%]",
-							sep="")
-					}
-				} else {
-					if (is.null(trainingSet$ranks)) {
-						results[[I[i]]] <- list(taxon=c("Root",
-								"unclassified_Root"),
-							confidence=rep(0, 2))
-					} else {
-						results[[I[i]]] <- list(taxon=c("Root",
-								"unclassified_Root"),
-							confidence=rep(0, 2),
-							rank=c(trainingSet$ranks[1],
-								trainingSet$ranks[2]))
-					}
-				}
-			}
+		if (length(mykmers) <= S[I[i]]) # not enough k-mers to test
 			next
-		}
 		
 		# choose which training sequences to use for benchmarking
 		k <- 1L
@@ -234,11 +290,11 @@ IdTaxa <- function(test,
 				s <- ceiling(n*fraction[k])
 				
 				# sample the decision k-mers
-				sampling <- matrix(sample(n, s*B, replace=TRUE), B, s)
+				sampling <- matrix(sample(n, s*B[I[i]], replace=TRUE), B[I[i]], s)
 				
 				hits <- matrix(0,
 					nrow=length(subtrees),
-					ncol=B)
+					ncol=B[I[i]])
 				matches <- .Call("intMatch",
 					decision_kmers[[k]][[1]],
 					mykmers,
@@ -249,15 +305,15 @@ IdTaxa <- function(test,
 						matches,
 						myweights[j,],
 						sampling,
-						B,
+						B[I[i]],
 						PACKAGE="DECIPHER")
 				}
 				
 				maxes <- apply(hits, 2, max) # max hits per bootstrap replicate
 				hits <- colSums(t(hits)==maxes & maxes > 0)
-				w <- which(hits >= minDescend*B)
+				w <- which(hits >= minDescend*B[I[i]])
 				if (length(w) != 1) { # zero or multiple groups with 100% confidence
-					w <- which(hits >= B*0.5) # require 50% confidence to use a subset of groups
+					w <- which(hits >= B[I[i]]*0.5) # require 50% confidence to use a subset of groups
 					if (length(w)==0) {
 						w <- seq_along(hits) # use all groups
 						break
@@ -279,33 +335,40 @@ IdTaxa <- function(test,
 		}
 		
 		keep <- unlist(sequences[children[[k]][w]])
+		if (fullLength[1] > 0 || is.finite(fullLength[2])) {
+			keep <- keep[Ls[keep] >= fullLength[1]*length(mykmers) &
+				Ls[keep] <= fullLength[2]*length(mykmers)]
+			if (length(keep)==0L) # no sequences
+				next
+		}
 		
 		# determine the number of k-mers per bootstrap replicate
 		s <- S[I[i]] # subsample size
 		
 		# sample the same query k-mers for all comparisons
-		sampling <- matrix(sample(mykmers, s*B, replace=TRUE), B, s)
+		sampling <- matrix(sample(mykmers, s*B[I[i]], replace=TRUE), B[I[i]], s)
 		
 		# only match unique k-mers to improve speed
 		uSampling <- sort(unique(as.vector(sampling)))
 		m <- match(sampling, uSampling)
 		
 		# lookup IDF weights for sampled k-mers
-		myweights <- matrix(counts[sampling], B, s)
+		myweights <- matrix(counts[sampling], B[I[i]], s)
 		
-		# record the matches to each genus
+		# record the matches to each group
 		hits <- .Call("parallelMatch",
 			uSampling,
 			kmers,
 			keep,
 			m,
 			myweights,
-			B,
+			B[I[i]],
 			processors,
 			PACKAGE="DECIPHER")
 		
 		# find the index of the top hit per group
-		sumHits <- rowSums(hits) # score per sequence
+		sumHits <- hits[[2]] # score per sequence
+		hits <- hits[[1]] # matrix of hits
 		lookup <- crossIndex[keep] # indices in taxonomy
 		index <- sort(unique(lookup)) # index of each tested group
 		o <- order(lookup)
@@ -314,21 +377,14 @@ IdTaxa <- function(test,
 			lookup[o],
 			index,
 			PACKAGE="DECIPHER")]
-		hits <- hits[topHits,, drop=FALSE] # only look at the top sequence per group
+		hits <- hits[, topHits, drop=FALSE] # only look at the top sequence per group
 		
 		# compute confidence from the number of hits per group
 		totHits <- numeric(length(topHits))
 		davg <- mean(rowSums(myweights))
-		for (j in seq_len(B)) { # each bootstrap replicate
-			mymax <- max(hits[, j])
-			w <- which(hits[, j]==mymax)
-			if (length(w) > 1) {
-				selected <- sample(w, 1)
-			} else {
-				selected <- w
-			}
-			totHits[selected] <- totHits[selected] + mymax/davg
-		}
+		maxes <- max.col(hits)
+		for (j in seq_len(B[I[i]])) # each bootstrap replicate
+			totHits[maxes[j]] <- totHits[maxes[j]] + hits[j, maxes[j]]/davg
 		
 		# choose the group with highest confidence
 		w <- which(totHits==max(totHits))
@@ -338,26 +394,14 @@ IdTaxa <- function(test,
 			selected <- w
 		}
 		if (O[i]) { # second pass
-			if (sum(hits[selected,])/davg <= sims[O[i]]) {
+			if (sum(hits[, selected])/davg <= sims[O[i]]) {
 				if (verbose)
 					setTxtProgressBar(pBar, i/length(I))
 				next # other strand was higher similarity
 			}
 		} else { # first pass (record result)
 			confs[i] <- totHits[selected] # confidence
-			sims[i] <- sum(hits[selected,])/davg # weighted k-mer similarity
-		}
-		
-		# sum confidences up the hierarchy
-		w <- which(totHits > 0)
-		confidences <- numeric(index[w[length(w)]])
-		for (j in seq_along(w)) {
-			confidences[index[w[j]]] <- totHits[w[j]]
-			p <- parents[index[w[j]]]
-			while (p > 0) {
-				confidences[p] <- confidences[p] + totHits[w[j]]
-				p <- parents[p]
-			}
+			sims[i] <- sum(hits[, selected])/davg # weighted k-mer similarity
 		}
 		
 		# record confidences up the hierarchy
@@ -367,7 +411,7 @@ IdTaxa <- function(test,
 			predicteds <- c(p, predicteds)
 			p <- parents[p]
 		}
-		confidences <- rep((totHits[selected]/B)*100, length(predicteds))
+		confidences <- rep(totHits[selected]/B[I[i]]*100, length(predicteds))
 		w <- totHits > 0
 		w[selected] <- FALSE
 		w <- which(w)
@@ -376,7 +420,7 @@ IdTaxa <- function(test,
 			while (p > 0) {
 				m <- match(p, predicteds)
 				if (!is.na(m))
-					confidences[m] <- confidences[m] + totHits[w[j]]
+					confidences[m] <- confidences[m] + totHits[w[j]]/B[I[i]]*100
 				p <- parents[p]
 			}
 		}

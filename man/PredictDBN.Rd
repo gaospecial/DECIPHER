@@ -102,6 +102,8 @@ Buslje, C., et al. (2009). Correction for phylogeny, small number of observation
 Freyhult, E., et al. (2005). Predicting RNA Structure Using Mutual Information. Applied Bioinformatics, \bold{4(1)}, 53-59.
 
 Venkatachalam, B., et al. (2014). Faster algorithms for RNA-folding using the Four-Russians method. Algorithms for Molecular Biology : AMB, \bold{9(1)}, 1-12.
+
+Wright, E. S. (2020). RNAconTest: comparing tools for noncoding RNA multiple sequence alignment based on structural consistency. RNA 2020, 26, 531-540.
 }
 \author{
 Erik Wright \email{eswright@pitt.edu}

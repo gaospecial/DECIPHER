@@ -22,7 +22,7 @@ An 8D array with four adjacent base pairs of the probe and target sequences at a
   ..$ : chr [1:5] "A" "C" "G" "T" ...
 }
 \details{
-The first four dimensions correspond to the 4 probe positions from 5' to 3'.  The fifth to eighth dimensions correspond to the 4 positions from 5' to 3' of the target sequence.
+The first four dimensions correspond to the four probe positions from 5' to 3'.  The fifth to eighth dimensions correspond to the four positions from 5' to 3' of the target sequence.
 }
 \source{
 Data obtained using NimbleGen microarrays and a Linear Free Energy Model developed by Yilmaz \emph{et al}.

@@ -119,8 +119,19 @@
 				}
 			})
 		rank <- lapply(x[d],
-			function(x)
-				x[[3]][-1])
+			function(x) {
+				x <- x[[3]][-1]
+				t <- table(x)
+				for (i in which(t > 1)) {
+					w <- which(x==names(t)[i])
+					x[w] <- paste(x[w],
+						sapply(seq_along(w),
+							function(x)
+								paste(rep(" ", x - 1), collapse="")),
+						sep="")
+				}
+				x
+			})
 		ranks <- unlist(lapply(rank,
 				function(x)
 					c("Root", x, "")),
@@ -200,7 +211,10 @@
 	org_colors <- rainbow(length(o), s=0.6)
 	colors <- col2rgb(org_colors)
 	for (i in rev(seq_len(l))) {
-		groups <- idsTbl[i,]
+		groups <- apply(idsTbl[seq_len(i),, drop=FALSE],
+			2L,
+			paste,
+			collapse=";")
 		counts <- tot
 		t <- tapply(counts,
 			groups,
@@ -221,6 +235,9 @@
 				maxColorValue=255)
 		}
 		if (i==l) { # draw outer ring
+			names(t)[t >= 0.01] <- sapply(strsplit(names(t)[t >= 0.01], ";", fixed=TRUE),
+				tail,
+				n=1)
 			names(t)[t < 0.01] <- ""
 			if (hasRanks) {
 				font <- ifelse(lastRank %in% c("genus", "species"), 3, 1)
@@ -266,15 +283,94 @@
 	invisible(org_colors[o])
 }
 
-`[.Taxa` <- function(x, i) {
-	ans <- NextMethod("[", x)
+`[.Taxa` <- function(x, i, j, threshold) {
 	if (class(x)[1] != "Taxa") {
 		stop("x must be an object of class 'Taxa'.")
 	} else if (class(x)[2]=="Train") {
-		x <- unclass(x)[i]
+		stop("Objects of class 'Train' cannot be subsetted.")
 	} else if (class(x)[2]=="Test") {
-		x <- unclass(x)[i]
-		class(x) <- c("Taxa", "Test")
+		if (!missing(i)) {
+			x <- unclass(x)[i]
+			class(x) <- c("Taxa", "Test")
+		}
+		if (!missing(threshold)) {
+			if (length(threshold) != 1 || !is.numeric(threshold))
+				stop("threshold must be a single numeric.")
+			if (threshold < 0 || threshold > 100)
+				stop("threshold must be between 0 and 100 (inclusive).")
+			for (k in seq_along(x)) {
+				b <- x[[k]]$confidence
+				if (length(b) > 2) {
+					w <- which(b >= threshold)
+					if (length(w) <= 1) {
+						x[[k]]$taxon <- c("Root", "unclassified_Root")
+						x[[k]]$confidence <- rep(b[1], 2)
+						x[[k]]$rank <- x[[k]]$rank[1:2]
+					} else if (length(w) < length(b)) {
+						x[[k]]$taxon <- c(x[[k]]$taxon[w],
+							paste("unclassified",
+								x[[k]]$taxon[w[length(w)]],
+								sep="_"))
+						x[[k]]$confidence <- c(b[w],
+							b[w[length(w)]])
+						x[[k]]$rank <- c(x[[k]]$rank[w],
+							x[[k]]$rank[w[length(w)] + 1L])
+					}
+				}
+			}
+		}
+		if (!missing(j)) {
+			if (length(j) <= 1)
+				stop('The length of j must be greater than one.')
+			if (is.numeric(j)) {
+				if (any(floor(j) != j))
+					stop('j can only be whole numbers.')
+				if (any(j <= 0))
+					stop('j must be positive.')
+				if (is.unsorted(j))
+					stop('j must be in ascending order.')
+				if (j[1] != 1)
+					stop('The first element of j must be 1.')
+				for (k in seq_along(x)) {
+					a <- x[[k]]$taxon[j]
+					b <- x[[k]]$confidence[j]
+					c <- x[[k]]$rank[j]
+					w <- which(!is.na(a))
+					if (length(w)==1) {
+						x[[k]]$taxon <- c("Root", "unclassified_Root")
+						x[[k]]$confidence <- rep(b[w], 2)
+						x[[k]]$rank <- c[1:2]
+					} else {
+						x[[k]]$taxon <- a[w]
+						x[[k]]$confidence <- b[w]
+						x[[k]]$rank <- c[w]
+					}
+				}
+			} else if (is.character(j)) {
+				if (j[1] != "rootrank")
+					stop("The first element of j must be 'rootrank'.")
+				for (k in seq_along(x)) {
+					c <- x[[k]]$rank
+					if (is.null(c))
+						stop("Missing rank information.")
+					m <- match(j, c)
+					m <- m[which(!is.na(m))]
+					if (is.unsorted(m))
+						stop("j must be in order of rank.")
+					if (length(m)==1) {
+						m <- c(1, 2)
+						x[[k]]$taxon <- c("Root", "unclassified_Root")
+						x[[k]]$confidence <- rep(x[[k]]$confidence, 2)
+					} else {
+						x[[k]]$taxon <- x[[k]]$taxon[m]
+						x[[k]]$confidence <- x[[k]]$confidence[m]
+					}
+					x[[k]]$rank <- c[m]
+				}
+			} else {
+				stop("j must be a numeric or character vector.")
+			}
+		}
 	} else {
 		stop("x has unrecognized class: ", class(x)[2])
 	}
@@ -342,7 +438,7 @@ plot.Taxa <- function(x, y=NULL, showRanks=TRUE, n=NULL, ...) {
 			# Create a pie chart
 			colors <- .plotIDs(test, showRanks, n)
 			
-			# Create a taxonomic tree
+			# Create a tree
 			makeTree <- function(I) {
 				if (length(train$children[[I]])==0) {
 					z <- I
@@ -379,7 +475,7 @@ plot.Taxa <- function(x, y=NULL, showRanks=TRUE, n=NULL, ...) {
 			class(tree) <- "dendrogram"
 			
 			p <- par(mar=c(0.1, 0.1, 2.1, 0.1))
-			# plot taxonomic tree
+			# plot tree
 			dev.hold()
 			on.exit(dev.flush())
 			plot(tree,
@@ -405,7 +501,7 @@ plot.Taxa <- function(x, y=NULL, showRanks=TRUE, n=NULL, ...) {
 			stop("n must be NULL if x is of class 'Train'.")
 		layout(matrix(c(1, 2, 3, 1, 2, 4), nrow=3))
 		
-		# Create a taxonomic tree
+		# Create a tree
 		makeTree <- function(I) {
 			if (length(x$children[[I]])==0) {
 				z <- I
@@ -443,7 +539,7 @@ plot.Taxa <- function(x, y=NULL, showRanks=TRUE, n=NULL, ...) {
 		class(tree) <- "dendrogram"
 		
 		p <- par(mar=c(0.1, 0.1, 2.1, 0.1))
-		# plot taxonomic tree
+		# plot tree
 		dev.hold()
 		on.exit(dev.flush())
 		plot(tree,
@@ -475,7 +571,6 @@ plot.Taxa <- function(x, y=NULL, showRanks=TRUE, n=NULL, ...) {
 		if (is.null(x$ranks)) {
 			t <- table(x$levels)
 			names(t) <- paste("Level", names(t))
-			main <- "Frequency of taxonomic levels"
 		} else {
 			t <- table(x$ranks)
 			w <- which(!duplicated(x$ranks))
@@ -488,10 +583,9 @@ plot.Taxa <- function(x, y=NULL, showRanks=TRUE, n=NULL, ...) {
 			c[is.na(c)] <- length(w) + 1L
 			o <- order(p, c)
 			t <- t[u[o]]
-			main <- "Frequency of taxonomic ranks"
 		}
 		plot(t,
-			main=main,
+			main="Frequency of rank levels",
 			ylab="Frequency")
 		
 		par(mar=c(4.1, 4.1, 2.1, 1.1))
@@ -507,7 +601,7 @@ plot.Taxa <- function(x, y=NULL, showRanks=TRUE, n=NULL, ...) {
 			breaks=seq(0,
 				ceiling(max(s)),
 				length.out=10),
-			main="Sequences per taxonomic label",
+			main="Sequences per label",
 			xlab="Number of sequence representatives",
 			xaxt="n")
 		ticks <- axTicks(1)
@@ -559,7 +653,7 @@ print.Taxa <- function(x, ...) {
 			max(x$levels) + 1L,
 			"\n   * Total number of sequences: ",
 			length(x$sequences[[1]]),
-			"\n   * Number of taxonomic groups: ",
+			"\n   * Number of groups: ",
 			sum(lengths(x$children)==0),
 			"\n   * Number of problem groups: ",
 			length(x$problemGroups),
@@ -595,10 +689,10 @@ print.Taxa <- function(x, ...) {
 		p1 <- paste(p1,
 			format(sapply(x[w1],
 					function(x)
-						tail(x$confidence,
-							n=1)),
+						floor(tail(x$confidence,
+							n=1))),
 				width=10,
-				nsmall=1,
+				nsmall=0,
 				digits=3,
 				justify="right"),
 			"% ",
@@ -678,10 +772,10 @@ print.Taxa <- function(x, ...) {
 			p2 <- paste(p2,
 				format(sapply(x[w2],
 						function(x)
-							tail(x$confidence,
-								n=1)),
+							floor(tail(x$confidence,
+								n=1))),
 					width=10,
-					nsmall=1,
+					nsmall=0,
 					digits=3,
 					justify="right"),
 				"% ",

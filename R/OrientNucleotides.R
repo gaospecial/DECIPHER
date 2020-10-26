@@ -98,7 +98,7 @@ OrientNucleotides <- function(myXStringSet,
 		myXStringSet,
 		wordSize,
 		PACKAGE="DECIPHER")
-	v <- lapply(v, sort.int, method="radix")
+	v <- lapply(v, sort)
 	X <- v[reference]
 	
 	dists <- function(x) {

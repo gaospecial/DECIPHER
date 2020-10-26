@@ -155,11 +155,13 @@ MapCharacters <- function(x,
 						} else {
 							attr(stack[[pos]][[i]], "change") <- character()
 						}
+						if (labelEdges)
+							attr(stack[[pos]][[i]], "edgetext") <- length(keep)
 					} else {
 						attr(stack[[pos]][[i]], "change") <- character()
+						if (labelEdges)
+							attr(stack[[pos]][[i]], "edgetext") <- 0L
 					}
-					if (labelEdges)
-						attr(stack[[pos]][[i]], "edgetext") <- length(w)
 				}
 				
 				# replace self in parent

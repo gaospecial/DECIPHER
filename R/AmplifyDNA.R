@@ -35,6 +35,7 @@ AmplifyDNA <- function(primers,
 		stop("maxProductSize must be a numeric.")
 	if (maxProductSize <= 0)
 		stop("maxProductSize must be greater than zero")
+	maxProductSize <- as.integer(maxProductSize)
 	if (!is.logical(includePrimers))
 		stop("includePrimers must be a logical.")
 	a <- vcountPattern("-", myDNAStringSet)
@@ -52,12 +53,16 @@ AmplifyDNA <- function(primers,
 	l <- rep(seq_along(primers), l)
 	primers <- unlist(primers)
 	
+	ns <- names(myDNAStringSet)
 	w <- width(myDNAStringSet)
+	w <- cumsum(w)
 	w <- w[-length(w)]
+	starts <- c(1L,
+		w + seq_along(w)*maxProductSize + 1L)
 	myDNAStringSet <- unlist(myDNAStringSet)
 	if (length(w) > 0)
 		myDNAStringSet <- replaceAt(myDNAStringSet,
-			IRanges(start=cumsum(w) + 1L,
+			IRanges(start=w + 1L,
 				width=0),
 			paste(rep("-", maxProductSize),
 				collapse=""))
@@ -67,7 +72,7 @@ AmplifyDNA <- function(primers,
 	for (i in 1:length(primers)) {
 		temp <- matchPattern(primers[[i]],
 			myDNAStringSet,
-			max.mismatch=ceiling(.25*nchar(primers[[i]])),
+			max.mismatch=ceiling(0.25*nchar(primers[[i]])),
 			with.indels=TRUE)
 		temp <- as(temp, "IRanges")
 		f <- c(f, temp)
@@ -99,7 +104,7 @@ AmplifyDNA <- function(primers,
 	
 	targets <- extractAt(myDNAStringSet,
 		at=IRanges(start=start(f),
-		end=end(f)))
+			end=end(f)))
 	fe <- CalculateEfficiencyPCR(primers[fp],
 		reverseComplement(targets),
 		annealingTemp, P, ions, ...)
@@ -109,7 +114,7 @@ AmplifyDNA <- function(primers,
 	
 	targets <- extractAt(myDNAStringSet,
 		at=IRanges(start=start(r),
-		end=end(r)))
+			end=end(r)))
 	re <- CalculateEfficiencyPCR(primers[rp],
 		targets,
 		annealingTemp, P, ions, ...)
@@ -151,6 +156,13 @@ AmplifyDNA <- function(primers,
 		
 		o <- order(effs, decreasing=TRUE)
 		
+		index <- sapply(b[o],
+			function(x) {
+				tail(which(starts <= x), n=1)
+			})
+		if (!is.null(ns))
+			index <- ns[index]
+		
 		if (includePrimers) {
 			extra <- ifelse(b > e, b - e - 1L, 0) # primers overlap
 			e <- ifelse(b > e, b - 1L, e) # primers overlap
@@ -168,7 +180,8 @@ AmplifyDNA <- function(primers,
 				l[fs[o]],
 				" x ",
 				l[rs[o]],
-				")",
+				") ",
+				index,
 				sep="")
 		} else {
 			v <- Views(myDNAStringSet,
@@ -179,7 +192,8 @@ AmplifyDNA <- function(primers,
 					l[fs[o]],
 					" x ",
 					l[rs[o]],
-					")",
+					") ",
+					index,
 					sep=""))
 			v <- as(v, "DNAStringSet")
 		}

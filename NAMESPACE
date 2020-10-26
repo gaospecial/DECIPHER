@@ -10,9 +10,9 @@ import(DBI)
 import(parallel)
 
 importFrom("grDevices", "colorRampPalette", "colors", "dev.flush", "dev.hold", "dev.size", "rainbow", "rgb", "as.graphicsAnnot", "col2rgb")
-importFrom("graphics", "abline", "axis", "box", "legend", "mtext", "par", "plot", "points", "rect", "segments", "strheight", "strwidth", "text", "axTicks", "hist", "layout", "lines", "polygon")
-importFrom("stats", "dendrapply", "dist", "is.leaf", "nlminb", "optimize", "order.dendrogram", "pbinom", "reorder", "setNames", "step", "uniroot", "weighted.mean")
-importFrom("utils", "browseURL", "data", "flush.console", "object.size", "setTxtProgressBar", "txtProgressBar")
+importFrom("graphics", "abline", "axis", "box", "legend", "mtext", "par", "plot", "points", "rect", "segments", "strheight", "strwidth", "text", "axTicks", "hist", "layout", "lines", "polygon", "locator")
+importFrom("stats", "dendrapply", "dist", "is.leaf", "nlminb", "optimize", "order.dendrogram", "pbinom", "reorder", "setNames", "step", "uniroot", "weighted.mean", "binomial", "glm", "glm.control", "optim", "predict", "smooth.spline")
+importFrom("utils", "browseURL", "data", "flush.console", "object.size", "setTxtProgressBar", "txtProgressBar", "packageVersion", "write.table")
 
 export(
 # interacting with a database:
@@ -42,7 +42,9 @@ AdjustAlignment, AlignDB, AlignProfiles, AlignSeqs, AlignTranslation, MaskAlignm
 # synteny:
 AA_REDUCED, AlignSynteny, FindSynteny,
 # taxonomic classification:
-LearnTaxa, IdTaxa
+LearnTaxa, IdTaxa,
+# genes:
+FindGenes, ExtractGenes, WriteGenes
 )
 
 S3method(`[`, "Synteny")
@@ -53,3 +55,6 @@ S3method(`[`, "Taxa")
 S3method(c, "Taxa")
 S3method(plot, "Taxa")
 S3method(print, "Taxa")
+S3method(`[`, "Genes")
+S3method(`plot`, "Genes")
+S3method(`print`, "Genes")

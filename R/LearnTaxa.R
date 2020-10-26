@@ -2,12 +2,13 @@ LearnTaxa <- function(train,
 	taxonomy,
 	rank=NULL,
 	K=NULL,
+	N=500,
 	minFraction=0.01,
 	maxFraction=0.06,
 	maxIterations=10,
 	multiplier=100,
 	maxChildren=200,
-	alphabet=AA_REDUCED[[1]],
+	alphabet=AA_REDUCED[[139]],
 	verbose=TRUE) {
 	
 	# error checking
@@ -61,29 +62,41 @@ LearnTaxa <- function(train,
 		if (size==1)
 			stop("More than one grouping of amino acids is required in the alphabet.")
 		alphabet <- alphabet - 1L
-		maxK <- as.integer(floor(log(4294967295, size)))
 	} else {
 		alphabet <- NULL
 		size <- 4
-		maxK <- 15
 	}
+	
 	if (is.null(K)) {
+		if (!is.numeric(N))
+			stop("N must be a numeric.")
+		if (N <= 1)
+			stop("N must be greater than one.")
+		quant <- quantile(width(train), 0.99)
+		if (max(width(train)) > N/50*quant)
+			warning("Extra long sequences in train may negatively affect accuracy.")
 		if (is(train, "AAStringSet")) {
-			K <- floor(log(100*quantile(width(train), 0.99),
+			K <- floor(log(N*quant,
 				.Call("alphabetSizeReducedAA",
 					train,
 					alphabet,
 					PACKAGE="DECIPHER")))
 		} else {
-			K <- floor(log(100*quantile(width(train), 0.99),
+			K <- floor(log(N*quant,
 				.Call("alphabetSize",
 					train,
 					PACKAGE="DECIPHER")))
+		}
+		if (is(train, "AAStringSet")) {
+			maxK <- as.integer(floor(log(1e8, size))) # theoretically 4294967295, but may encounter memory errors
+		} else {
+			maxK <- 13 # theoretically 15, but may encounter memory errors
 		}
 		if (K < 1) {
 			K <- 1
 		} else if (K > maxK) {
 			K <- maxK
+			warning("K may be smaller than ideal.")
 		}
 	} else {
 		if (!is.numeric(K))
@@ -94,6 +107,13 @@ LearnTaxa <- function(train,
 			stop("K must be a whole number.")
 		if (K < 1)
 			stop("K must be at least one.")
+		if (is(train, "AAStringSet")) {
+			maxK <- as.integer(floor(log(4294967295, size)))
+		} else {
+			maxK <- 15
+		}
+		if (K > maxK)
+			stop(paste("K can be at most ", maxK, ".", sep=""))
 	}
 	if (!is.numeric(minFraction))
 		stop("minFraction must be a numeric.")
@@ -198,12 +218,31 @@ LearnTaxa <- function(train,
 	taxa <- unlist(lapply(s,
 		function(x) x[length(x)]))
 	levels <- lengths(s)
-	children <- lapply(seq_along(taxonomy),
-		function(x) {
-			w <- which(levels==(levels[x] + 1L))
-			w <- w[which(w > x)]
-			w[startsWith(taxonomy[w], taxonomy[x])]
-		})
+	
+	maxL <- max(levels) - 1L # max level with children
+	levs <- vector("list", maxL)
+	for (i in seq_len(maxL))
+		levs[[i]] <- which(levels==(i + 1L))
+	starts <- rep(1L, maxL)
+	children <- vector("list", length(taxonomy))
+	for (i in seq_along(children)) {
+		j <- levels[i]
+		if (j <= maxL) {
+			while (starts[j] <= length(levs[[j]]) &&
+				levs[[j]][starts[j]] <= i)
+				starts[j] <- starts[j] + 1L
+			if (starts[j] <= length(levs[[j]])) {
+				w <- levs[[j]][starts[j]:length(levs[[j]])]
+				w <- w[startsWith(taxonomy[w], taxonomy[i])]
+			} else {
+				w <- integer()
+			}
+		} else {
+			w <- integer()
+		}
+		children[[i]] <- w
+	}
+	
 	parents <- numeric(length(taxonomy))
 	for (i in seq_along(children))
 		parents[children[[i]]] <- i
@@ -250,23 +289,19 @@ LearnTaxa <- function(train,
 		}
 	}
 	
-	# find the sequences corresponding to each taxonomy:
+	# find the sequences corresponding to each taxonomy
 	end_taxonomy <- substring(taxonomy, 6) # without "Root;"
-	# 1) find taxonomy in u_classes
-	sequences <- lapply(end_taxonomy,
-		function(x) {
-			which(startsWith(u_classes, x))
-		})
-	# 2) create a mapping from u_classes to classes
-	map <- lapply(u_classes,
-		function(x) {
-			which(classes==x)
-		})
-	# 3) map taxonomy to classes
-	sequences <- lapply(sequences,
-		function(x) {
-			unlist(map[x])
-		})
+	sequences <- vector("list", length(end_taxonomy))
+	nchars <- nchar(end_taxonomy)
+	u_nchars <- unique(nchars)
+	nchars <- match(nchars, u_nchars)
+	nchars <- tapply(seq_along(nchars), nchars, c, simplify=FALSE)
+	for (i in seq_along(u_nchars)) {
+		m <- match(substring(classes, 0, u_nchars[i]),
+			end_taxonomy[nchars[[i]]])
+		m <- tapply(seq_along(m), m, c, simplify=FALSE)
+		sequences[nchars[[i]]] <- m
+	}
 	nSeqs <- lengths(sequences)
 	
 	# record the most distinctive k-mers at each node in the taxonomic tree

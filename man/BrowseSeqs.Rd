@@ -61,6 +61,7 @@ Returns \code{htmlFile} if the html file was written successfully.
 }
 \references{
 ES Wright (2016) "Using DECIPHER v2.0 to Analyze Big Biological Sequence Data in R". The R Journal, \bold{8(1)}, 352-359.
+Kunzmann P., et al. (2020) "Substitution matrix based color schemes for sequence alignment visualization". BMC Bioinformatics, \bold{21(1):209}.
 }
 \author{
 Erik Wright \email{eswright@pitt.edu}
@@ -143,6 +144,14 @@ BrowseSeqs(AA, highlight=0)
 
 # example of highlighting positions that differ from the majority consensus
 BrowseSeqs(AA, highlight=0, threshold=0.5)
+
+# specify an alternative color scheme for amino acids (from Kunzmann et al.)
+colors <- c(`-`="#000000", `A`="#BDB1E8", `R`="#EFA2C5", `N`="#F6602F",
+    `D`="#FD5559", `C`="#12C7FE", `Q`="#DDACB4", `E`="#FEA097", `G`="#F46802",
+    `H`="#FCA708", `I`="#369BD9", `L`="#2E95EC", `K`="#CF7690", `M`="#4B8EFE",
+    `F`="#76997D", `P`="#FD2AE3", `S`="#A08A9A", `T`="#9A84D5", `W`="#74C80D",
+    `Y`="#9BB896", `V`="#89B9F9")
+BrowseSeqs(AA, colors=colors, patterns=names(colors))
 
 # example of coloring in a reduced amino acid alphabet
 alpha <- AA_REDUCED[[15]]

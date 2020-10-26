@@ -1,0 +1,267 @@
+%\VignetteIndexEntry{The Magic of Gene Finding}
+%\VignettePackage{DECIPHER}
+
+\documentclass[10pt]{article}
+
+\usepackage{times}
+\usepackage{hyperref}
+\usepackage{underscore}
+
+\textwidth=6.5in
+\textheight=8.5in
+%\parskip=.3cm
+\oddsidemargin=-.1in
+\evensidemargin=-.1in
+\headheight=-.3in
+\setlength{\parindent}{1cm}
+
+\newcommand{\scscst}{\scriptscriptstyle}
+\newcommand{\scst}{\scriptstyle}
+
+\newcommand{\R}{{\textsf{R}}}
+\newcommand{\code}[1]{{\texttt{#1}}}
+\newcommand{\term}[1]{{\emph{#1}}}
+\newcommand{\Rpackage}[1]{\textsf{#1}}
+\newcommand{\Rfunction}[1]{\texttt{#1}}
+\newcommand{\Robject}[1]{\texttt{#1}}
+\newcommand{\Rclass}[1]{{\textit{#1}}}
+\newcommand{\Rmethod}[1]{{\textit{#1}}}
+\newcommand{\Rfunarg}[1]{{\textit{#1}}}
+
+\bibliographystyle{plainnat}
+
+\begin{document}
+%\setkeys{Gin}{width=0.55\textwidth}
+
+\title{The Magic of Gene Finding}
+\author{Erik S. Wright}
+\date{\today}
+\maketitle
+
+\newenvironment{centerfig}
+{\begin{figure}[htp]\centering}
+{\end{figure}}
+\renewcommand{\indent}{\hspace*{\tindent}}
+\DefineVerbatimEnvironment{Sinput}{Verbatim} {xleftmargin=2em} \DefineVerbatimEnvironment{Soutput}{Verbatim}{xleftmargin=2em} \DefineVerbatimEnvironment{Scode}{Verbatim}{xleftmargin=2em} \fvset{listparameters={\setlength{\topsep}{0pt}}} \renewenvironment{Schunk}{\vspace{\topsep}}{\vspace{\topsep}}
+\SweaveOpts{keep.source=TRUE}
+<<echo=false>>=
+options(continue=" ")
+options(width=80)
+options(SweaveHooks=list(fig=function()	par(mar=c(4.1, 4.1, 0.3, 0.1))))
+set.seed(123)
+@
+
+\tableofcontents
+
+%------------------------------------------------------------
+\section{Introduction}
+%------------------------------------------------------------
+
+This vignette reveals the tricks behind the magic that is \emph{ab initio} gene finding.  Cells all have the magical ability to transcribe and translate portions of their genome, somehow decoding key signals from a sea of possibilities.  The \Rfunction{FindGenes} function attempts to decipher these signals in order to accurately predict an organism's set of genes.  Cells do much of this magic using only information upstream of the gene, whereas \Rfunction{FindGenes} uses both the content of the gene and its upstream information to predict gene boundaries.  As a case study, this tutorial focuses on finding genes in the genome of \emph{Chlamydia trachomatis}, an intracellular bacterial pathogen known for causing chlamydia.  This genome was chosen because it is relatively small (only ~1 Mbp) so the examples run quickly.  Nevertheless, \Rfunction{FindGenes} is designed to work with any genome that lacks introns, making it well-suited for prokaryotic gene finding.
+
+%------------------------------------------------------------
+\section{Getting Started}
+%------------------------------------------------------------
+
+\newlength\tindent
+\setlength{\tindent}{\parindent}
+\setlength{\parindent}{0pt}
+
+\subsection{Startup}
+
+To get started we need to load the \Rpackage{DECIPHER} package, which automatically loads a few other required packages.
+
+<<startup,results=hide>>=
+library(DECIPHER)
+@
+
+Gene finding is performed with the function \Rfunction{FindGenes}.  Help can be accessed via:
+
+\begin{Schunk}
+\begin{Sinput}
+> ? FindGenes
+\end{Sinput}
+\end{Schunk}
+
+Once \Rpackage{DECIPHER} is installed, the code in this tutorial can be obtained via:
+
+\begin{Schunk}
+\begin{Sinput}
+> browseVignettes("DECIPHER")
+\end{Sinput}
+\end{Schunk}
+
+%------------------------------------------------------------
+\section{Finding Genes in a Genome}
+%------------------------------------------------------------
+
+\setlength{\parindent}{1cm}
+
+\emph{Ab initio} gene finding begins from a genome and locates genes without prior knowledge about the specific organism.
+
+\subsection{Importing the genome}
+
+The first step is to set filepaths to the genome sequence (in FASTA format).  Be sure to change the path names to those on your system by replacing all of the text inside quotes labeled ``$<<$path to ...$>>$'' with the actual path on your system.
+
+<<expr1,eval=TRUE>>=
+# specify the path to your genome:
+genome_path <- "<<path to genome FASTA file>>"
+# OR use the example genome:
+genome_path <- system.file("extdata",
+	"Chlamydia_trachomatis_NC_000117.fas.gz",
+	package="DECIPHER")
+
+# read the sequences into memory
+genome <- readDNAStringSet(genome_path)
+genome
+@
+
+\subsection{Finding genes}
+
+The next step is to find genes in the genome using \Rfunction{FindGenes}, which does all the magic.  There are fairly few choices to make at this step.  By default, the bacterial and archaeal genetic code is used for translation, including the initiation codons ``ATG'', ``GTG'', ``TTG'', ``CTG'', ``ATA'', ``ATT'', and ``ATC''.  The default \Rfunarg{minGeneLength} is \code{60}, although we could set this lower (e.g., \code{30}) to locate very short genes or higher (e.g., \code{90}) for (only slightly) better accuracy.  The argument \Rfunarg{allowEdges} (default \code{TRUE}) controls whether genes are allowed to run off the ends of the genome, as would be expected for circular or incomplete chromosomes.  Here, we will only set \Rfunarg{showPlot} to \code{TRUE} to display a summary of the gene finding process and \Rfunarg{allScores} to \code{TRUE} to see the scores of all open reading frames (including predicted genes).
+
+\begin{centerfig}
+<<expr2,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6>>=
+orfs <- FindGenes(genome, showPlot=TRUE, allScores=TRUE)
+@
+\caption{\label{f1} Plot summarizing the gene finding process of \Rfunction{FindGenes}.  See \code{?plot.Genes} for details.}
+\end{centerfig}
+
+\clearpage
+
+\subsection{Inspecting the output}
+
+And presto! We now have our gene predictions in the form of an object belonging to class \Rclass{Genes}.  Now that we have our genes in hand, let's take a look at them:
+
+<<expr3,eval=TRUE>>=
+orfs
+@
+
+Here, we can see that the genome has a wide range of gene lengths, high density of predicted genes, uses multiple initiation codons, and contains many possible open reading frames.  We see all the open reading frames in the output because \Rfunarg{allScores} was set to \code{TRUE}.  If we only want to look at the subset of open reading frames that are predicted as genes, we can subset the object:
+
+<<expr4,eval=TRUE>>=
+genes <- orfs[orfs[, "Gene"]==1,]
+@
+
+The \code{"Gene"} column is one of several describing the open reading frames.  Objects of class \Rclass{Genes} are stored as matrices with many columns containing information about the open reading frames:
+
+<<expr5,eval=TRUE>>=
+colnames(genes)
+@
+
+%------------------------------------------------------------
+\section{Analyzing the Output}
+%------------------------------------------------------------
+
+\subsection{Extracting genes from the genome}
+
+Predictions in hand, the first thing we can do is extract the genes from the genome.  This can be easily done using \Rfunction{ExtractGenes}.
+
+<<expr6,eval=TRUE>>=
+dna <- ExtractGenes(genes, genome)
+dna
+@
+
+We see that the first gene has no start codon and the last gene has no stop codon.  This implies that the genes likely connect to each other because the genome is circular and the genome end splits one gene into two.  Therefore, the first predicted gene's first codon is not a true start codon and we need to drop this first sequence from our analysis of start codons.  We can look at the distribution of predicted start codons with:
+
+<<expr7,eval=TRUE>>=
+table(subseq(dna[-1], 1, 3))
+@
+
+There is one predicted non-canonical initiation codon, ``CTG'', and the typical three bacterial initiation codons: ``ATG'', ``GTG'', and ``TTG''.  Let's take a closer look at genes with non-canonical initiation codons:
+
+<<expr8,eval=TRUE>>=
+w <- which(!subseq(dna, 1, 3) %in% c("ATG", "GTG", "TTG"))
+w
+w <- w[-1] # drop the first sequence because it is a fragment
+w
+dna[w]
+genes[w,]
+@
+
+We can also look at the predicted protein sequences by translating the genes:
+
+<<expr9,eval=TRUE>>=
+aa <- ExtractGenes(genes, genome, type="AAStringSet")
+aa
+@
+
+All of the genes start with a methionine (``M'') residue and end with a stop (``*'') except the first and last gene because they wrap around the end of the genome.  If so inclined, we could easily remove the first and last positions with:
+
+<<expr10,eval=TRUE>>=
+subseq(aa, 2, -2)
+@
+
+\subsection{Revealing the secrets of gene finding}
+
+The predictions made by \Rfunction{FindGenes} are supported by many scores that are mostly independent of each other.  However, some scores are related because they make use of information from the same region relative to the gene boundaries.  We can take a look at score correlations with:
+
+\begin{centerfig}
+<<expr11,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6>>=
+pairs(genes[, 5:16], pch=46, col="#00000033", panel=panel.smooth)
+@
+\caption{\label{f2} Scatterplot matrix of scores used by \Rfunction{FindGenes} to make gene predictions.}
+\end{centerfig}
+
+\clearpage
+
+Certainly some of the magic of gene finding is having a lot of scores!  We see that the ribosome binding site score and upstream nucleotide score are the most correlated, which is unsurprising because they both rely on the nucleotides immediately upstream of the start codon.  The different scores are defined as follows:
+
+\begin{enumerate}
+	\item Upstream signals
+	\begin{enumerate}
+		\item \emph{Ribosome Binding Site Score} - Binding strength and position of the Shine-Delgarno sequence, as well as other motifs in the first bases upstream of the start codon.
+		\item \emph{Upstream Nucleotide Score} - Nucleotides in each position immediately upstream of the start codon.
+		\item \emph{Upstream Motif Score} - K-mer motifs further upstream of the start codon.
+	\end{enumerate}
+	\item Start site signals
+	\begin{enumerate}
+		\item \emph{Start Score} - Choice of start codon relative to the background distribution of open reading frames.
+		\item \emph{Folding Score} - Free energy of RNA-RNA folding around the start codon and relative to locations upstream and downstream of the start.
+		\item \emph{Initial Codon Score} - Choice of codons in the first few positions after the start codon.
+	\end{enumerate}
+	\item Gene content signals
+	\begin{enumerate}
+		\item \emph{Coding Score} - Usage of codons or pairs of codons within the open reading frame.
+		\item \emph{Length Score} - Length of the open reading frame relative to the background of lengths expected by chance.
+		\item \emph{Autocorrelation Score} - The degree to which the same or different codons are used sequentially to code for an amino acid.
+	\end{enumerate}
+	\item Termination signals
+	\begin{enumerate}
+		\item \emph{Termination Codon Score} - Codon bias immediately before the stop codon.
+		\item \emph{Stop Score} - Choice of stop codon relative to the observed distribution of possible stop codons.
+	\end{enumerate}
+\end{enumerate}
+
+\subsection{Taking a closer look at the output}
+
+If we have a particular gene of interest, it can sometimes be useful to plot the output of \Rfunction{FindGenes} as the set of all possible open reading frames with the predicted genes highlighted.  The \Rfunction{plot} function for a \Rclass{Genes} object is interactive, so it is possible to pan left and right by setting the \Rfunarg{interact} argument equal to \code{TRUE}.  For now we will only look at the beginning of the genome:
+
+\begin{centerfig}
+<<expr12,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6>>=
+plot(orfs, interact=FALSE)
+@
+\caption{\label{f3} All possible open reading frames (red and blue) with predicted genes highlighted in green.}
+\end{centerfig}
+
+\clearpage
+
+%------------------------------------------------------------
+\section{Exporting the output}
+%------------------------------------------------------------
+
+The genes can be exported in a variety of formats, including as a FASTA file with \Rfunction{writeXStringSet}, GenBank (gbk) or general feature format (gff) file with \Rfunction{WriteGenes}, or delimited file formats (e.g., csv, tab, etc.) with \Rfunction{write.table}.
+
+Now that you know the tricks of the trade, you can work your own magic to find new genes!
+
+%------------------------------------------------------------
+\section{Session Information}
+%------------------------------------------------------------
+
+All of the output in this vignette was produced under the following conditions:
+
+<<sessinfo,echo=FALSE,results=tex>>=
+toLatex(sessionInfo(), locale=FALSE)
+@
+
+\end{document}

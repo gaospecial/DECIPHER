@@ -95,7 +95,8 @@ AlignTranslation <- function(myXStringSet,
 					start,
 					end),
 				genetic.code=geneticCode[[group[j]]],
-				if.fuzzy.codon="solve")
+				if.fuzzy.codon="solve",
+				no.init.codon=TRUE)
 		}
 		end <- width(myXStringSet)[w]
 		offset <- end - start + 1

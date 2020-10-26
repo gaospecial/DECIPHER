@@ -11,12 +11,13 @@ LearnTaxa(train,
           taxonomy,
           rank = NULL,
           K = NULL,
+          N = 500,
           minFraction = 0.01,
           maxFraction = 0.06,
           maxIterations = 10,
           multiplier = 100,
           maxChildren = 200,
-          alphabet = AA_REDUCED[[1]],
+          alphabet = AA_REDUCED[[139]],
           verbose = TRUE)
 }
 \arguments{
@@ -30,7 +31,10 @@ Character string providing the reference taxonomic assignment for each sequence 
 Optionally, a \code{data.frame} with 5 named columns giving the ``Index'' (i.e., 0 to the number of unique taxa), ``Name'' (i.e., taxon name), ``Parent'' (i.e., ``Index'' of the parent taxon), ``Level'' (i.e., integer rank level), and ``Rank'' (e.g., ``genus'') of each taxonomic rank.  This information is often provided in a separate ``taxid'' file along with publicly available training sequence sets.
 }
   \item{K}{
-Integer specifying the k-mer size or \code{NULL} (the default) to calculate the k-mer size automatically.  The default value of \code{K} is such that k-mer matches between sequences are rarely (~1\%) found by chance.
+Integer specifying the k-mer size or \code{NULL} (the default) to calculate the k-mer size automatically.  The default value of \code{K} is such that matches between sequences are found by chance every \code{N} k-mers.
+}
+  \item{N}{
+Numeric indicating the approximate number of k-mers that can be randomly selected before one is found by chance on average. For example, the default value of \code{500} will set \code{K} (when \code{K} is unspecified) so that every 500th k-mer is expected to match by chance.
 }
   \item{minFraction}{
 Numeric giving the minimum fraction of k-mers to sample during the initial tree descent phase of the classification algorithm.  (See details section below.)

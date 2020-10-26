@@ -4,7 +4,7 @@
 Assign Sequences a Taxonomic Classification
 }
 \description{
-Classifies sequences according to a training set by assigning a confidence to taxonomic labels for each taxonomic rank.
+Classifies sequences according to a training set by assigning a confidence to taxonomic labels for each taxonomic level.
 }
 \usage{
 IdTaxa(test,
@@ -15,6 +15,7 @@ IdTaxa(test,
        bootstraps = 100,
        samples = L^0.47,
        minDescend = 0.98,
+       fullLength = 0,
        processors = 1,
        verbose = TRUE)
 }
@@ -29,19 +30,22 @@ An object of class \code{Taxa} and subclass {Train}.
 Character string indicating the type of output desired.  This should be (an abbreviation of) one of \code{"extended"} or \code{"collapsed"}.  (See value section below.)
 }
   \item{strand}{
-Character string indicating the orientation of the \code{test} sequences relative to the \code{trainingSet}.  This should be (an abbreviation of) one of \code{"both"}, \code{"top"}, or \code{"bottom"}.  The top strand is defined as the input \code{test} sequences being in the same orientation as the \code{trainingSet}, and the bottom strand is its reverse complement orientation.  The default of \code{"both"} will classify using both orientations and choose the result with highest confidence.  Choosing the correct \code{strand} will make classification over 2-fold faster, assuming that all of the reads are in the same orientation. Note that \code{strand} must be \code{"top"} when \code{test} is an \code{AAStringSet}.
+Character string indicating the orientation of the \code{test} sequences relative to the \code{trainingSet}.  This should be (an abbreviation of) one of \code{"both"}, \code{"top"}, or \code{"bottom"}.  The top strand is defined as the input \code{test} sequences being in the same orientation as the \code{trainingSet}, and the bottom strand is its reverse complement orientation.  The default of \code{"both"} will classify using both orientations and choose the result with highest confidence.  Choosing the correct \code{strand} will make classification over 2-fold faster, assuming that all of the reads are in the same orientation. Note that \code{strand} is ignored when \code{test} is an \code{AAStringSet}.
 }
   \item{threshold}{
 Numeric specifying the confidence at which to truncate the output taxonomic classifications.  Lower values of \code{threshold} will classify deeper into the taxonomic tree at the expense of accuracy, and vise-versa for higher values of \code{threshold}.
 }
   \item{bootstraps}{
-Integer giving the number of bootstrap replicates to perform for each sequence.
+Integer giving the maximum number of bootstrap replicates to perform for each sequence.  The number of bootstrap replicates is set automatically such that (on average) 99\% of k-mers are sampled in each \code{test} sequence.
 }
   \item{samples}{
 A function or call written as a function of `L', which will evaluate to a numeric vector the same length as `L'.  Typically of the form ``\code{A + B*L^C}'', where `A', `B', and `C' are constants.
 }
   \item{minDescend}{
 Numeric giving the minimum fraction of \code{bootstraps} required to descend the tree during the initial tree descend phase of the algorithm.  Higher values are less likely to descend the tree, causing direct comparison against more sequences in the \code{trainingSet}.  Lower values may increase classification speed at the expense of accuracy.  Suggested values are between \code{1.0} and \code{0.9}.
+}
+  \item{fullLength}{
+Numeric specifying the fold-difference in sequence lengths between sequences in \code{test} and \code{trainingSet} that is allowable, or \code{0} (the default) to consider all sequences in \code{trainingSet} regardless of length.  Can be specified as either a single numeric (> 1), or two numerics specifying the upper and lower fold-difference.  If \code{fullLength} is between \code{0} and \code{1} (exclusive), the fold-difference is inferred from the length variability among sequences belonging to each class based on the \code{foldDifference} quantiles.  For example, setting \code{fullLength} to \code{0.99} would use the 1st and 99th percentile of intra-group length variability from the \code{trainingSet}.  In the case of full-length sequences, specifying \code{fullLength} can improve both speed and accuracy by using sequence length as a pre-filter to classification.  Note that \code{fullLength} should only be greater than \code{0} when both the \code{test} and \code{trainingSet} consist of full-length sequences.
 }
   \item{processors}{
 The number of processors to use, or \code{NULL} to automatically detect and use all available processors.
