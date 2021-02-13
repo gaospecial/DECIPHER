@@ -11,7 +11,7 @@ import(parallel)
 
 importFrom("grDevices", "colorRampPalette", "colors", "dev.flush", "dev.hold", "dev.size", "rainbow", "rgb", "as.graphicsAnnot", "col2rgb")
 importFrom("graphics", "abline", "axis", "box", "legend", "mtext", "par", "plot", "points", "rect", "segments", "strheight", "strwidth", "text", "axTicks", "hist", "layout", "lines", "polygon", "locator")
-importFrom("stats", "dendrapply", "dist", "is.leaf", "nlminb", "optimize", "order.dendrogram", "pbinom", "reorder", "setNames", "step", "uniroot", "weighted.mean", "binomial", "glm", "glm.control", "optim", "predict", "smooth.spline")
+importFrom("stats", "dendrapply", "dist", "is.leaf", "nlminb", "optimize", "order.dendrogram", "pbinom", "reorder", "setNames", "step", "uniroot", "weighted.mean", "binomial", "glm", "glm.control", "optim", "predict", "smooth.spline", "dlnorm", "plnorm", "qlnorm")
 importFrom("utils", "browseURL", "data", "flush.console", "object.size", "setTxtProgressBar", "txtProgressBar", "packageVersion", "write.table")
 
 export(
@@ -44,7 +44,7 @@ AA_REDUCED, AlignSynteny, FindSynteny,
 # taxonomic classification:
 LearnTaxa, IdTaxa,
 # genes:
-FindGenes, ExtractGenes, WriteGenes
+FindGenes, FindNonCoding, ExtractGenes, LearnNonCoding, WriteGenes
 )
 
 S3method(`[`, "Synteny")
@@ -58,3 +58,4 @@ S3method(print, "Taxa")
 S3method(`[`, "Genes")
 S3method(`plot`, "Genes")
 S3method(`print`, "Genes")
+S3method(`print`, "NonCoding")

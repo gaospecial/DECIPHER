@@ -104,6 +104,8 @@ SEXP sparseMult(SEXP row, SEXP col, SEXP value, SEXP nrows, SEXP ncols, SEXP b);
 
 SEXP calculateDeltaG(SEXP p, SEXP t, SEXP deltaGrules);
 
+SEXP calculateHairpinDeltaG(SEXP x, SEXP arms, SEXP deltaGrules);
+
 // CalculateFISH.c
 
 SEXP calculateFISH(SEXP probes, SEXP targets);
@@ -116,7 +118,7 @@ SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SE
 
 // EnumerateSequence.c
 
-SEXP enumerateSequence(SEXP x, SEXP wordSize);
+SEXP enumerateSequence(SEXP x, SEXP wordSize, SEXP mask);
 
 SEXP enumerateSequenceAA(SEXP x, SEXP wordSize);
 
@@ -124,11 +126,13 @@ SEXP enumerateGappedSequence(SEXP x, SEXP wordSize, SEXP ordering);
 
 SEXP enumerateGappedSequenceAA(SEXP x, SEXP wordSize, SEXP ordering);
 
-SEXP enumerateSequenceReducedAA(SEXP x, SEXP wordSize, SEXP alphabet);
+SEXP enumerateSequenceReducedAA(SEXP x, SEXP wordSize, SEXP alphabet, SEXP mask);
 
 SEXP alphabetSizeReducedAA(SEXP x, SEXP alphabet);
 
 SEXP alphabetSize(SEXP x);
+
+SEXP maskRepeats(SEXP e, int n, int l1, int l2, int l3);
 
 // Compositions.c
 
@@ -194,8 +198,6 @@ SEXP chainSegments(SEXP x_s, SEXP x_e, SEXP x_i, SEXP x_f, SEXP y_s, SEXP y_e, S
 
 SEXP extendSegments(SEXP X, SEXP W1, SEXP W2, SEXP S1, SEXP S2, SEXP O1P, SEXP O1N, SEXP O2P, SEXP O2N, SEXP S, SEXP maxDrop, SEXP INDEX1, SEXP INDEX2);
 
-SEXP maskRepeats(SEXP e, SEXP size, SEXP minL, SEXP maxL, SEXP totL);
-
 // Translate.c
 
 SEXP basicTranslate(SEXP x, SEXP code, SEXP starts);
@@ -228,13 +230,15 @@ SEXP getPools(SEXP x);
 
 // PredictDBN.c
 
-SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgProdCorr, SEXP slope, SEXP shift, SEXP weights, SEXP pseudoknots, SEXP threshold, SEXP verbose, SEXP pBar, SEXP nThreads);
+SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgProdCorr, SEXP slope, SEXP shift, SEXP weights, SEXP pseudoknots, SEXP threshold, SEXP patterns, SEXP verbose, SEXP pBar, SEXP nThreads);
+
+SEXP allZero(SEXP vec1, SEXP vec2, SEXP start1, SEXP start2, SEXP end1, SEXP end2);
 
 // InformationContent.c
 
-SEXP informationContent(SEXP p, SEXP nS, SEXP correction);
+SEXP informationContent(SEXP p, SEXP nS, SEXP correction, SEXP randomBackground);
 
-SEXP informationContentAA(SEXP p, SEXP nS, SEXP correction);
+SEXP informationContentAA(SEXP p, SEXP nS, SEXP correction, SEXP randomBackground);
 
 // VectorSums.c
 
@@ -293,3 +297,15 @@ SEXP unicodonModel(SEXP x, SEXP orftable, SEXP stop_codons);
 SEXP chainGenes(SEXP orftable, SEXP topScore, SEXP topLength, SEXP scoreIntergenic, SEXP maxOverlapSame, SEXP maxOverlapOpposite, SEXP maxFracOverlap, SEXP sameScores, SEXP oppoScores);
 
 SEXP longestORFs(SEXP orftable);
+
+SEXP getIndex(SEXP start1, SEXP start2, SEXP len, SEXP score);
+
+SEXP inBounds(SEXP vec1, SEXP vec3, SEXP lo1, SEXP hi1, SEXP hi3);
+
+SEXP getBounds(SEXP widths, SEXP start, SEXP end, SEXP minL, SEXP maxL, SEXP lenScores, SEXP kmer, SEXP Ksize, SEXP negOk, SEXP minS, SEXP partS);
+
+SEXP addIfElse(SEXP vec, SEXP index, SEXP scores);
+
+SEXP kmerScores(SEXP oligos, SEXP ints, SEXP windowSize, SEXP kSize);
+
+SEXP getHits(SEXP starts, SEXP ends, SEXP left1, SEXP left2, SEXP right1, SEXP right2, SEXP deltaG);

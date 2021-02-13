@@ -59,17 +59,61 @@ static void alphabetFrequency(const Chars_holder *P, int *bits, int position)
 	}
 }
 
-//ans_start <- .Call("enumerateSequence", myDNAStringSet, wordSize, PACKAGE="DECIPHER")
-SEXP enumerateSequence(SEXP x, SEXP wordSize)
+// changes repeat regions to NAs
+SEXP maskRepeats(SEXP e, int n, int l1, int l2, int l3)
+{
+	if (MAYBE_SHARED(e))
+		error(".Call function 'maskRepeats' called in incorrect context.");
+	
+	int i, p, j, k;
+	int *x = INTEGER(e); // enumerated sequence
+	int l = length(e);
+//	int n = asInteger(size);
+//	int l1 = asInteger(minL); // min period
+//	int l2 = asInteger(maxL); // max period
+//	int l3 = asInteger(totL); // min length of repeat
+	
+	i = 0; // current position
+	while (i < (l - l2)) {
+		if (x[i]!=NA_INTEGER) {
+			for (p = l1; p <= l2; p++) { // periodicity
+				if (x[i]==x[i + p]) { // repeat
+					j = i + 1;
+					
+					while (j < (l - p)) {
+						if (x[j]!=x[j + p])
+							break;
+						j++;
+					}
+					
+					if ((j - i + n) > p && // continuous repeat
+						(j + p - i + n) > l3) {
+						for (k = i; k <= (j + p - 1); k++)
+							x[k] = NA_INTEGER;
+						i = k - 1;
+						break;
+					}
+				}
+			}
+		}
+		i++;
+	}
+	
+	return R_NilValue;
+}
+
+//ans_start <- .Call("enumerateSequence", myDNAStringSet, wordSize, FALSE, PACKAGE="DECIPHER")
+SEXP enumerateSequence(SEXP x, SEXP wordSize, SEXP mask)
 {
 	XStringSet_holder x_set;
 	Chars_holder x_i;
-	int x_length, i, j, k, wS, sum, ambiguous, *rans;
+	int x_length, i, j, k, wS, maskReps, sum, ambiguous, *rans;
 	
 	// initialize the XStringSet
 	x_set = hold_XStringSet(x);
 	x_length = get_length_from_XStringSet_holder(&x_set);
 	wS = asInteger(wordSize); // [1 to 15]
+	maskReps = asInteger(mask);
 	
 	SEXP ret_list;
 	PROTECT(ret_list = allocVector(VECSXP, x_length));
@@ -113,6 +157,9 @@ SEXP enumerateSequence(SEXP x, SEXP wordSize)
 				}
 			}
 		}
+		
+		if (maskReps)
+			maskRepeats(ans, wS, 7, 12, 30);
 		
 		SET_VECTOR_ELT(ret_list, i, ans);
 		UNPROTECT(1);
@@ -586,17 +633,18 @@ static void alphabetFrequencyReducedAA(const Chars_holder *P, int *bits, int pos
 }
 
 //ans_start <- .Call("enumerateReducedSequenceAA", myDNAStringSet, wordSize, alphabet, PACKAGE="DECIPHER")
-SEXP enumerateSequenceReducedAA(SEXP x, SEXP wordSize, SEXP alphabet)
+SEXP enumerateSequenceReducedAA(SEXP x, SEXP wordSize, SEXP alphabet, SEXP mask)
 {
 	XStringSet_holder x_set;
 	Chars_holder x_i;
-	int x_length, i, j, k, wS, sum, ambiguous, *rans;
+	int x_length, i, j, k, wS, maskReps, sum, ambiguous, *rans;
 	int *alpha = INTEGER(alphabet);
 	
 	// initialize the XStringSet
 	x_set = hold_XStringSet(x);
 	x_length = get_length_from_XStringSet_holder(&x_set);
 	wS = asInteger(wordSize); // [1 to 20]
+	maskReps = asInteger(mask);
 	
 	SEXP ret_list;
 	PROTECT(ret_list = allocVector(VECSXP, x_length));
@@ -647,6 +695,9 @@ SEXP enumerateSequenceReducedAA(SEXP x, SEXP wordSize, SEXP alphabet)
 				}
 			}
 		}
+		
+		if (maskReps)
+			maskRepeats(ans, wS, 3, 11, 15);
 		
 		SET_VECTOR_ELT(ret_list, i, ans);
 		UNPROTECT(1);

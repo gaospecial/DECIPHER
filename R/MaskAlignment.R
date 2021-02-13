@@ -26,6 +26,7 @@ MaskAlignment <- function(myXStringSet,
 	maxFractionGaps=0.2,
 	includeTerminalGaps=FALSE,
 	correction=FALSE,
+	randomBackground=FALSE,
 	showPlot=FALSE) {
 	
 	# error checking
@@ -58,11 +59,14 @@ MaskAlignment <- function(myXStringSet,
 		stop("includeTerminalGaps must be a logical.")
 	if (!is.logical(correction))
 		stop("correction must be a logical.")
+	if (!is.logical(randomBackground))
+		stop("randomBackground must be a logical.")
+	if (length(randomBackground) != 1L)
+		stop("randomBackground must be a single logical.")
 	if (!is.logical(showPlot))
 		stop("showPlot must be a logical.")
 	
 	if (is(myXStringSet, "AAStringSet")) {
-		MAX <- 4.321928 # log(20, 2)
 		pwm <- .Call("consensusProfileAA",
 			myXStringSet,
 			rep(1, length(myXStringSet)),
@@ -78,10 +82,12 @@ MaskAlignment <- function(myXStringSet,
 		a <- .Call("informationContentAA",
 			pwm,
 			length(myXStringSet),
-			correction)
-		MAX <- max(a, MAX)
+			correction,
+			randomBackground)
+		if (showPlot)
+			MAX <- max(4.321928, # log(20, 2)
+				a)
 	} else {
-		MAX <- 2 # log(4, 2)
 		pwm <- .Call("consensusProfile",
 			myXStringSet,
 			rep(1, length(myXStringSet)),
@@ -97,8 +103,11 @@ MaskAlignment <- function(myXStringSet,
 		a <- .Call("informationContent",
 			pwm,
 			length(myXStringSet),
-			correction)
-		MAX <- max(a, MAX)
+			correction,
+			randomBackground)
+		if (showPlot)
+			MAX <- max(2, # log(4, 2)
+				a)
 	}
 	
 	gaps <- which(cm > maxFractionGaps)

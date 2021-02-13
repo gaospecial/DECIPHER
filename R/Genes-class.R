@@ -3,11 +3,15 @@
 		stop("x must be an object of class 'Genes'.")
 	a <- attributes(x)
 	x <- unclass(x)
-	x <- x[i, j, drop=FALSE]
 	if (missing(j)) {
+		x <- x[i, j, drop=FALSE]
 		class(x) <- "Genes"
 		attr(x, "widths") <- a$widths
 		attr(x, "geneticCode") <- a$geneticCode
+		attr(x, "minGeneLength") <- a$minGeneLength
+		attr(x, "allowEdges") <- a$allowEdges
+	} else {
+		x <- x[i, j, ...]
 	}
 	
 	return(x)
@@ -17,81 +21,103 @@ print.Genes <- function(x, ...) {
 	if (!is(x, "Genes"))
 		stop("x must be an object of class 'Genes'.")
 	N <- nrow(x)
-	if (N > 0) {
-		w <- which(x[, "Gene"]==1)
-		if (length(w) > 0) {
-			l <- x[w, "End"] - x[w, "Begin"] + 1L
-			n <- length(w)
-			s <- suppressWarnings(cor(x[, -c(1:6, 17:18)],
-				method="spearman"))
-			s <- 100*s[upper.tri(s)]
-			cat("Genes object specifying",
-				formatC(n,
+	if (N == 0) {
+		cat("Genes object of size 0.\n")
+	} else {
+		w1 <- which(x[, "Gene"] > 0)
+		n1 <- length(w1)
+		l1 <- x[w1, "End"] - x[w1, "Begin"] + 1L
+		w2 <- which(1/x[, "Gene"] == Inf) # disregard negative zero
+		n2 <- length(w2)
+		l2 <- x[w2, "End"] - x[w2, "Begin"] + 1L
+		w3 <- which(x[, "Gene"] < 0)
+		n3 <- length(w3)
+		l3 <- x[w3, "End"] - x[w3, "Begin"] + 1L
+		
+		cat("Genes object of size",
+				formatC(N,
 					big.mark=",",
-					format="fg"))
-			if (n==1) {
-				cat(" gene of",
-					formatC(l,
-						big.mark=",",
-						format="fg"),
-					"nucleotides.")
-			} else {
-				cat(" genes from",
-					formatC(min(l),
-						big.mark=",",
-						format="fg"),
-					"to",
-					formatC(max(l),
-						big.mark=",",
-						format="fg"),
-					"nucleotides.")
-			}
-			u <- unique(x[w, "StartScore"])
-			u <- u[u != 0]
-			cat("\nDensity: ",
-				round(100*sum(l)/sum(attr(x, "widths")), 1),
-				"%; Initation codons: ",
-				length(u),
+					format="fg"),
+			"specifying:")
+		if (n1 == 1) {
+			cat("\n1 protein coding gene of ",
+				formatC(l1,
+					big.mark=",",
+					format="fg"),
+				" nucleotides.",
 				sep="")
-			if (any(is.na(s))) {
-				cat(".\n\n")
-			} else {
-				cat("; Score correlations: ",
-					round(min(s)),
-					"% to ",
-					round(max(s)),
-					"%.\n\n",
-					sep="")
-			}
-		} else {
-			l <- x[, "End"] - x[, "Begin"] + 1L
-			n <- nrow(x)
-			cat("Genes object specifying",
-				formatC(n,
+		} else if (n1 > 1) {
+			cat("\n",
+				formatC(n1,
 					big.mark=",",
-					format="fg"))
-			if (n==1) {
-				cat(" open reading frame of",
-					formatC(l,
-						big.mark=",",
-						format="fg"),
-					"nucleotides.\n\n")
-			} else {
-				cat(" open reading frames from",
-					formatC(min(l),
-						big.mark=",",
-						format="fg"),
-					"to",
-					formatC(max(l),
-						big.mark=",",
-						format="fg"),
-					"nucleotides.\n\n")
-			}
+					format="fg"),
+				" protein coding genes from ",
+				formatC(min(l1),
+					big.mark=",",
+					format="fg"),
+				" to ",
+				formatC(max(l1),
+					big.mark=",",
+					format="fg"),
+				" nucleotides.",
+				sep="")
+		}
+		if (n2 == 1) {
+			cat("\n1 open reading frame of ",
+				formatC(l2,
+					big.mark=",",
+					format="fg"),
+				" nucleotides.",
+				sep="")
+		} else if (n2 > 1) {
+			cat("\n",
+				formatC(n2,
+					big.mark=",",
+					format="fg"),
+				" open reading frames from ",
+				formatC(min(l2),
+					big.mark=",",
+					format="fg"),
+				" to ",
+				formatC(max(l2),
+					big.mark=",",
+					format="fg"),
+				" nucleotides.",
+				sep="")
+		}
+		if (n3 == 1) {
+			cat("\n1 non-coding RNA of ",
+				formatC(l3,
+					big.mark=",",
+					format="fg"),
+				" nucleotides.",
+				sep="")
+		} else if (n3 > 1) {
+			cat("\n",
+				formatC(n3,
+					big.mark=",",
+					format="fg"),
+				" non-coding RNAs from ",
+				formatC(min(l3),
+					big.mark=",",
+					format="fg"),
+				" to ",
+				formatC(max(l3),
+					big.mark=",",
+					format="fg"),
+				" nucleotides.",
+				sep="")
 		}
 		
-		print(cbind(as.data.frame(round(head(x[, 1:5]), 2)),
-			`...`="...",
-			as.data.frame(round(head(x[, 17:18]), 2))))
+		cat("\n\n")
+		if (ncol(x) > 6) {
+			print(cbind(as.data.frame(round(head(x[, 1:5, drop=FALSE]), 2)),
+				`...`="...",
+				as.data.frame(round(head(x[, ncol(x), drop=FALSE]), 2))))
+		} else {
+			print(as.data.frame(round(head(x[, seq_len(ncol(x)), drop=FALSE]), 2)))
+		}
+		
 		if (N==7) {
 			cat("... with 1 more row.\n")
 		} else if (N > 6) {
@@ -102,9 +128,9 @@ print.Genes <- function(x, ...) {
 				" more rows.\n",
 				sep="")
 		}
-	} else {
-		cat("Genes object specifying no genes and no open reading frames.\n") 
 	}
+	
+	invisible(x)
 }
 
 plot.Genes <- function(x,
@@ -119,11 +145,11 @@ plot.Genes <- function(x,
 	x[, "End"] <- x[, "End"] + ws[x[, "Index"]]
 	ws <- ws[-1L]
 	
-	pos <- which(x[, "Strand"]==0)
-	neg <- which(x[, "Strand"]==1)
-	genes <- which(x[, "Gene"]==1)
-	pos_genes <- which(x[, "Gene"]==1 & x[, "Strand"]==0)
-	neg_genes <- which(x[, "Gene"]==1 & x[, "Strand"]==1)
+	pos <- which(x[, "Strand"] == 0)
+	neg <- which(x[, "Strand"] == 1)
+	genes <- which(x[, "Gene"] != 0)
+	pos_genes <- which(x[, "Gene"] != 0 & x[, "Strand"] == 0)
+	neg_genes <- which(x[, "Gene"] != 0 & x[, "Strand"] == 1)
 	
 	start <- xlim[1L]
 	offset <- diff(xlim) + 1
@@ -135,6 +161,7 @@ plot.Genes <- function(x,
 			ylim=ylim,
 			xlab="Cumulative genome position",
 			ylab="Total score")
+		abline(h=0, v=ws, lwd=2, lty=3)
 		segments(x[pos, "Begin"],
 			x[pos, "TotalScore"],
 			x[pos, "End"],
@@ -157,7 +184,6 @@ plot.Genes <- function(x,
 		abline(v=x[neg_genes, "Begin"],
 			lty=5)
 		abline(v=x[neg_genes, "End"])
-		abline(h=0, v=ws, lwd=2, lty=3)
 		
 		if (!interact)
 			break

@@ -14,9 +14,10 @@ PredictDBN(myXStringSet,
            avgProdCorr = 1,
            slope = 2,
            shift = 1.3,
-           threshold = 0.7,
+           threshold = 0.3,
            pseudoknots = 1,
            weight = NA,
+           useFreeEnergy = TRUE,
            processors = 1,
            verbose = TRUE)
 }
@@ -50,6 +51,9 @@ Integer indicating the maximum order of pseudoknots that are acceptable.  A valu
 }
   \item{weight}{
 Either a numeric vector of weights for each sequence, a single number implying equal weights, or \code{NA} (the default) to automatically calculate sequence weights based on \code{myXStringSet}.
+}
+  \item{useFreeEnergy}{
+Logical determining whether RNA free energy predictions should be incorporated along with mutual information into the secondary structure prediction.
 }
   \item{processors}{
 The number of processors to use, or \code{NULL} to automatically detect and use all available processors.

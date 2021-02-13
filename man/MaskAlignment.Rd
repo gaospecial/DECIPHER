@@ -14,6 +14,7 @@ MaskAlignment(myXStringSet,
               maxFractionGaps = 0.2,
               includeTerminalGaps = FALSE,
               correction = FALSE,
+              randomBackground = FALSE,
               showPlot = FALSE)
 }
 \arguments{
@@ -37,6 +38,9 @@ Logical specifying whether or not to include terminal gaps ("." or "-" character
 }
   \item{correction}{
 Logical indicating whether to apply a small-sample size correction to columns with few letters (Yu et al., 2015).
+}
+  \item{randomBackground}{
+Logical determining whether background letter frequencies are determined directly from \code{myXStringSet} (the default) or an uniform distribution of letters.
 }
   \item{showPlot}{
 Logical specifying whether or not to show a plot of the positions that were kept or masked.

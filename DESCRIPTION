@@ -1,13 +1,13 @@
 Package: DECIPHER
 Type: Package
 Title: Tools for curating, analyzing, and manipulating biological sequences
-Version: 2.19.1
-Date: 2020-10-28
+Version: 2.19.2
+Date: 2020-02-13
 Author: Erik Wright
 Maintainer: Erik Wright <eswright@pitt.edu>
 biocViews: Clustering, Genetics, Sequencing, DataImport, Visualization, Microarray, QualityControl, qPCR, Alignment, WholeGenome, Microbiome, ImmunoOncology, GenePrediction
 Description: A toolset for deciphering and managing biological sequences.
-Depends: R (>= 3.5.0), Biostrings (>= 2.35.12), RSQLite (>= 1.1), stats, parallel
+Depends: R (>= 3.5.0), Biostrings (>= 2.59.1), RSQLite (>= 1.1), stats, parallel
 Imports: methods, DBI, S4Vectors, IRanges, XVector
 LinkingTo: Biostrings, S4Vectors, IRanges, XVector
 License: GPL-3

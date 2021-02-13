@@ -13,7 +13,7 @@ FindSynteny <- function(dbFile,
 	minScore=30,
 	dropScore=-100,
 	maskRepeats=TRUE,
-	allowOverlap=FALSE,
+	allowOverlap=TRUE,
 	storage=0.5,
 	processors=1,
 	verbose=TRUE) {
@@ -329,17 +329,18 @@ FindSynteny <- function(dbFile,
 				E1 <- .Call("enumerateSequence",
 					seq1,
 					N,
+					maskRepeats,
 					PACKAGE="DECIPHER")[[1]]
+#				if (maskRepeats) # in-place change of E1
+#					E1 <- .Call("maskRepeats",
+#						E1,
+#						N,
+#						7L, # minimum period
+#						12L, # maximum period
+#						30L, # minimum length
+#						PACKAGE="DECIPHER")
 				for (i in which(WIDTH1 > (N - 2) & WIDTH1 < length(E1)))
 					E1[(WIDTH1[i] - (N - 2)):WIDTH1[i]] <- NA
-				if (maskRepeats)
-					.Call("maskRepeats",
-						E1,
-						N,
-						7L, # minimum period
-						12L, # maximum period
-						30L, # minimum length
-						PACKAGE="DECIPHER")
 				if ((object.size(E1) + object.size(store) + object.size(results)) < storage)
 					store[g1][[1L]][["E"]][["nt"]][[N]] <- E1
 			}
@@ -349,17 +350,18 @@ FindSynteny <- function(dbFile,
 				e2 <- .Call("enumerateSequence",
 					seq2,
 					N,
+					maskRepeats,
 					PACKAGE="DECIPHER")[[1]]
+#				if (maskRepeats) # in-place change of e2
+#					e2 <- .Call("maskRepeats",
+#						e2,
+#						N,
+#						7L, # minimum period
+#						12L, # maximum period
+#						30L, # minimum length
+#						PACKAGE="DECIPHER")
 				for (i in which(WIDTH2 > (N - 2) & WIDTH2 < length(e2)))
 					e2[(WIDTH2[i] - (N - 2)):WIDTH2[i]] <- NA
-				if (maskRepeats)
-					.Call("maskRepeats",
-						e2,
-						N,
-						7L, # minimum period
-						12L, # maximum period
-						30L, # minimum length
-						PACKAGE="DECIPHER")
 				if ((object.size(e2) + object.size(store) + object.size(results)) < storage)
 					store[g2][[1L]][["E"]][["nt"]][[N]] <- e2
 			}
@@ -467,17 +469,18 @@ FindSynteny <- function(dbFile,
 							t1,
 							N_AA,
 							alphabet,
+							maskRepeats,
 							PACKAGE="DECIPHER")[[1]]
+#						if (maskRepeats) # in-place change of e1
+#							e1 <- .Call("maskRepeats",
+#								e1,
+#								N_AA,
+#								3L, # minimum period
+#								11L, # maximum period
+#								15L, # minimum length
+#								PACKAGE="DECIPHER")
 						for (i in which(width1 > (N_AA - 2) & width1 < length(e1)))
 							e1[(width1[i] - (N_AA - 2)):width1[i]] <- NA
-						if (maskRepeats)
-							.Call("maskRepeats",
-								e1,
-								N_AA,
-								3L, # minimum period
-								11L, # maximum period
-								15L, # minimum length
-								PACKAGE="DECIPHER")
 						if ((object.size(e1) + object.size(store) + object.size(results)) < storage)
 							store[g1][[1L]][["E"]][["aa"]][[rF1]][[N_AA]] <- e1
 					}
@@ -511,17 +514,18 @@ FindSynteny <- function(dbFile,
 								t2,
 								N_AA,
 								alphabet,
+								maskRepeats,
 								PACKAGE="DECIPHER")[[1]]
+#							if (maskRepeats) # in-place change of e2
+#								e2 <- .Call("maskRepeats",
+#									e2,
+#									N_AA,
+#									3L, # minimum period
+#									11L, # maximum period
+#									15L, # minimum length
+#									PACKAGE="DECIPHER")
 							for (i in which(width2 > (N_AA - 2) & width2 < length(e2)))
 								e2[(width2[i] - (N_AA - 2)):width2[i]] <- NA
-							if (maskRepeats)
-								.Call("maskRepeats",
-									e2,
-									N_AA,
-									3L, # minimum period
-									11L, # maximum period
-									15L, # minimum length
-									PACKAGE="DECIPHER")
 							if ((object.size(e2) + object.size(store) + object.size(results)) < storage)
 								store[g2][[1L]][["E"]][["aa"]][[rF2]][[N_AA]] <- e2
 						}
@@ -726,17 +730,18 @@ FindSynteny <- function(dbFile,
 				e2 <- .Call("enumerateSequence",
 					seq2,
 					N,
+					maskRepeats,
 					PACKAGE="DECIPHER")[[1]]
+#				if (maskRepeats) # in-place change of e2
+#					e2 <- .Call("maskRepeats",
+#						e2,
+#						N,
+#						7L, # minimum period
+#						12L, # maximum period
+#						30L, # minimum length
+#						PACKAGE="DECIPHER")
 				for (i in which(WIDTH2 > (N - 2) & WIDTH2 < length(e2)))
 					e2[(WIDTH2[i] - (N - 2)):WIDTH2[i]] <- NA
-				if (maskRepeats)
-					.Call("maskRepeats",
-						e2,
-						N,
-						7L, # minimum period
-						12L, # maximum period
-						30L, # minimum length
-						PACKAGE="DECIPHER")
 				if ((object.size(e2) + object.size(store) + object.size(results)) < storage)
 					store[g2][[1L]][["E"]][["nt_rc"]][[N]] <- e2
 			}
@@ -828,17 +833,18 @@ FindSynteny <- function(dbFile,
 							t1,
 							N_AA,
 							alphabet,
+							maskRepeats,
 							PACKAGE="DECIPHER")[[1]]
+#						if (maskRepeats) # in-place change of e1
+#							e1 <- .Call("maskRepeats",
+#								e1,
+#								N_AA,
+#								3L, # minimum period
+#								11L, # maximum period
+#								15L, # minimum length
+#								PACKAGE="DECIPHER")
 						for (i in which(width1 > (N_AA - 2) & width1 < length(e1)))
 							e1[(width1[i] - (N_AA - 2)):width1[i]] <- NA
-						if (maskRepeats)
-							.Call("maskRepeats",
-								e1,
-								N_AA,
-								3L, # minimum period
-								11L, # maximum period
-								15L, # minimum length
-								PACKAGE="DECIPHER")
 						if ((object.size(e1) + object.size(store) + object.size(results)) < storage)
 							store[g1][[1L]][["E"]][["aa"]][[rF1]][[N_AA]] <- e1
 					}
@@ -872,17 +878,18 @@ FindSynteny <- function(dbFile,
 								t2,
 								N_AA,
 								alphabet,
+								maskRepeats,
 								PACKAGE="DECIPHER")[[1]]
+#							if (maskRepeats) # in-place change of e2
+#								e2 <- .Call("maskRepeats",
+#									e2,
+#									N_AA,
+#									3L, # minimum period
+#									11L, # maximum period
+#									15L, # minimum length
+#									PACKAGE="DECIPHER")
 							for (i in which(width2 > (N_AA - 2) & width2 < length(e2)))
 								e2[(width2[i] - (N_AA - 2)):width2[i]] <- NA
-							if (maskRepeats)
-								.Call("maskRepeats",
-									e2,
-									N_AA,
-									3L, # minimum period
-									11L, # maximum period
-									15L, # minimum length
-									PACKAGE="DECIPHER")
 							if ((object.size(e2) + object.size(store) + object.size(results)) < storage)
 								store[g2][[1L]][["E"]][["aa_rc"]][[rF2]][[N_AA]] <- e2
 						}

@@ -16,6 +16,13 @@
  */
 #include <R_ext/Rdynload.h>
 
+/*
+ * Biostrings_interface.h is needed for the DNAencode(), get_XString_asRoSeq(),
+ * init_match_reporting(), report_match() and reported_matches_asSEXP()
+ * protoypes, and for the COUNT_MRMODE and START_MRMODE constant symbols.
+ */
+#include "Biostrings_interface.h"
+
 // DECIPHER header file
 #include "DECIPHER.h"
 
@@ -346,6 +353,114 @@ SEXP calculateDeltaG(SEXP p, SEXP t, SEXP deltaGrules)
 			}
 			
 			if ((!((s1 == 4) && (s2 == 4)) || j >= n) && count > 3) {
+				dGov += *(dGrules + dG[0] + dG[1]*5 + dG[2]*25 + dG[3]*125 + dG[4]*625 + dG[5]*3125 + dG[6]*15625 + dG[7]*78125);
+				
+				if (dGov > 0)
+					dGov = 0;
+				
+				// find minima
+				if (dGov < rans[i])
+					rans[i] = dGov;
+			}
+		}
+	}
+	
+	UNPROTECT(1);
+	
+	return ans;	
+}
+
+SEXP calculateHairpinDeltaG(SEXP x, SEXP arms, SEXP deltaGrules)
+{
+	int i, j, k, count, s1, s2;
+	int *a = INTEGER(arms);
+	int dG[8];
+	double dGov;
+	double *dGrules = REAL(deltaGrules);
+	
+	// initialize the XStringSet
+	XStringSet_holder x_set;
+	Chars_holder x_i;
+	x_set = hold_XStringSet(x);
+	int x_length = get_length_from_XStringSet_holder(&x_set);
+	
+	SEXP ans;
+	PROTECT(ans = allocVector(REALSXP, x_length));
+	double *rans = REAL(ans);
+	
+	for (i = 0; i < x_length; i++) {
+		x_i = get_elt_from_XStringSet_holder(&x_set, i);
+		count = 0;
+		dGov = 0;
+		rans[i] = 0;
+		k = x_i.length - 1; // other end of sequence
+		for (j = 0; j < a[i] + 2; j++) {
+			if (j < a[i]) { // within hairpin
+				switch (x_i.ptr[j]) {
+					case 1: // A
+						s1 = 0;
+						break;
+					case 2: // C
+						s1 = 1;
+						break;
+					case 4: // G
+						s1 = 2;
+						break;
+					case 8: // T/U
+						s1 = 3;
+						break;
+					default: // treat others as gap
+						s1 = 4;
+						break;
+				}
+				switch (x_i.ptr[k--]) {
+					case 1: // A
+						s2 = 3;
+						break;
+					case 2: // C
+						s2 = 2;
+						break;
+					case 4: // G
+						s2 = 1;
+						break;
+					case 8: // T/U
+						s2 = 0;
+						break;
+					default: // treat others as gap
+						s2 = 4;
+						break;
+				}
+				if (!((s1 == 4) && (s2 == 4))) { // not a common gap
+					if (count > 3) { // rotate dG array
+						dG[0] = dG[1];
+						dG[1] = dG[2];
+						dG[2] = dG[3];
+						dG[3] = s1;
+						dG[4] = dG[5];
+						dG[5] = dG[6];
+						dG[6] = dG[7];
+						dG[7] = s2;
+					} else { // fill dG array
+						dG[count] = s1;
+						dG[count + 4] = s2;
+						count++;
+					}
+				}
+			} else {
+				// set dG array to gap
+				if (count > 3) { // rotate dG array
+					dG[0] = dG[1];
+					dG[1] = dG[2];
+					dG[2] = dG[3];
+					dG[3] = 4;
+					dG[4] = dG[5];
+					dG[5] = dG[6];
+					dG[6] = dG[7];
+					dG[7] = 4;
+				}
+			}
+			
+			if ((!((s1 == 4) && (s2 == 4)) || j >= a[i]) && count > 3) {
 				dGov += *(dGrules + dG[0] + dG[1]*5 + dG[2]*25 + dG[3]*125 + dG[4]*625 + dG[5]*3125 + dG[6]*15625 + dG[7]*78125);
 				
 				if (dGov > 0)

@@ -14,10 +14,16 @@ BrowseSeqs <- function(myXStringSet,
 	if (length(myXStringSet)==0)
 		stop("No sequence information to display.")
 	if (is(patterns, "DNAStringSet")) {
+		if (!is(myXStringSet, "DNAStringSet"))
+			stop("patterns must be a DNAStringSet.")
 		type <- 1L
 	} else if (is(patterns, "RNAStringSet")) {
+		if (!is(myXStringSet, "RNAStringSet"))
+			stop("patterns must be a RNAStringSet.")
 		type <- 2L
 	} else if (is(patterns, "AAStringSet")) {
+		if (!is(myXStringSet, "AAStringSet"))
+			stop("patterns must be a AAStringSet.")
 		type <- 3L
 	} else if (is(patterns, "list")) {
 		type <- -1L
@@ -185,6 +191,10 @@ BrowseSeqs <- function(myXStringSet,
 	if (is.null(names(myXStringSet))) {
 		names(myXStringSet) <- 1:length(myXStringSet)
 	} else {
+		names(myXStringSet) <- iconv(names(myXStringSet),
+			from="",
+			to="UTF-8",
+			sub=" ")
 		names(myXStringSet) <- gsub("\t", " ", names(myXStringSet), fixed=TRUE)
 		names(myXStringSet) <- gsub("\n", " ", names(myXStringSet), fixed=TRUE)
 	}
@@ -397,6 +407,7 @@ BrowseSeqs <- function(myXStringSet,
 			format(c("", "", names(myXStringSet)[1:(l - 1)], "", "Consensus", "", ""), justify="right"),
 				html,
 			sep="    ")
+		html <- gsub("&", "&amp;", html, fixed=TRUE)
 		
 		styles <- character()
 		for (i in seq_along(colors)) {

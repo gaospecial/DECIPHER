@@ -12,7 +12,7 @@ DECIPHER is a software toolset that can be used for deciphering and managing bio
 \tabular{ll}{
 Package: \tab DECIPHER\cr
 Type: \tab Package\cr
-Depends: \tab R (>= 3.5.0), Biostrings (>= 2.35.12), RSQLite (>= 1.1), stats, parallel\cr
+Depends: \tab R (>= 3.5.0), Biostrings (>= 2.59.1), RSQLite (>= 1.1), stats, parallel\cr
 Imports: \tab methods, DBI, S4Vectors, IRanges, XVector\cr
 LinkingTo: \tab Biostrings, RSQLite, S4Vectors, IRanges, XVector\cr
 License: \tab GPL-3\cr
@@ -72,6 +72,7 @@ DistanceMatrix           Calculate the Distance Between Sequences
 ExtractGenes             Extract Predicted Genes from a Genome
 FindChimeras             Find Chimeras in a Sequence Database
 FindGenes                Find Genes in a Genome
+FindNonCoding            Find Non-Coding RNAs in a Genome
 FindSynteny              Finds Synteny in a Sequence Database
 FormGroups               Forms Groups By Rank
 Genes-class              Genes objects and accessors
@@ -83,6 +84,7 @@ IdentifyByRank           Identify By Taxonomic Rank
 IdLengths                Determine the Number of Bases, Nonbases, and Width
                          of Each Sequence
 IdTaxa                   Assign Sequences a Taxonomic Classification
+LearnNonCoding           Learn a Non-Coding RNA Model
 LearnTaxa                Train a Classifier for Assigning Taxonomy
 MapCharacters            Map Changes in Ancestral Character States
 MaskAlignment            Mask Highly Variable Regions of An Alignment
@@ -91,6 +93,8 @@ MIQS                     MIQS Amino Acid Substitution Matrix
 MODELS                   Available Models of DNA Evolution
 NNLS                     Sequential Coordinate-wise Algorithm for the
                          Non-negative Least Squares Problem
+NonCoding                NonCoding Models for Common Non-Coding RNA Families
+NonCoding-class          NonCoding Objects and Methods
 OrientNucleotides        Orient Nucleotide Sequences
 PFASUM                   PFASUM Amino Acid Substitution Matrices
 PredictDBN               Predict RNA Secondary Structure in Dot-Bracket

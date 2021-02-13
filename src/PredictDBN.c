@@ -134,7 +134,7 @@ double pNoRun(double N, double K, double p) {
 	}
 }
 
-SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgProdCorr, SEXP slope, SEXP shift, SEXP weights, SEXP pseudoknots, SEXP threshold, SEXP verbose, SEXP pBar, SEXP nThreads)
+SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgProdCorr, SEXP slope, SEXP shift, SEXP weights, SEXP pseudoknots, SEXP threshold, SEXP patterns, SEXP verbose, SEXP pBar, SEXP nThreads)
 {
 	int i, j, k, p, s, d, l;
 	
@@ -439,6 +439,42 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 		}
 	}
 	//Rprintf("\nshift = %1.2f slope = %1.2f minVal = %1.2f", sh, -1*sl, minVal);
+	
+	if (patterns != R_NilValue) {
+		SEXP P1 = VECTOR_ELT(patterns, 0);
+		SEXP P2 = VECTOR_ELT(patterns, 1);
+		for (i = 0; i < (tot - 1); i++) {
+			SEXP P11 = VECTOR_ELT(P1, pos[i]);
+			SEXP P21 = VECTOR_ELT(P2, pos[i]);
+			int L = length(P11);
+			if (L == 0)
+				continue;
+			int *J = INTEGER(P11);
+			double *W = REAL(P21);
+			int count = 0;
+			j = 0;
+			while (count < L && j < tot) {
+				if (W[count] < thresh) {
+					count++;
+				} else {
+					while (j < tot) {
+						if (J[count] - 1 > pos[j]) {
+							j++;
+						} else if (J[count] - 1 == pos[j]) {
+							if (MI[i*tot + j] < W[count])
+								MI[i*tot + j] = W[count];
+							count++;
+							j++;
+							break;
+						} else {
+							count++;
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
 	
 	char *states;
 	int *unpaired, q, *leftMax, *rightMax;
@@ -1036,6 +1072,41 @@ SEXP predictDBN(SEXP x, SEXP output, SEXP minOccupancy, SEXP impact, SEXP avgPro
 	} else {
 		UNPROTECT(1);
 	}
+	
+	return ans;
+}
+
+SEXP allZero(SEXP vec1, SEXP vec2, SEXP start1, SEXP start2, SEXP end1, SEXP end2)
+{
+	int i;
+	int *v1 = INTEGER(vec1);
+	int *v2 = INTEGER(vec2);
+	int s1 = asInteger(start1) - 1;
+	int s2 = asInteger(start2) - 1;
+	int e1 = asInteger(end1) - 1;
+	int e2 = asInteger(end2) - 1;
+	
+	SEXP ans;
+	PROTECT(ans = allocVector(INTSXP, 1));
+	int *rans = INTEGER(ans);
+	rans[0] = 1;
+	
+	for (i = s1; i < s2; i++) {
+		if (v1[i] || v2[i]) {
+			rans[0] = 0;
+			break;
+		}
+	}
+	if (rans[0]) {
+		for (i = e1; i < e2; i++) {
+			if (v1[i] || v2[i]) {
+				rans[0] = 0;
+				break;
+			}
+		}
+	}
+	
+	UNPROTECT(1);
 	
 	return ans;
 }

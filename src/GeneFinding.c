@@ -2358,6 +2358,8 @@ SEXP chainGenes(SEXP orftable, SEXP topScore, SEXP topLength, SEXP scoreIntergen
 {
 	int i, j;
 	int tot = length(orftable)/4; // number of rows
+	if (tot==0)
+		return NEW_INTEGER(0);
 	int *orfs = INTEGER(orftable);
 	int *topL = INTEGER(topLength);
 	int scoreInt = asInteger(scoreIntergenic);
@@ -2366,20 +2368,28 @@ SEXP chainGenes(SEXP orftable, SEXP topScore, SEXP topLength, SEXP scoreIntergen
 	double maxOvF = asReal(maxFracOverlap);
 	double *samS = REAL(sameScores);
 	double *oppS = REAL(oppoScores);
+	double *topS = REAL(topScore);
 	int l = length(sameScores);
 	int maxL = (l - 1)/2;
 	int negMaxL = -1*maxL;
 	l--;
 	
-	SEXP pointers; // index of previous row in chain
-	PROTECT(pointers = allocVector(REALSXP, tot));
-	double *p = REAL(pointers);
-	for (i = 0; i < tot; i++)
-		p[i] = i + 1; // starts at 1
+//	SEXP pointers; // index of previous row in chain
+//	PROTECT(pointers = allocVector(REALSXP, tot));
+//	double *p = REAL(pointers);
+//	for (i = 0; i < tot; i++)
+//		p[i] = i + 1; // starts at 1
 	
-	SEXP cumscore; // cumulative score of chain
-	PROTECT(cumscore = duplicate(topScore));
-	double *c = REAL(cumscore);
+//	SEXP cumscore; // cumulative score of chain
+//	PROTECT(cumscore = duplicate(topScore));
+//	double *c = REAL(cumscore);
+	
+	int *p = Calloc(tot, int);
+	double *c = Calloc(tot, double);
+	for (i = 0; i < tot; i++) {
+		p[i] = i;
+		c[i] = topS[i];
+	}
 	
 	int currIndex = orfs[0]; // current index in orfs
 	int switchIndex = 0; // i at last index switch
@@ -2474,18 +2484,46 @@ SEXP chainGenes(SEXP orftable, SEXP topScore, SEXP topLength, SEXP scoreIntergen
 		
 		if (pointer >= 0) {
 			c[i] += currscore;
-			p[i] = pointer + 1;
+			p[i] = pointer;
 		}
 	}
 	
-	SEXP ret_list;
-	PROTECT(ret_list = allocVector(VECSXP, 2));
-	SET_VECTOR_ELT(ret_list, 0, pointers);
-	SET_VECTOR_ELT(ret_list, 1, cumscore);
+//	SEXP ret_list;
+//	PROTECT(ret_list = allocVector(VECSXP, 2));
+//	SET_VECTOR_ELT(ret_list, 0, pointers);
+//	SET_VECTOR_ELT(ret_list, 1, cumscore);
 	
-	UNPROTECT(3);
+//	return ret_list;
 	
-	return ret_list;
+	pointer = 0;
+	for (i = 1; i < tot; i++)
+		if (c[i] > c[pointer])
+			pointer = i;
+	
+	int *indices = Calloc(pointer + 1, int);
+	int position = 0;
+	indices[position] = pointer;
+	while (pointer != p[pointer]) {
+		pointer = p[pointer];
+		position++;
+		indices[position] = pointer;
+	}
+	
+	SEXP ans;
+	PROTECT(ans = allocVector(INTSXP, position + 1));
+	int *rans = INTEGER(ans);
+	i = 0;
+	while (position >= 0)
+		rans[i++] = indices[position--] + 1;
+	
+	Free(p);
+	Free(c);
+	Free(indices);
+	
+//	UNPROTECT(3);
+	UNPROTECT(1);
+	
+	return ans;
 }
 
 SEXP longestORFs(SEXP orftable)
@@ -2545,6 +2583,397 @@ SEXP longestORFs(SEXP orftable)
 			rans[count++] = i + 1;
 	
 	Free(longest);
+	
+	UNPROTECT(1);
+	
+	return ans;
+}
+
+SEXP getIndex(SEXP start1, SEXP start2, SEXP len, SEXP score)
+{
+	int i, j, e;
+	int count = 0;
+	int l = asInteger(len);
+	int n = length(start1);
+	int *s1 = INTEGER(start1);
+	int *s2 = INTEGER(start2);
+	int *s = INTEGER(score);
+	
+	SEXP ans;
+	PROTECT(ans = allocVector(INTSXP, l));
+	int *rans = INTEGER(ans);
+	for (j = 0; j < l; j++)
+		rans[j] = 0;
+	
+	for (j = 0; j < n; j++) {
+		if (s2[j] > count) {
+			if (s1[j] > l) {
+				break;
+			} else if (s1[j] > count) {
+				if (s2[j] > l) {
+					e = l;
+				} else {
+					e = s2[j];
+				}
+				for (i = s1[j] - 1; i < e; i++)
+					if (s[j] > rans[i])
+						rans[i] = s[j];
+				count = s2[j];
+			} else if (count < s2[j]) {
+				if (s2[j] > l) {
+					e = l;
+				} else {
+					e = s2[j];
+				}
+				for (i = count; i < e; i++)
+					if (s[j] > rans[i])
+						rans[i] = s[j];
+				count = s2[j];
+			}
+		}
+	}
+	
+	UNPROTECT(1);
+	
+	return ans;
+}
+
+SEXP inBounds(SEXP vec1, SEXP vec3, SEXP lo1, SEXP hi1, SEXP hi3)
+{
+	int i = 0, j, count = 0;
+	int l = length(vec1);
+	int *v1 = INTEGER(vec1);
+	double *v3 = REAL(vec3);
+	
+	int l1 = asInteger(lo1);
+	int h1 = asInteger(hi1);
+	double h3 = asReal(hi3);
+	
+	while (i < l) {
+		if (v1[i] >= l1) {
+			j = i;
+			while (j < l && v1[j] <= h1) {
+				if (v3[j] <= h3)
+					count++;
+				j++;
+			}
+			break;
+		}
+		i++;
+	}
+	
+	SEXP ans;
+	PROTECT(ans = allocVector(INTSXP, count));
+	int *rans = INTEGER(ans);
+	
+	j = 0;
+	while (j < count) {
+		if (v1[i] >= l1 &&
+			v1[i] <= h1 &&
+			v3[i] <= h3)
+			rans[j++] = i + 1;
+		i++;
+	}
+	
+	UNPROTECT(1);
+	
+	return ans;
+}
+
+SEXP getBounds(SEXP widths, SEXP start, SEXP end, SEXP minL, SEXP maxL, SEXP lenScores, SEXP kmer, SEXP Ksize, SEXP negOk, SEXP minS, SEXP partS)
+{
+	int j, e;
+	double score, temp;
+	int i = 1;
+	int s = 0;
+	int index = 0;
+	int strand = 0;
+	
+	int *w = INTEGER(widths);
+	double *starts = REAL(start);
+	double *ends = REAL(end);
+	double *kmers = REAL(kmer);
+	int minLength = asInteger(minL);
+	int maxLength = asInteger(maxL);
+	double *lS = REAL(lenScores);
+	int k = asInteger(Ksize);
+	int neg = asInteger(negOk);
+	double minScore = asReal(minS);
+	double partScore = asReal(partS);
+	
+	int midLength = 0;
+	for (i = 0; i < maxLength - minLength + 1; i++) {
+			if (lS[i] > lS[midLength])
+				midLength = i;
+	}
+	midLength += minLength;
+	
+	int lX = length(widths);
+	int l = length(start);
+	
+	int *ws = Calloc(lX, int);
+	int *offsets = Calloc(lX, int);
+	int *rev_width = Calloc(lX, int);
+	for (j = 0; j < lX; j++) {
+		rev_width[lX - j - 1] = w[j];
+		if (j > 0) {
+			ws[j] = ws[j - 1] + w[j];
+			offsets[j] = ws[j - 1];
+		} else {
+			ws[j] = w[j];
+		}
+	}
+	
+	int size = 9e2;
+	double *r = Calloc(size, double);
+	int count = 0;
+	
+	while (i < l) {
+		if (i >= ws[index]) {
+			index++;
+			s = -1;
+			if (index >= lX) {
+				index = 0;
+				strand = 1;
+				for (j = 0; j < lX; j++) {
+					if (j > 0) {
+						offsets[j] = ws[j - 1];
+					} else {
+						offsets[j] = ws[lX - 1];
+					}
+					ws[j] = offsets[j] + rev_width[j];
+				}
+			}
+		} else if (starts[i - 1] < starts[i]) { // ascended
+			s = i;
+		} else if (s >= 0 && starts[i - 1] > starts[i]) { // descended
+			for (j = s; j < i; j++)
+				if (kmers[s] > kmers[j])
+					s = j; // choose min
+			
+			e = s + minLength - 1;
+			if (e >= ws[index]) { // all out of bounds
+				i = ws[index];
+			} else if (starts[s] >= 0) {
+				score = ends[e];
+				score += kmers[e - k + 2] - kmers[s];
+				score += lS[e - s - minLength + 1];
+				for (j = e + 1; j < ws[index] && j < s + maxLength; j++) {
+					if (ends[j] >= 0 &&
+						starts[s] + ends[j] >= partScore) {
+						temp = ends[j];
+						if (j - s + 1 < midLength) { // add k-mer score
+							temp += kmers[j - k + 2] - kmers[s];
+						} else { // add average k-mer score for midLength
+							temp += (kmers[j - k + 2] - kmers[s])*midLength/(j - s + 1);
+						}
+						temp += lS[j - s - minLength + 1];
+						if (score < temp) {
+							e = j;
+							score = temp;
+						}
+					}
+				}
+				score += starts[s];
+				if (ends[e] >= 0 &&
+					starts[s] + ends[e] >= partScore &&
+					score >= minScore) {
+					if (count + 9 >= size) {
+						size *= 2;
+						r = Realloc(r, size, double);
+					}
+					
+					if (strand) {
+						r[count++] = lX - index;
+					} else {
+						r[count++] = index + 1;
+					}
+					r[count++] = strand;
+					
+					// coordinates in XString
+					r[count++] = s + 1;
+					r[count++] = e + 1;
+					
+					r[count++] = score;
+					r[count++] = neg;
+					
+					// coordinates to XStringSet
+					if (strand) {
+						r[count++] = rev_width[index] - e + offsets[index];
+						r[count++] = rev_width[index] - s + offsets[index];
+					} else {
+						r[count++] = s - offsets[index] + 1;
+						r[count++] = e - offsets[index] + 1;
+					}
+					
+					r[count++] = starts[s] + ends[e];
+				}
+				
+				s = -1;
+			} else {
+				s = -1;
+			}
+		}
+		
+		i++;
+	}
+	
+	Free(rev_width);
+	Free(offsets);
+	Free(ws);
+	
+	int nrow = count/9;
+	SEXP ans;
+	PROTECT(ans = allocMatrix(REALSXP, nrow, 9));
+	double *rans = REAL(ans);
+	
+	i = 0;
+	j = 0;
+	while (i < count) {
+		rans[j] = r[i++];
+		rans[nrow + j] = r[i++];
+		rans[2*nrow + j] = r[i++];
+		rans[3*nrow + j] = r[i++];
+		rans[4*nrow + j] = r[i++];
+		rans[5*nrow + j] = r[i++];
+		rans[6*nrow + j] = r[i++];
+		rans[7*nrow + j] = r[i++];
+		rans[8*nrow + j] = r[i++];
+		j++;
+	}
+	
+	Free(r);
+	UNPROTECT(1);
+	
+	return ans;
+}
+
+SEXP addIfElse(SEXP vec, SEXP index, SEXP scores)
+{
+	if (MAYBE_SHARED(vec))
+		error(".Call function 'addIfElse' called in incorrect context.");
+	
+	double *v = REAL(vec);
+	double *s = REAL(scores);
+	int *ind = INTEGER(index);
+	int l = length(vec);
+	
+	for (int i = 0; i < l; i++)
+		v[i] += s[ind[i]];
+	
+	return vec;
+}
+
+SEXP kmerScores(SEXP oligos, SEXP ints, SEXP windowSize, SEXP kSize)
+{
+	int i = 0, j = 0, k = 0, count = 0;
+	double *o = REAL(oligos);
+	int *mer = INTEGER(ints);
+	int wS = asInteger(windowSize);
+	double kS = asReal(kSize); // coerce to double
+	
+	int hS = wS/2; // half the windowSize
+	int l = length(ints);
+	int *bg = Calloc(length(oligos), int); // rolling distribution of k-mers
+	
+	SEXP ans;
+	PROTECT(ans = allocVector(REALSXP, l + 1));
+	double *rans = REAL(ans);
+	rans[0] = 0;
+	
+	// calculate:
+	// log(fg/sum(fg)/(1/n)) - log(bg/sum(bg)/(1/n))/kS
+	// log(oligos*n) - log(bg*n/count)/kS
+	// log(oligos*count/bg)/kS
+	
+	while (count < wS && i < l) {
+		if (mer[i] != NA_INTEGER) {
+			count++;
+			bg[mer[i] - 1]++;
+			
+			while (count >= wS) {
+				// record score at midpoint
+				while (k <= i - hS) {
+					if (mer[k] != NA_INTEGER) {
+						if (bg[mer[k] - 1] > 0) {
+							rans[k + 1] = log(o[mer[k] - 1]*(double)count/(double)bg[mer[k] - 1])/kS;
+						} else { // use pseudocount
+							rans[k + 1] = log(o[mer[k] - 1]*(double)count)/kS;
+						}
+					} else {
+						rans[k + 1] = 0;
+					}
+					k++;
+				}
+				
+				// remove from positions before windowSize
+				if (mer[j] != NA_INTEGER) {
+					count--;
+					bg[mer[j] - 1]--;
+				}
+				j++;
+			}
+		}
+		i++;
+	}
+	while (k < l) {
+		if (mer[k] != NA_INTEGER) {
+			if (bg[mer[k] - 1] > 0) {
+				rans[k + 1] = log(o[mer[k] - 1]*(double)count/(double)bg[mer[k] - 1])/kS;
+			} else { // use pseudocount
+				rans[k + 1] = log(o[mer[k] - 1]*(double)count)/kS;
+			}
+		} else {
+			rans[k + 1] = 0;
+		}
+		k++;
+	}
+	
+	// perform cumulative sum
+	for (k = 2; k <= l; k++)
+		rans[k] += rans[k - 1];
+	
+	Free(bg);
+	UNPROTECT(1);
+	
+	return ans;
+}
+
+SEXP getHits(SEXP starts, SEXP ends, SEXP left1, SEXP left2, SEXP right1, SEXP right2, SEXP deltaG)
+{
+	int j, c1 = 0, c2;
+	int *pS = INTEGER(starts);
+	int *pE = INTEGER(ends);
+	int *s1 = INTEGER(left1);
+	int *s2 = INTEGER(left2);
+	int *e1 = INTEGER(right1);
+	int *e2 = INTEGER(right2);
+	double *dG = REAL(deltaG);
+	int l1 = length(starts);
+	int l2 = length(left1);
+	
+	SEXP ans;
+	PROTECT(ans = allocVector(INTSXP, l2));
+	int *rans = INTEGER(ans);
+	for (j = 0; j < l2; j++) {
+		rans[j] = 0;
+		
+		while (c1 < l1 && pS[c1] < s1[j])
+			c1++;
+		
+		c2 = c1;
+		while (c2 < l1 && pS[c2] <= s2[j]) {
+			if (pE[c2] >= e1[j] && pE[c2] <= e2[j]) {
+				if (rans[j] > 0) {
+					if (dG[c2] < dG[rans[j] - 1])
+						rans[j] = c2 + 1;
+				} else {
+					rans[j] = c2 + 1;
+				}
+			}
+			c2++;
+		}
+	}
 	
 	UNPROTECT(1);
 	

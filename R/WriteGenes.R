@@ -30,8 +30,12 @@ WriteGenes <- function(x,
 	}
 	
 	ns <- names(attr(x, "widths"))
-	sn <- strsplit(ns , " ", fixed=TRUE)
-	sn <- sapply(sn, head, n=1)
+	if (is.null(ns)) {
+		ns <- sn <- seq_along(attr(x, "widths"))
+	} else {
+		sn <- strsplit(ns , " ", fixed=TRUE)
+		sn <- sapply(sn, head, n=1)
+	}
 	
 	w <- which(x[, "Gene"]==1)
 	if (length(w)==0L)
@@ -54,7 +58,9 @@ WriteGenes <- function(x,
 				append=TRUE)
 			for (j in seq_along(t[[i]])) {
 				if (x[t[[i]][j], "Strand"]==1L) {
-					cat("     CDS             complement(",
+					cat(ifelse(1/x[t[[i]][j], "Gene"] < 0,
+							"     misc_RNA        complement(",
+							"     CDS             complement("),
 						x[t[[i]][j], "Begin"],
 						"..",
 						x[t[[i]][j], "End"],
@@ -63,7 +69,9 @@ WriteGenes <- function(x,
 						file=file,
 						append=TRUE)
 				} else {
-					cat("     CDS             ",
+					cat(ifelse(1/x[t[[i]][j], "Gene"] < 0,
+							"     misc_RNA        ",
+							"     CDS             "),
 						x[t[[i]][j], "Begin"],
 						"..",
 						x[t[[i]][j], "End"],
@@ -102,14 +110,18 @@ WriteGenes <- function(x,
 				paste("DECIPHER_v",
 					packageVersion("DECIPHER"),
 					sep=""),
-				"CDS",
+				ifelse(1/x[t[[i]], "Gene"] < 0,
+					"transcript",
+					"CDS"),
 				x[t[[i]], "Begin"],
 				x[t[[i]], "End"],
 				round(100*x[t[[i]], "FractionReps"]),
 				ifelse(x[t[[i]], "Strand"]==1L,
 					"-",
 					"+"),
-				"0",
+				ifelse(1/x[t[[i]], "Gene"] < 0,
+					".",
+					"0"),
 				paste("ID=",
 					x[t[[i]], "Index"],
 					"_",

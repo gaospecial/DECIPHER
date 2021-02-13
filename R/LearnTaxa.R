@@ -178,11 +178,13 @@ LearnTaxa <- function(train,
 			train,
 			K,
 			alphabet,
+			FALSE, # mask repeats
 			PACKAGE="DECIPHER")
 	} else {
 		kmers <- .Call("enumerateSequence",
 			train,
 			K,
+			FALSE, # mask repeats
 			PACKAGE="DECIPHER")
 	}
 	kmers <- lapply(kmers,

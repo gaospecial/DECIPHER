@@ -130,6 +130,8 @@ The functions of DECIPHER can be grouped into several categories based on intend
 \begin{enumerate} \item \Rfunction{AmplifyDNA} \item \Rfunction{CalculateEfficiencyPCR} \item \Rfunction{DesignPrimers} \item \Rfunction{DesignSignatures} \item \Rfunction{MeltDNA} \end{enumerate}
 \item Classifying sequences into a taxonomy:
 \begin{enumerate} \item \Rfunction{LearnTaxa} \item \Rfunction{IdTaxa} \item \Rclass{Taxa-class} \end{enumerate}
+\item Gene calling (a.k.a. gene finding):
+\begin{enumerate} \item \Rfunction{ExtractGenes} \item \Rfunction{FindGenes} \item \Rfunction{FindNonCoding} \item \Rclass{Genes-class} \item \Rfunction{LearnNonCoding} \item \Rclass{NonCoding-class} \item \Rfunction{WriteGenes} \end{enumerate}
 \end{enumerate}
 
 %------------------------------------------------------------

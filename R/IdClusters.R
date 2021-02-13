@@ -1411,6 +1411,7 @@ IdClusters <- function(myDistMatrix=NULL,
 				v <- .Call("enumerateSequence",
 					.subset(myXStringSet, o),
 					wordSize,
+					FALSE, # mask repeats
 					PACKAGE="DECIPHER")
 			}
 			v <- lapply(v,
@@ -1795,7 +1796,7 @@ IdClusters <- function(myDistMatrix=NULL,
 				
 				w <- which(duplicated(myClustersList$labels))
 				if (length(w) > 0) {
-					warning("Duplicated labels in dendrogram appended with index.")
+					warning("Duplicated labels in myDistMatrix appended with index.")
 					myClustersList$labels[w] <- paste(myClustersList$labels[w],
 						w,
 						sep="_")
@@ -1963,7 +1964,8 @@ IdClusters <- function(myDistMatrix=NULL,
 				
 				w <- which(duplicated(dNames))
 				if (length(w) > 0) {
-					warning("Duplicated labels in myDistMatrix appended with index.")
+					if (type==1 && !showPlot)
+						warning("Duplicated labels in myDistMatrix appended with index.")
 					dNames[w] <- paste(dNames[w],
 						w,
 						sep="_")

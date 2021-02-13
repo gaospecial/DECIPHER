@@ -165,11 +165,13 @@ IdTaxa <- function(test,
 			test,
 			K,
 			trainingSet$alphabet,
+			FALSE, # mask repeats
 			PACKAGE="DECIPHER")
 	} else {
 		testkmers <- .Call("enumerateSequence",
 			test,
 			K,
+			FALSE, # mask repeats
 			PACKAGE="DECIPHER")
 	}
 	
@@ -230,6 +232,7 @@ IdTaxa <- function(test,
 		revkmers <- .Call("enumerateSequence",
 			reverseComplement(test[boths]),
 			K,
+			FALSE, # mask repeats
 			PACKAGE="DECIPHER")
 		revkmers <- lapply(revkmers,
 			function(x)

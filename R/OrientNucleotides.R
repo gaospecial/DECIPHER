@@ -97,6 +97,7 @@ OrientNucleotides <- function(myXStringSet,
 	v <- .Call("enumerateSequence",
 		myXStringSet,
 		wordSize,
+		FALSE, # mask repeats
 		PACKAGE="DECIPHER")
 	v <- lapply(v, sort)
 	X <- v[reference]
@@ -126,6 +127,7 @@ OrientNucleotides <- function(myXStringSet,
 		v <- .Call("enumerateSequence",
 			seqs,
 			wordSize,
+			FALSE, # mask repeats
 			PACKAGE="DECIPHER")
 		v <- lapply(v, sort.int)
 		
@@ -154,6 +156,7 @@ OrientNucleotides <- function(myXStringSet,
 		v <- .Call("enumerateSequence",
 			seqs,
 			wordSize,
+			FALSE, # mask repeats
 			PACKAGE="DECIPHER")
 		v <- lapply(v, sort.int)
 		
@@ -182,6 +185,7 @@ OrientNucleotides <- function(myXStringSet,
 		v <- .Call("enumerateSequence",
 			seqs,
 			wordSize,
+			FALSE, # mask repeats
 			PACKAGE="DECIPHER")
 		v <- lapply(v, sort.int)
 		

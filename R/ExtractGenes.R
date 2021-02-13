@@ -15,6 +15,8 @@ ExtractGenes <- function(x,
 		stop("Invalid type.")
 	if (type==-1)
 		stop("Ambiguous type.")
+	if (type==3 && any(1/x[, "Gene"] < 0))
+		stop("Only open reading frames in x can be translated when type is 'AAStringSet'.")
 	if (!all(attr(x, "widths")==width(myDNAStringSet)))
 		stop("Mismatch between x and myDNAStringSet.")
 	

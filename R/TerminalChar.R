@@ -19,33 +19,39 @@ TerminalChar <- function(myXStringSet,
 		numF <- length(myXStringSet)
 		maxW <- max(width(myXStringSet))
 		
-		gaps <- matrix(data=0, nrow=numF, ncol=3,
+		gaps <- matrix(data=0,
+			nrow=numF,
+			ncol=3,
 			dimnames=list(names(myXStringSet),
-				c("leadingChar","trailingChar","difference")))
+				c("leadingChar",
+					"trailingChar",
+					"difference")))
 		myXStringSetRev <- reverse(myXStringSet)
 		
-		lead <- isMatchingAt(char, myXStringSet,
+		lead <- isMatchingAt(char,
+			myXStringSet,
 			seq_len(maxW))
-		trail <- isMatchingAt(char, myXStringSetRev,
+		trail <- isMatchingAt(char,
+			myXStringSetRev,
 			seq_len(maxW))
 		
-		for (i in 1:numF) {
+		for (i in seq_len(numF)) {
 			# leading characters
-			index <- which(!lead[,i])[1L]
+			index <- which(!lead[seq_len(width(myXStringSet[i])), i])[1L]
 			
 			if (is.na(index)) { # sequence is all that character
-				gaps[i,1] <- width(myXStringSet[i])
-				gaps[i,2] <- width(myXStringSet[i])
-				gaps[i,3] <- NA
+				gaps[i, 1] <- width(myXStringSet[i])
+				gaps[i, 2] <- width(myXStringSet[i])
+				gaps[i, 3] <- NA
 			} else {
-				gaps[i,1] <- index - 1L
+				gaps[i, 1] <- index - 1L
 				
 				# trailing characters
-				index <- which(!trail[,i])[1L]
-				gaps[i,2] <- index - 1L
+				index <- which(!trail[, i])[1L]
+				gaps[i, 2] <- index - 1L
 				
 				# difference between leading and trailing gaps
-				gaps[i,3] <- width(myXStringSet[i]) - gaps[i,2] - gaps[i,1]
+				gaps[i, 3] <- width(myXStringSet[i]) - gaps[i, 2] - gaps[i, 1]
 			}
 		}
 	}

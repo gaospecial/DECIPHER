@@ -131,19 +131,19 @@ orfs <- FindGenes(genome, showPlot=TRUE, allScores=TRUE)
 
 \subsection{Inspecting the output}
 
-And presto! We now have our gene predictions in the form of an object belonging to class \Rclass{Genes}.  Now that we have our genes in hand, let's take a look at them:
+And presto! With a wave of our magic wand we now have our gene predictions in the form of an object belonging to class \Rclass{Genes}.  Now that we have our genes in hand, let's take a look at them:
 
 <<expr3,eval=TRUE>>=
 orfs
 @
 
-Here, we can see that the genome has a wide range of gene lengths, high density of predicted genes, uses multiple initiation codons, and contains many possible open reading frames.  We see all the open reading frames in the output because \Rfunarg{allScores} was set to \code{TRUE}.  If we only want to look at the subset of open reading frames that are predicted as genes, we can subset the object:
+Open reading frames are defined by their \code{Begin} and \code{End} position, as well as whether they are on the top (i.e., \code{Strand} is \code{0}) or bottom strand.  Here, genes are flagged by having a non-zero value in the \code{Gene} column.  We see all the open reading frames in the output because \Rfunarg{allScores} was set to \code{TRUE}.  If we only want to look at the subset of open reading frames that are predicted as genes, we can subset the object:
 
 <<expr4,eval=TRUE>>=
 genes <- orfs[orfs[, "Gene"]==1,]
 @
 
-The \code{"Gene"} column is one of several describing the open reading frames.  Objects of class \Rclass{Genes} are stored as matrices with many columns containing information about the open reading frames:
+The \code{"Gene"} column is one of several describing the open reading frames.  Objects of class \Rclass{Genes} are stored as matrices with many columns:
 
 <<expr5,eval=TRUE>>=
 colnames(genes)
@@ -168,7 +168,7 @@ We see that the first gene has no start codon and the last gene has no stop codo
 table(subseq(dna[-1], 1, 3))
 @
 
-There is one predicted non-canonical initiation codon, ``CTG'', and the typical three bacterial initiation codons: ``ATG'', ``GTG'', and ``TTG''.  Let's take a closer look at genes with non-canonical initiation codons:
+There are the typical three bacterial initiation codons, ``ATG'', ``GTG'', and ``TTG'', and one predicted non-canonical initiation codon: ``CTG''.  Let's take a closer look at genes with non-canonical initiation codons:
 
 <<expr8,eval=TRUE>>=
 w <- which(!subseq(dna, 1, 3) %in% c("ATG", "GTG", "TTG"))
@@ -176,10 +176,10 @@ w
 w <- w[-1] # drop the first sequence because it is a fragment
 w
 dna[w]
-genes[w,]
+genes[w]
 @
 
-We can also look at the predicted protein sequences by translating the genes:
+That worked like a charm, so let's look at the predicted protein sequences by translating the genes:
 
 <<expr9,eval=TRUE>>=
 aa <- ExtractGenes(genes, genome, type="AAStringSet")
@@ -192,12 +192,39 @@ All of the genes start with a methionine (``M'') residue and end with a stop (``
 subseq(aa, 2, -2)
 @
 
+\subsection{Removing genes with too many ambiguities}
+
+Genomes sometimes contain ambiguous positions (e.g., ``N'') within open reading frames.  These ambiguities can make an open reading frame look longer than it actually is, giving the illusion of a single gene when none (or more than one) is present.  We can easily remove those with more than some magic number (let's say 20 or 5\%) of ambiguous positions:
+
+<<expr11,eval=TRUE>>=
+a <- alphabetFrequency(dna, baseOnly=TRUE)
+w <- which(a[, "other"] <= 20 & a[, "other"]/width(dna) <= 5)
+genes <- genes[w]
+@
+
+Abracadabra! The genes with many ambiguities have magically disappeared from our gene set.
+
+\subsection{Taking a look at the shortest genes}
+
+You might think finding short genes (< 90 nucleotides) would require black magic, but \Rfunction{FindGenes} can do it quite well.  We can select the subset of short genes and take a look at how repeatedly they were called genes during iteration:
+
+<<expr12,eval=TRUE>>=
+w <- which(width(dna) < 90)
+dna[w]
+aa[w]
+genes[w]
+genes[w, "End"] - genes[w, "Begin"] + 1 # lengths
+genes[w, "FractionReps"]
+@
+
+We can see from the \emph{FractionReps} column always being 100\% that these short genes were repeatedly identified during iteration, suggesting they weren't pulled out of a hat.  That's impressive given how short they are!
+
 \subsection{Revealing the secrets of gene finding}
 
-The predictions made by \Rfunction{FindGenes} are supported by many scores that are mostly independent of each other.  However, some scores are related because they make use of information from the same region relative to the gene boundaries.  We can take a look at score correlations with:
+All of this might seem like hocus pocus, but the predictions made by \Rfunction{FindGenes} are supported by many scores.  Some scores are related because they make use of information from the same region relative to the gene boundaries.  We can take a look at score correlations with:
 
 \begin{centerfig}
-<<expr11,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6>>=
+<<expr13,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6>>=
 pairs(genes[, 5:16], pch=46, col="#00000033", panel=panel.smooth)
 @
 \caption{\label{f2} Scatterplot matrix of scores used by \Rfunction{FindGenes} to make gene predictions.}
@@ -205,7 +232,7 @@ pairs(genes[, 5:16], pch=46, col="#00000033", panel=panel.smooth)
 
 \clearpage
 
-Certainly some of the magic of gene finding is having a lot of scores!  We see that the ribosome binding site score and upstream nucleotide score are the most correlated, which is unsurprising because they both rely on the nucleotides immediately upstream of the start codon.  The different scores are defined as follows:
+Certainly some of the magic of gene finding is having a lot of scores!  We can see that the ribosome binding site score and upstream nucleotide score are the most correlated.  This isn't just magical thinking, both scores rely on the same nucleotides immediately upstream of the start codon.  The different scores are defined as follows:
 
 \begin{enumerate}
 	\item Upstream signals
@@ -238,13 +265,109 @@ Certainly some of the magic of gene finding is having a lot of scores!  We see t
 If we have a particular gene of interest, it can sometimes be useful to plot the output of \Rfunction{FindGenes} as the set of all possible open reading frames with the predicted genes highlighted.  The \Rfunction{plot} function for a \Rclass{Genes} object is interactive, so it is possible to pan left and right by setting the \Rfunarg{interact} argument equal to \code{TRUE}.  For now we will only look at the beginning of the genome:
 
 \begin{centerfig}
-<<expr12,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6>>=
+<<expr14,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6>>=
 plot(orfs, interact=FALSE)
 @
 \caption{\label{f3} All possible open reading frames (red and blue) with predicted genes highlighted in green.}
 \end{centerfig}
 
 \clearpage
+
+%------------------------------------------------------------
+\section{Incorporating non-coding RNAs}
+%------------------------------------------------------------
+
+\subsection{Examining the intergenic spaces}
+
+The space between genes sometimes contains promoter sequences, pseudogenes, or non-coding RNA genes that are of interest.  We can conjure up the intergenic sequences longer than a given width (e.g., 30 nucleotides) with the commands:
+
+<<expr15,eval=TRUE>>=
+s <- c(1, genes[, "End"] + 1)
+e <- c(genes[, "Begin"] - 1, width(genome))
+w <- which(e - s >= 30)
+intergenic <- unlist(extractAt(genome, IRanges(s[w], e[w])))
+intergenic
+@
+
+Some of these intergenic regions might be similar to each other.  We can find related intergenic sequences by clustering those within a certain distance (e.g., 20%).  Before we do that we should combine the sequences with their reverse complement since some intergenic regions will be in the opposite orientation of others.
+
+<<expr16,eval=TRUE>>=
+intergenic <- c(intergenic, reverseComplement(intergenic))
+names(intergenic) <- c(w, paste(w, "rc", sep="_"))
+clusts <- IdClusters(myXStringSet=intergenic, method="inexact", cutoff=0.2)
+@
+
+Since we used \code{inexact} clustering, the clusters containing the longest sequences will be first.  We can look at sequences belonging to the first cluster:
+
+<<expr17,eval=TRUE>>=
+tail(sort(table(clusts$cluster))) # the biggest clusters
+AlignSeqs(intergenic[clusts$cluster==1], verbose=FALSE)
+@
+
+These two long intergenic regions probably contain copies of the ribosomal RNA operon.  A signature of non-coding RNAs is that they tend to have higher GC content than expected.  We can create a plot of GC content in intergenic regions versus size.  Since our genome averages 41\% GC content, we can use statistics to add a line for the 95\% confidence interval.  Only a few intergenic regions have unexpectedly high GC content.
+
+\begin{centerfig}
+<<expr18,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6>>=
+gc <- alphabetFrequency(intergenic, as.prob=TRUE, baseOnly=TRUE)
+gc <- gc[, "G"] + gc[, "C"]
+plot(width(intergenic),
+	100*gc,
+	xlab="Length (nucleotides)",
+	ylab="GC content (%)",
+	main="Intergenic regions",
+	log="x")
+size <- 10^seq(1, 4, 0.1)
+expected <- 0.413*size
+lines(size, 100*(expected + 1.96*sqrt(expected))/size)
+@
+\caption{\label{f4} Non-coding RNAs are often found in intergenic regions with unexpectedly high GC content.}
+\end{centerfig}
+
+\clearpage
+
+\subsection{Finding and including non-coding RNAs}
+
+The \Rpackage{DECIPHER} has a separate function, \Rfunction{FindNonCoding}, to find non-coding RNAs in a genome.  It searches for predefined models created from multiple sequence alignments of non-coding RNAs.  Thankfully \Rpackage{DECIPHER} includes pre-built models of non-coding RNAs commonly found in bacteria, archaea, and eukarya.  Since \emph{C. trachomatis} is a bacterium, we will load the bacterial models.  For genomes belonging to organisms from other domains of life, simply replace ``Bacteria'' with ``Archaea'' or ``Eukarya''.
+
+<<expr19,eval=TRUE>>=
+data(NonCodingRNA_Bacteria)
+x <- NonCodingRNA_Bacteria
+names(x)
+@
+
+We need to search for these models in our genome before we can incorporate them into our gene calls.
+
+<<expr20,eval=TRUE>>=
+rnas <- FindNonCoding(x, genome)
+rnas
+@
+
+Tada!  \Rfunction{FindNonCoding} outputs an object of class \Rclass{Genes} just like \Rfunction{FindGenes}.  However, non-coding RNAs are denoted with negative numbers in the \code{Gene} column.  Each number corresponds to the model that was identified.  We can look at the set of non-coding RNAs that were found in the \emph{C. trachomatis} genome:
+
+<<expr21,eval=TRUE>>=
+sort(table(names(x)[-rnas[, "Gene"]]))
+@
+
+There was at least one tRNA gene found for each amino acid, as well as two copies of each ribosomal RNA gene, and the RNaseP and tmRNA genes.  Now, we can easily include these non-coding RNAs into our gene calls.
+
+<<expr22,eval=TRUE>>=
+genes <- FindGenes(genome, includeGenes=rnas)
+genes
+@
+
+That worked like magic!  Now the \Rclass{Genes} object contains both protein coding genes and non-coding RNAs.
+
+%------------------------------------------------------------
+\section{Guaranteeing repeatability}
+%------------------------------------------------------------
+
+\Rfunction{FindGenes} sometimes uses random sampling to increase speed of the algorithm.  For this reason, gene predictions may change slightly if the prediction process is repeated with the same inputs.  For some applications this randomness is undesirable, and it can easily be avoided by setting the random seed before using \Rfunction{FindGenes}.  The process of setting and then unsetting the seed in \R{} is straightforward:
+
+<<expr23,eval=FALSE>>=
+set.seed(123) # choose a whole number as the random seed
+# then make gene predictions with FindGenes (not shown)
+set.seed(NULL) # return to the original state by unsetting the seed
+@
 
 %------------------------------------------------------------
 \section{Exporting the output}

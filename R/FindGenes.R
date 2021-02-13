@@ -34,7 +34,7 @@
 		scoreIntergenic <- FALSE
 	}
 	
-	res <- .Call("chainGenes",
+	indices <- .Call("chainGenes",
 		topstarts,
 		topScore,
 		toplengths,
@@ -45,25 +45,6 @@
 		sameScores,
 		oppoScores,
 		PACKAGE="DECIPHER")
-	
-	pointers <- res[[1]]
-	cumscore <- res[[2]]
-	
-	pointer <- which.max(cumscore)
-	indices <- integer(pointer)
-	position <- 1L
-	indices[position] <- pointer
-	repeat {
-		if (pointer==pointers[pointer]) {
-			break
-		} else {
-			pointer <- pointers[pointer]
-			position <- position + 1L
-			indices[position] <- pointer
-		}
-	}
-	length(indices) <- position
-	indices <- rev(indices)
 	
 	# eliminate ORFans (small genes in low density regions)
 	remove <- logical(length(indices))
@@ -156,10 +137,69 @@
 	return(sort(indices))
 }
 
+.extractSD <- function(dna) {
+	
+	up_region <- DNAString("WWGGDVDTGATCCWKCYGCASVTTCMSSTACRGMW")
+	maxL <- 60 # length of upstream region to align
+	SD <- DNAString("AAGGAGGT")
+	
+	dna <- xscat(dna, paste(rep("-", maxL), collapse=""))
+	dna <- unlist(dna)
+	dna <- xscat(dna,
+		paste0(rep("-", maxL), collapse=""),
+		reverseComplement(dna))
+	
+	views1 <- matchPattern("ACCTTGTTACGACTT",
+		dna,
+		max.mismatch=2,
+		with.indels=TRUE,
+		fixed="subject")
+	
+	views2 <- matchPattern("GACGGGCGGTGTGTRCAA",
+		dna,
+		max.mismatch=3,
+		with.indels=TRUE,
+		fixed="subject")
+	
+	keep <- logical(length(views1))
+	for (j in seq_along(views1)) {
+		L <- start(views2) - end(views1)[j]
+		keep[j] <- any(L >= 50 & L <= 150)
+	}
+	
+	views <- views1[keep]
+	
+	starts <- start(views) - maxL
+	starts <- starts[starts > 0]
+	if (length(starts) > 0) {
+		dna <- extractAt(dna,
+			IRanges(starts,
+				width=maxL))
+		
+		p <- pairwiseAlignment(RemoveGaps(dna),
+			up_region,
+			substitutionMatrix=nucleotideSubstitutionMatrix(),
+			gapOpening=5,
+			gapExtension=0,
+			type="local-global")
+		
+		p <- DNAStringSet(pattern(p))
+		p <- subseq(p, 1, length(SD))
+		p <- RemoveGaps(p)
+		p <- unique(p)
+		
+		if (length(p)==1 &&
+			width(p)==length(SD))
+			SD <- p[[1]]
+	}
+	
+	return(SD)
+}
+
 .extractRBS <- function(dna,
 	deltaGrulesRNA,
 	upstreamWidth,
-	pattern=DNAString("AAGGAGG"),
+	pattern,
 	precision=2,
 	spacing=3) {
 	
@@ -288,6 +328,7 @@
 FindGenes <- function(myDNAStringSet,
 	geneticCode=getGeneticCode("11"),
 	minGeneLength=60,
+	includeGenes=NULL,
 	allowEdges=TRUE,
 	allScores=FALSE,
 	showPlot=FALSE,
@@ -312,7 +353,7 @@ FindGenes <- function(myDNAStringSet,
 	ions <- 1 # Na+ equivalents
 	penalty <- 7.879 # qchisq(0.005, 1, lower.tail=FALSE)
 	length_params <- c(-4, 1400, 0.25, -10, 200) # initial parameters for sigmoid fitting the distribution of gene lengths
-	includeMultiplier <- 1.5 # multiplier on x_intercept to seek inclusion despite negative score
+	includeMultiplier <- 2 # multiplier on x_intercept to seek inclusion despite negative score
 	startCodonDist <- c("ATG"=80, "GTG"=14, "TTG"=5.995, "CTG"=0.002, "ATA"=0.001, "ATT"=0.001, "ATC"=0.001) # prior distribution of initial codon frequencies
 	signals <- matrix(c(3, 8, 9, 1, 12, 10, 4, 0, 2, 6, 7, 11),
 		nrow=3)
@@ -394,6 +435,9 @@ FindGenes <- function(myDNAStringSet,
 	if (minGeneLength != floor(minGeneLength))
 		stop("minGeneLength must be a whole number.")
 	minGeneLength <- as.integer(minGeneLength)
+	if (!is.null(includeGenes) &&
+		!is(includeGenes, "Genes"))
+		stop("includeGenes must be a Genes object.")
 	if (!is.logical(allowEdges))
 		stop("allowEdges must be a logical.")
 	if (!is.logical(allScores))
@@ -419,6 +463,10 @@ FindGenes <- function(myDNAStringSet,
 		allowEdges,
 		PACKAGE="DECIPHER")
 	colnames(ORFs) <- c("Index", "Strand", "Begin", "End")
+	includeScores <- includeGenes[, "TotalScore"]
+	includeGene <- includeGenes[, "Gene"]
+	includeGenes <- includeGenes[, colnames(ORFs)]
+	mode(includeGenes) <- "integer" # coerce to integer matrix
 	
 	if (nrow(ORFs)==0)
 		stop("myDNAStringSet does not contain any open reading frames.")
@@ -467,10 +515,14 @@ FindGenes <- function(myDNAStringSet,
 	.fitSigmoid <- function(x, y, ini) {
 		weights <- diff(c(0, log(x)))
 		.SSE <- function(p) {
-				pdf <- .PDF2(x, p)
-				if (any(is.nan(pdf)))
-					return(sum(y^2))
-				expected <- .CDF2(x, p)
+			# avoid conditions with numeric errors
+			pdf <- .PDF2(x, p)
+			if (any(is.nan(pdf) |
+				is.infinite(pdf) |
+				pdf < 0))
+				return(sum(y^2))
+			
+			expected <- .CDF2(x, p)
 			
 			sum(weights*(y - expected)^2)
 		}
@@ -541,18 +593,33 @@ FindGenes <- function(myDNAStringSet,
 	# chain high-scoring ORFs into putative genes
 	cutoff <- quantile(orf_scores[longest[which(l[longest] <= noiseCutoff)]],
 		threshold)
-	indices <- .chainGenes(ORFs,
-		orf_scores,
-		codScr,
-		sameScores=same_scores,
-		oppoScores=oppo_scores,
-		maxOverlapSame=maxOverlapSame,
-		maxOverlapOpposite=maxOverlapOpposite,
-		minScore=cutoff,
-		includeLength=includeMultiplier*x_intercept)
+	if (length(includeScores) > 0) {
+		indices <- .chainGenes(rbind(ORFs,
+				includeGenes),
+			c(orf_scores,
+				includeScores),
+			c(codScr,
+				rep(0, length(includeScores))),
+			sameScores=same_scores,
+			oppoScores=oppo_scores,
+			maxOverlapSame=maxOverlapSame,
+			maxOverlapOpposite=maxOverlapOpposite,
+			minScore=cutoff,
+			includeLength=includeMultiplier*x_intercept)
+	} else {
+		indices <- .chainGenes(ORFs,
+			orf_scores,
+			codScr,
+			sameScores=same_scores,
+			oppoScores=oppo_scores,
+			maxOverlapSame=maxOverlapSame,
+			maxOverlapOpposite=maxOverlapOpposite,
+			minScore=cutoff,
+			includeLength=includeMultiplier*x_intercept)
+	}
 	
 	if (verbose) {
-		deltaSta <- mean(staScr[indices]) - mean(staScr[-indices])
+		deltaSta <- mean(staScr[indices], na.rm=TRUE) - mean(staScr[-indices], na.rm=TRUE)
 		show <- formatC(deltaSta,
 			width=6,
 			digits=2,
@@ -566,6 +633,9 @@ FindGenes <- function(myDNAStringSet,
 		cat(show)
 		flush.console()
 	}
+	
+	if (length(includeScores) > 0)
+		indices <- indices[indices <= nrow(ORFs)]
 	
 	# split the upstream region into k-mers
 	upstream <- .Call("getRegion",
@@ -581,10 +651,12 @@ FindGenes <- function(myDNAStringSet,
 	deltaGrulesRNA <- deltaHrulesRNA - (273.15 + temp)*deltaSrulesRNA
 	
 	# Shine-Delgarno free energy
+	SD <- .extractSD(myDNAStringSet)
 	upstream <- DNAStringSet(upstream)
 	dG_RBS <- .extractRBS(upstream,
 		deltaGrulesRNA,
-		upstreamWidth)
+		upstreamWidth,
+		SD)
 	
 	# tile subsequences 3 bases apart
 	foldLeft <- foldRight <- vector("list", length(offset))
@@ -1074,18 +1146,16 @@ FindGenes <- function(myDNAStringSet,
 					upstreamWidth - RBSk,
 					1L)
 				for (i in seq_along(PWMs)) {
-					scores <- matrix(0,
-						nrow=length(starts),
-						ncol=length(pos))
+					scores <- numeric(length(starts))
 					for (j in seq_along(pos)) {
-						w <- which(pos[j] + RBSk - 1L <= width(upstream))
-						scores[w, j] <- PWMscoreStartingAt(PWMs[[i]],
+						w <- which(pos[j] + RBSk <= width(upstream))
+						PWMscore <- PWMscoreStartingAt(PWMs[[i]],
 							merged,
 							starting.at=begin[w] + pos[j] + 1L)
+						W <- which(PWMscore > scores[w])
+						scores[w[W]] <- PWMscore[W]
 					}
-					hits[[i]] <- apply(scores,
-						1L,
-						max)
+					hits[[i]] <- scores
 				}
 				hits[[length(hits)]] <- rbsScr
 				hits <- data.frame(hits)
@@ -1208,15 +1278,30 @@ FindGenes <- function(myDNAStringSet,
 		cutoff <- cutoff + same_scores[maxL + 1L] # add typical intergenic score
 		
 		# chain high-scoring ORFs into genes
-		indices <- .chainGenes(ORFs,
-			orf_scores,
-			codScr,
-			sameScores=same_scores,
-			oppoScores=oppo_scores,
-			maxOverlapSame=maxOverlapSame,
-			maxOverlapOpposite=maxOverlapOpposite,
-			minScore=cutoff,
-			includeLength=includeMultiplier*x_intercept)
+		if (length(includeScores) > 0) {
+			indices <- .chainGenes(rbind(ORFs,
+					includeGenes),
+				c(orf_scores,
+					includeScores),
+				c(codScr,
+					length(includeScores)),
+				sameScores=same_scores,
+				oppoScores=oppo_scores,
+				maxOverlapSame=maxOverlapSame,
+				maxOverlapOpposite=maxOverlapOpposite,
+				minScore=cutoff,
+				includeLength=includeMultiplier*x_intercept)
+		} else {
+			indices <- .chainGenes(ORFs,
+				orf_scores,
+				codScr,
+				sameScores=same_scores,
+				oppoScores=oppo_scores,
+				maxOverlapSame=maxOverlapSame,
+				maxOverlapOpposite=maxOverlapOpposite,
+				minScore=cutoff,
+				includeLength=includeMultiplier*x_intercept)
+		}
 		
 		if (showPlot) {
 			plot(l[longest],
@@ -1224,6 +1309,7 @@ FindGenes <- function(myDNAStringSet,
 				xlab="ORF length (nucleotides)",
 				ylab="Total score",
 				log="x",
+				col="#00000033",
 				pch=46)
 			points(l[indices],
 				orf_scores[indices],
@@ -1422,14 +1508,22 @@ FindGenes <- function(myDNAStringSet,
 		}
 		indices <- do.call(.getGenes,
 			c(params, list(indices)))
+		if (length(includeScores) > 0)
+			indices <- indices[indices <= nrow(ORFs)]
 	}
 	
-	bootstraps <- integer(nrow(ORFs))
+	bootstraps <- integer(nrow(ORFs) + length(includeScores))
 	bootstraps[indices] <- 1
 	prev_indices <- indices
 	for (i in 2L:maxIterations) {
-		indices <- do.call(.getGenes,
-			c(params, list(indices)))
+		if (length(includeScores) > 0) {
+			indices <- do.call(.getGenes,
+				c(params, list(indices[indices <= nrow(ORFs)])))
+		} else {
+			indices <- do.call(.getGenes,
+				c(params, list(indices)))
+		}
+		
 		bootstraps[indices] <- bootstraps[indices] + 1
 		indices <- which(bootstraps==i)
 		if (length(prev_indices)==length(indices) &&
@@ -1438,6 +1532,8 @@ FindGenes <- function(myDNAStringSet,
 		prev_indices <- indices
 	}
 	
+	if (length(includeScores) > 0)
+		indices <- indices[indices <= nrow(ORFs)]
 	params <- c(params,
 		list(indices=indices, # indices no longer changes
 			allScores=TRUE,
@@ -1447,18 +1543,60 @@ FindGenes <- function(myDNAStringSet,
 	indices <- ans[[2]]
 	bootstraps[indices] <- bootstraps[indices] + 1
 	ans <- ans[[1]]
-	if (allScores) {
-		gene <- numeric(nrow(ans))
-		gene[indices] <- 1
-		ans <- cbind(ans,
-			FractionReps=bootstraps/(i + 1),
-			Gene=gene)
+	if (length(includeScores) > 0) {
+		if (allScores) {
+			gene <- numeric(nrow(ans))
+			gene[indices[indices <= nrow(ORFs)]] <- 1
+			
+			indices <- indices[indices > nrow(ORFs)] - nrow(ORFs)
+			if (length(indices) > 0) {
+				includeGene[-indices] <- 0
+				includeGene[-indices] <- -includeGene[-indices]
+			} else {
+				includeGene[] <- 0
+				includeGene[] <- -includeGene[]
+			}
+			gene <- c(gene, includeGene)
+			
+			includeGenes <- matrix(c(includeGenes,
+					includeScores,
+					rep(NA_real_,
+						length(includeScores)*(ncol(ans) - ncol(includeGenes) - 1L))),
+				nrow=length(includeScores))
+			
+			ans <- cbind(rbind(ans, includeGenes),
+				FractionReps=bootstraps/(i + 1),
+				Gene=gene)
+		} else {
+			subindices <- indices[indices > nrow(ORFs)] - nrow(ORFs)
+			includeGenes <- matrix(c(includeGenes[subindices,],
+					includeScores[subindices],
+					rep(NA_real_,
+						length(subindices)*(ncol(ans) - ncol(includeGenes) - 1L))),
+				nrow=length(subindices))
+			
+			ans <- ans[indices[indices <= nrow(ORFs)],]
+			ans <- cbind(rbind(ans,
+					includeGenes),
+				FractionReps=bootstraps[indices]/(i + 1),
+				Gene=c(rep(1, nrow(ans)),
+					includeGene[subindices]))
+		}
 	} else {
-		ans <- ans[indices,]
-		ans <- cbind(ans,
-			FractionReps=bootstraps[indices]/(i + 1),
-			Gene=rep(1, nrow(ans)))
+		if (allScores) {
+			gene <- numeric(nrow(ans))
+			gene[indices] <- 1
+			ans <- cbind(ans,
+				FractionReps=bootstraps/(i + 1),
+				Gene=gene)
+		} else {
+			ans <- ans[indices,]
+			ans <- cbind(ans,
+				FractionReps=bootstraps[indices]/(i + 1),
+				Gene=rep(1, nrow(ans)))
+		}
 	}
+	
 	o <- order(ans[, "Index"], ans[, "Begin"])
 	ans <- ans[o,]
 	rownames(ans) <- seq_len(nrow(ans))

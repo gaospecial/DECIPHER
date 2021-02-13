@@ -22,29 +22,37 @@
 // DECIPHER header file
 #include "DECIPHER.h"
 
-SEXP informationContent(SEXP p, SEXP nS, SEXP correction)
+SEXP informationContent(SEXP p, SEXP nS, SEXP correction, SEXP randomBackground)
 {
 	int i, j;
-	double *pprofile;
+	double *pprofile, palpha[4], weight;
 	double pNseqs = asReal(nS);
 	int corr = asInteger(correction);
+	int rBackground = asInteger(randomBackground);
 	
 	pprofile = REAL(p);
 	int size = 8;
 	R_len_t lp = length(p)/size;
 	
 	// calculate the background character frequency distribution
-	double palpha[4] = {0};
-	double weight = 0;
-	for (i = 0; i < lp; i++) {
-		for (j = 0; j < 4; j++) {
-			palpha[j] += pprofile[j + size*i]*pprofile[7 + size*i];
+	if (rBackground) {
+		for (j = 0; j < 4; j++)
+			palpha[j] = 0.25;
+	} else {
+		weight = 0;
+		for (j = 0; j < 4; j++)
+			palpha[j] = 0;
+		
+		for (i = 0; i < lp; i++) {
+			for (j = 0; j < 4; j++) {
+				palpha[j] += pprofile[j + size*i]*pprofile[7 + size*i];
+			}
+			weight += (1 - pprofile[4 + size*i])*pprofile[7 + size*i];
 		}
-		weight += (1 - pprofile[4 + size*i])*pprofile[7 + size*i];
-	}
-	if (weight > 0) { // non-gap characters present
-		for (j = 0; j < 4; j++) {
-			palpha[j] /= weight;
+		if (weight > 0) { // non-gap characters present
+			for (j = 0; j < 4; j++) {
+				palpha[j] /= weight;
+			}
 		}
 	}
 	
@@ -99,29 +107,37 @@ SEXP informationContent(SEXP p, SEXP nS, SEXP correction)
 	return(ans);
 }
 
-SEXP informationContentAA(SEXP p, SEXP nS, SEXP correction)
+SEXP informationContentAA(SEXP p, SEXP nS, SEXP correction, SEXP randomBackground)
 {
 	int i, j;
-	double *pprofile;
+	double *pprofile, palpha[20], weight;
 	double pNseqs = asReal(nS);
 	int corr = asInteger(correction);
+	int rBackground = asInteger(randomBackground);
 	
 	pprofile = REAL(p);
 	int size = 29;
 	R_len_t lp = length(p)/size;
 	
 	// calculate the background character frequency distribution
-	double palpha[20] = {0};
-	double weight = 0;
-	for (i = 0; i < lp; i++) {
-		for (j = 0; j < 20; j++) {
-			palpha[j] += pprofile[j + size*i]*pprofile[26 + size*i];
+	if (rBackground) {
+		for (j = 0; j < 20; j++)
+			palpha[j] = 0.05;
+	} else {
+		weight = 0;
+		for (j = 0; j < 20; j++)
+			palpha[j] = 0;
+		
+		for (i = 0; i < lp; i++) {
+			for (j = 0; j < 20; j++) {
+				palpha[j] += pprofile[j + size*i]*pprofile[26 + size*i];
+			}
+			weight += (1 - pprofile[23 + size*i])*pprofile[26 + size*i];
 		}
-		weight += (1 - pprofile[23 + size*i])*pprofile[26 + size*i];
-	}
-	if (weight > 0) { // non-gap characters present
-		for (j = 0; j < 20; j++) {
-			palpha[j] /= weight;
+		if (weight > 0) { // non-gap characters present
+			for (j = 0; j < 20; j++) {
+				palpha[j] /= weight;
+			}
 		}
 	}
 	

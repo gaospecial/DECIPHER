@@ -22,7 +22,7 @@ FindSynteny(dbFile,
             minScore = 30,
             dropScore = -100,
             maskRepeats = TRUE,
-            allowOverlap = FALSE,
+            allowOverlap = TRUE,
             storage = 0.5,
             processors = 1,
             verbose = TRUE)

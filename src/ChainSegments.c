@@ -37,7 +37,7 @@
 
 // in-place fills missing sequence in the input
 SEXP fillOverlaps(SEXP m, SEXP n)
-{	
+{
 	if (MAYBE_SHARED(m))
 		error(".Call function 'fillOverlaps' called in incorrect context.");
 	
@@ -51,9 +51,9 @@ SEXP fillOverlaps(SEXP m, SEXP n)
 	int p = 0; // last position
 	
 	while (k < l) {
-		if (x[k]!=NA_INTEGER &&
-			x[p]!=NA_INTEGER &&
-			x[k]==(x[p] + y - 1)) {
+		if (x[k] != NA_INTEGER &&
+			x[p] != NA_INTEGER &&
+			x[k] == (x[p] + y - 1)) {
 			if (last > p) {
 				for (i = p + 1; i < k; i++)
 					x[i] = x[i - 1] + 1;
@@ -71,7 +71,7 @@ SEXP fillOverlaps(SEXP m, SEXP n)
 
 // adjusts starts and ends in order to be within widths
 SEXP indexByContig(SEXP starts, SEXP ends, SEXP order, SEXP index, SEXP widths)
-{	
+{
 	int j, k, p;
 	int *o = INTEGER(order);
 	int *w = INTEGER(widths);
@@ -118,7 +118,7 @@ SEXP indexByContig(SEXP starts, SEXP ends, SEXP order, SEXP index, SEXP widths)
 }
 
 SEXP chainSegments(SEXP x_s, SEXP x_e, SEXP x_i, SEXP x_f, SEXP y_s, SEXP y_e, SEXP y_i, SEXP y_f, SEXP weights, SEXP sepCost, SEXP gapCost, SEXP shiftCost, SEXP codingCost, SEXP maxSep, SEXP maxGap, SEXP ordering, SEXP minScore, SEXP maxW)
-{	
+{
 	int *xs = INTEGER(x_s);
 	int *xe = INTEGER(x_e);
 	int *xi = INTEGER(x_i);
@@ -751,44 +751,4 @@ SEXP extendSegments(SEXP X, SEXP W1, SEXP W2, SEXP S1, SEXP S2, SEXP O1P, SEXP O
 	UNPROTECT(1);
 	
 	return ans;
-}
-
-// changes repeat regions to NAs
-SEXP maskRepeats(SEXP e, SEXP size, SEXP minL, SEXP maxL, SEXP totL)
-{	
-	int i, p, j, k;
-	int *x = INTEGER(e); // enumerated sequence
-	int l = length(e);
-	int n = asInteger(size);
-	int l1 = asInteger(minL); // min period
-	int l2 = asInteger(maxL); // max period
-	int l3 = asInteger(totL); // min length of repeat
-	
-	i = 0; // current position
-	while (i < (l - l2)) {
-		if (x[i]!=NA_INTEGER) {
-			for (p = l1; p <= l2; p++) { // periodicity
-				if (x[i]==x[i + p]) { // repeat
-					j = i + 1;
-					
-					while (j < (l - p)) {
-						if (x[j]!=x[j + p])
-							break;
-						j++;
-					}
-					
-					if ((j - i + n) > p && // continuous repeat
-						(j + p - i + n) > l3) {
-						for (k = i; k <= (j + p - 1); k++)
-							x[k] = NA_INTEGER;
-						i = k - 1;
-						break;
-					}
-				}
-			}
-		}
-		i++;
-	}
-	
-	return R_NilValue;
 }

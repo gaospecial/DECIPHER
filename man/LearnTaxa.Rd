@@ -129,7 +129,7 @@ Murali, A., et al. (2018). IDTAXA: a novel approach for accurate taxonomic class
 Erik Wright \email{eswright@pitt.edu}
 }
 \note{
-If \code{K} is \code{NULL}, the automatically determined value of \code{K} might be too large on some machines, resulting in an error.  In such cases it is recommended that \code{K} be set manually to a smaller value.
+If \code{K} is \code{NULL}, the automatically determined value of \code{K} might be too large for some computers, resulting in an error.  In such cases it is recommended that \code{K} be manually set to a smaller value.
 }
 \seealso{
 \code{\link{IdTaxa}}, \code{\link{Taxa-class}}
