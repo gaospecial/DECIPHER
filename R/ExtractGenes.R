@@ -43,5 +43,7 @@ ExtractGenes <- function(x,
 			...)
 	}
 	
+	names(z) <- NULL
+	
 	return(z)
 }

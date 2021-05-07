@@ -65,6 +65,7 @@ DesignProbes             Design FISH Probes Targeting a Specific Group of
                          Sequences
 DesignSignatures         Design PCR Primers for Amplifying Group-Specific
                          Signatures
+DetectRepeats            Detect Repeats in a Sequence
 DigestDNA                Simulate Restriction Digestion of DNA
 Disambiguate             Expand Ambiguities into All Permutations of a
                          DNAStringSet

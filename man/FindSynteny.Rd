@@ -35,7 +35,7 @@ A SQLite connection object or a character string specifying the path to the data
 Character string specifying the table where the sequences are located.
 }
   \item{identifier}{
-Optional character string used to narrow the search results to those matching a specific identifier.  If "" then all identifiers are selected.
+Optional character string used to narrow the search results to those matching a specific identifier.  If \code{""} then all identifiers are selected.  Repeated identifiers will find synteny between a sequence and itself, while blocking identical positions from matching in both sequences.
 }
   \item{useFrames}{
 Logical specifying whether to use 6-frame amino acid translations to help find more distant hits.  Using the \code{alphabet} is helpful when the genome is largely composed of coding DNA.  If \code{FALSE} then faster but less sensitive to distant homology.

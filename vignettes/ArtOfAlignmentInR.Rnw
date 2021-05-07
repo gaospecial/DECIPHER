@@ -204,13 +204,13 @@ The accuracy of protein alignment begins to drop-off when sequences in the refer
 \section{Recommendations for optimal performance}
 %------------------------------------------------------------
 
-\Rpackage{DECIPHER} has a number of alignment functions and associated parameters.  The flow-chart in Figure \ref{f7} is intended to simplify this process for the most frequently encountered multiple sequence alignment tasks.  For more information on any of these suggestions, refer to the examples in the following sections of this vignette.
+\Rpackage{DECIPHER} has a number of alignment functions and associated parameters.  The flow-chart in Figure \ref{f6} is intended to simplify this process for the most frequently encountered multiple sequence alignment tasks.  For more information on any of these suggestions, refer to the examples in the following sections of this vignette.
 
 \begin{figure}
 \begin{center}
 \includegraphics[height=0.6\textheight,keepaspectratio]{AlignmentFlowChart}
 \end{center}
-\caption{\label{f7} Flow-chart depicting how to choose the best combination of alignment functions and parameters for the most common multiple sequence alignment problems.}
+\caption{\label{f6} Flow-chart depicting how to choose the best combination of alignment functions and parameters for the most common multiple sequence alignment problems.}
 \end{figure}
 
 \clearpage
@@ -250,7 +250,7 @@ writeXStringSet(DNA, file="<<path to output file>>")
 
 Note that frameshift errors can greatly disrupt the alignment of protein coding sequences.  Frameshifts can be corrected by first using \Rfunction{CorrectFrameshifts} on the nucleotide sequences, and then using the corrected sequences as input to \Rfunction{AlignTranslation} with the argument \Rfunarg{readingFrame} equal to \code{1}.
 
-If the input sequences include exact replicates, then alignment can be accelerated by de-replicating the sequences before alignment.  The sequences can then be re-replicated after alignment to create a larger alignment of all the original sequences.  \Rfunction{AlignSeqs} does not automatically handle redundancy in the input sequences, but doing so is fairly straightforward.
+If the input sequences include exact replicates, then alignment can be accelerated by de-replicating the sequences before alignment.  The sequences can then be re-replicated after alignment to create a larger alignment of all the original sequences.  \Rfunction{AlignSeqs} does not automatically handle redundancy in the input sequences, but doing so is fairly straightforward.  In this case there aren't any exact duplicates in the example \code{dna} sequences.  Nonetheless, the process to de-replicate before alignment and re-replicate after alignment would look like:
 
 <<expr3,eval=FALSE,echo=TRUE>>=
 u_dna <- unique(dna) # the unique input sequences

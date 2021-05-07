@@ -80,6 +80,8 @@ SEXP boundedMatches(SEXP x, SEXP bl, SEXP bu);
 
 SEXP intMatchOnce(SEXP x, SEXP y, SEXP o1, SEXP o2);
 
+SEXP intMatchSelfOnce(SEXP x, SEXP o1);
+
 SEXP matchListsDual(SEXP x, SEXP y, SEXP verbose, SEXP pBar, SEXP nThreads);
 
 SEXP groupMax(SEXP x, SEXP y, SEXP z);
@@ -89,6 +91,8 @@ SEXP groupMax(SEXP x, SEXP y, SEXP z);
 SEXP replaceChars(SEXP x, SEXP r, SEXP t);
 
 SEXP replaceChar(SEXP x, SEXP c, SEXP r);
+
+SEXP replaceGaps(SEXP x, SEXP y, SEXP start, SEXP type);
 
 // TerminalMismatch.c
 
@@ -250,7 +254,7 @@ SEXP parallelMatch(SEXP x, SEXP y, SEXP indices, SEXP z, SEXP a, SEXP b, SEXP nT
 
 SEXP getORFs(SEXP x, SEXP start_codons, SEXP stop_codons, SEXP min_gene_length, SEXP allow_edges);
 
-SEXP codonModel(SEXP x, SEXP orftable, SEXP stop_codons, SEXP min_orf_length);
+SEXP codonModel(SEXP x, SEXP orftable, SEXP stop_codons, SEXP min_orf_length, SEXP coding_scores);
 
 SEXP scoreCodonModel(SEXP x, SEXP orftable, SEXP codon_scores);
 
@@ -264,7 +268,7 @@ SEXP initialCodonModel(SEXP x, SEXP orftable, SEXP indices, SEXP initial_codons)
 
 SEXP scoreInitialCodonModel(SEXP x, SEXP orftable, SEXP ini_scores);
 
-SEXP getRegion(SEXP x, SEXP orftable, SEXP width, SEXP offset);
+SEXP getRegion(SEXP x, SEXP orftable, SEXP width, SEXP offset, SEXP toStart);
 
 SEXP autocorrelationModel(SEXP x, SEXP orftable, SEXP indices, SEXP aatable);
 
@@ -302,10 +306,18 @@ SEXP getIndex(SEXP start1, SEXP start2, SEXP len, SEXP score);
 
 SEXP inBounds(SEXP vec1, SEXP vec3, SEXP lo1, SEXP hi1, SEXP hi3);
 
-SEXP getBounds(SEXP widths, SEXP start, SEXP end, SEXP minL, SEXP maxL, SEXP lenScores, SEXP kmer, SEXP Ksize, SEXP negOk, SEXP minS, SEXP partS);
+SEXP getBounds(SEXP widths, SEXP start, SEXP end, SEXP minL, SEXP maxL, SEXP lenScores, SEXP kmer, SEXP Ksize, SEXP negOk, SEXP minS, SEXP partS, SEXP minC);
 
 SEXP addIfElse(SEXP vec, SEXP index, SEXP scores);
 
 SEXP kmerScores(SEXP oligos, SEXP ints, SEXP windowSize, SEXP kSize);
 
 SEXP getHits(SEXP starts, SEXP ends, SEXP left1, SEXP left2, SEXP right1, SEXP right2, SEXP deltaG);
+
+SEXP couplingModel(SEXP x, SEXP orftable, SEXP indices, SEXP aatable, SEXP maxDist);
+
+SEXP scoreCouplingModel(SEXP x, SEXP orftable, SEXP coupling_scores, SEXP aatable);
+
+SEXP maxPerORF(SEXP orftable, SEXP scores);
+
+SEXP scorePWM(SEXP pwm, SEXP x, SEXP minScore, SEXP nThreads);

@@ -8,11 +8,11 @@ NNLS <- function(A,
 	if (length(A) != 4)
 		stop("A must have four components: A$i, A$j, A$x, and A$dimnames.")
 	if (!is.integer(A$i))
-		stop("Rows (i) must be an integer vector.")
+		stop("Rows (i) must be a vector of integers.")
 	if (!is.integer(A$j))
-		stop("Columns (j) must be an integer vector.")
-	if (!is.numeric(A$x))
-		stop("Values (x) must be a numeric vector.")
+		stop("Columns (j) must be a vector of integers.")
+	if (!is.double(A$x))
+		stop("Values (x) must be a vector of doubles.")
 	if (length(A$i) != length(A$j))
 		stop("The length of columns (j) and rows (i) must be equal.")
 	if (length(A$i) != length(A$x))
@@ -25,9 +25,12 @@ NNLS <- function(A,
 		stop("b must be a numeric vector or matrix.")
 	if (!((length(b) %% length(A$dimnames[[1]]))==0))
 		stop("The length of b must be a multiple of the number of rows in A.")
-	if (is(b, "matrix"))
-		if (nrow(b)!=length(A$dimnames[[1]]))
+	if (is(b, "matrix")) {
+		if (nrow(b) != length(A$dimnames[[1]]))
 			stop("The number of rows in b must equal the number of rows in A.")
+	} else {
+		b <- matrix(b, ncol=ncol(x))
+	}
 	if (!is.numeric(precision))
 		stop("precision must be a numeric.")
 	if (precision <= 0)
@@ -66,7 +69,7 @@ NNLS <- function(A,
 		pBar,
 		processors,
 		PACKAGE="DECIPHER")
-	b <- matrix(b, ncol=ncol(x))
+	
 	res <- b - .Call("sparseMult",
 		A$i,
 		A$j,
@@ -77,6 +80,7 @@ NNLS <- function(A,
 		PACKAGE="DECIPHER")
 	
 	rownames(x) <- A$dimnames[[2]]
+	colnames(x) <- colnames(b)
 	rownames(res) <- A$dimnames[[1]]
 	
 	if (verbose) {

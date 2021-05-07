@@ -205,96 +205,6 @@ AlignSeqs <- function(myXStringSet,
 					stop("Dimensions of structureMatrix are incompatible with the structures.")
 				replace <- TRUE
 			} else if (type==2L) {
-				if (verbose) {
-					cat("Predicting RNA Secondary Structures:\n")
-					pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
-					time.1 <- Sys.time()
-				}
-				
-				# predict hairpin structures
-				ions <- 1
-				temp <- 37
-				data("deltaHrulesRNA", envir=environment(), package="DECIPHER")
-				data("deltaSrulesRNA", envir=environment(), package="DECIPHER")
-				deltaSrulesRNA <- deltaSrulesRNA + 0.368*log(ions)/1000
-				deltaGrulesRNA <- deltaHrulesRNA - (273.15 + temp)*deltaSrulesRNA
-				dG_ini <- 4.065225 # 3.6 - (273.15 + temp)*(-1.5/1000 + 0.368*log(ions)/1000)
-				
-				structures <- vector("list", l)
-				for (i in seq_len(l)) {
-					rna <- myXStringSet[[i]]
-					
-					pals <- findPalindromes(rna,
-						min.armlength=4,
-						max.looplength=500,
-						min.looplength=3,
-						max.mismatch=1,
-						allow.wobble=TRUE)
-					
-					dna <- DNAStringSet(pals)
-					arms <- palindromeArmLength(pals,
-						max.mismatch=1,
-						allow.wobble=TRUE)
-					max_arms <- as.integer((width(pals) - 3)/2)
-					w <- which(arms > max_arms)
-					if (length(w) > 0)
-						arms[w] <- max_arms[w]
-					
-					dG <- .Call("calculateHairpinDeltaG",
-						dna,
-						arms + 1L, # include end bases
-						deltaGrulesRNA,
-						PACKAGE="DECIPHER") + dG_ini
-					o <- order(dG)
-					o <- o[dG[o] < 0]
-					
-					s1 <- start(pals)
-					s2 <- start(pals) + arms - 1L
-					e1 <- end(pals) - arms + 1L
-					e2 <- end(pals)
-					
-					left <- right <- logical(length(rna))
-					for (j in o) {
-						cont <- .Call("allZero",
-							left,
-							right,
-							s1[j],
-							s2[j],
-							e2[j],
-							e1[j],
-							PACKAGE="DECIPHER")
-						if (cont) {
-							s <- s1[j]:s2[j]
-							e <- e2[j]:e1[j]
-							left[s] <- TRUE
-							right[s] <- TRUE
-						}
-					}
-					
-					# assign probability of pairing
-					left <- ifelse(left, 0.2, 0)
-					right <- ifelse(right, 0.2, 0)
-					structures[[i]] <- matrix(c(1 - left - right,
-							left,
-							right),
-						nrow=3,
-						byrow=TRUE)
-					
-					if (verbose)
-						setTxtProgressBar(pBar, i/l)
-				}
-				
-				if (verbose) {
-					close(pBar)
-					time.2 <- Sys.time()
-					cat("\n")
-					print(round(difftime(time.2,
-						time.1,
-						units='secs'),
-						digits=2))
-					cat("\n")
-				}
-				
 				w <- which(m=="structureMatrix")
 				if (length(w) > 0) {
 					structureMatrix <- args[[w]]
@@ -308,7 +218,7 @@ AlignSeqs <- function(myXStringSet,
 					if (dim(structureMatrix)[1] != 3)
 						stop("structureMatrix must be 3 x 3 when structures is NULL.")
 				} else { # use the default structureMatrix
-					structureMatrix <- matrix(c(-3, -4, -4, -4, 10, 0, -4, 0, 10),
+					structureMatrix <- matrix(c(2, -1, -1, -1, 18, 0, -1, 0, 18),
 						nrow=3) # order is ., (, )
 				}
 				replace <- FALSE
@@ -887,14 +797,15 @@ AlignSeqs <- function(myXStringSet,
 		weights <- weights/mean(weights)
 		
 		if (replace) {
-			structureMatrix <- matrix(c(-3, -4, -4, -4, 10, 0, -4, 0, 10),
+			structureMatrix <- matrix(c(2, -1, -1, -1, 18, 0, -1, 0, 18),
 				nrow=3) # order is ., (, )
 			replace <- FALSE
 		}
 		
 		PredictDBN(seqs,
-			type="search",
+			type="structures",
 			weight=weights,
+			useFreeEnergy=FALSE,
 			processors=processors,
 			verbose=verbose)
 	}

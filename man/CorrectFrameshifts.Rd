@@ -26,7 +26,7 @@ CorrectFrameshifts(myXStringSet,
 A \code{DNAStringSet} or \code{RNAStringSet} of unaligned protein coding sequences in 5' to 3' orientation.
 }
   \item{myAAStringSet}{
-An \code{AAStringSet} of reference sequences having accurate translations.
+An \code{AAStringSet} of reference protein sequences.  Ideally this would consist of a small set of diverse amino acid sequences belonging to the same group of protein coding sequences as \code{myXStringSet}.
 }
   \item{type}{
 Character string indicating the type of result desired.  This should be (an abbreviation of) one of \code{"indels"}, \code{"sequences"}, or \code{"both"}.  (See details section below.)

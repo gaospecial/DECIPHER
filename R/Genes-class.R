@@ -137,7 +137,35 @@ plot.Genes <- function(x,
 	xlim=c(1, 1e4),
 	ylim=c(-100, 500),
 	interact=FALSE,
+	colorBy="Strand",
+	colorRamp=colorRampPalette(c("darkblue", "darkred")),
+	colorGenes="green4",
 	...) {
+	
+	if (class(x)[1] != "Genes")
+		stop("x must be an object of class 'Genes'.")
+	if (is.character(colorBy)) {
+		colorBy <- pmatch(colorBy[1], colnames(x))
+		if (is.na(colorBy))
+			stop("Invalid colorBy.")
+		if (colorBy == -1)
+			stop("Ambiguous colorBy.")
+	} else {
+		stop("colorBy must be a character string.")
+	}
+	if (typeof(colorRamp) != "closure")
+		stop("colorRamp must be a function.")
+	if (!is.na(colorGenes) &&
+		typeof(colorGenes) != "character")
+		stop("colorGenes must be NA or a character string.")
+	if (!is.numeric(xlim) ||
+		length(xlim) != 2L)
+		stop("xlim must be a numeric vector of length 2.")
+	if (min(xlim) < 1 ||
+		max(xlim) > sum(attr(x, "widths")))
+		stop("xlim must be within the bounds of the sequences specified in x.")
+	if (!is.numeric(ylim) || length(ylim) != 2L)
+		stop("ylim must be a numeric vector of length 2.")
 	
 	ws <- attr(x, "widths")
 	ws <- cumsum(ws) - ws
@@ -145,8 +173,15 @@ plot.Genes <- function(x,
 	x[, "End"] <- x[, "End"] + ws[x[, "Index"]]
 	ws <- ws[-1L]
 	
-	pos <- which(x[, "Strand"] == 0)
-	neg <- which(x[, "Strand"] == 1)
+	var <- x[, colorBy]
+	var <- .bincode(var,
+		seq(min(var, na.rm=TRUE),
+			max(var, na.rm=TRUE),
+			length.out=101),
+		include.lowest=TRUE)
+	colors <- colorRamp(100)
+	colors <- colors[var]
+	
 	genes <- which(x[, "Gene"] != 0)
 	pos_genes <- which(x[, "Gene"] != 0 & x[, "Strand"] == 0)
 	neg_genes <- which(x[, "Gene"] != 0 & x[, "Strand"] == 1)
@@ -162,21 +197,16 @@ plot.Genes <- function(x,
 			xlab="Cumulative genome position",
 			ylab="Total score")
 		abline(h=0, v=ws, lwd=2, lty=3)
-		segments(x[pos, "Begin"],
-			x[pos, "TotalScore"],
-			x[pos, "End"],
-			x[pos, "TotalScore"],
-			col="darkred")
-		segments(x[neg, "Begin"],
-			x[neg, "TotalScore"],
-			x[neg, "End"],
-			x[neg, "TotalScore"],
-			col="darkblue")
+		segments(x[, "Begin"],
+			x[, "TotalScore"],
+			x[, "End"],
+			x[, "TotalScore"],
+			col=colors)
 		segments(x[genes, "Begin"],
 			x[genes, "TotalScore"],
 			x[genes, "End"],
 			x[genes, "TotalScore"],
-			col="green4",
+			col=colorGenes,
 			lwd=2)
 		abline(v=x[pos_genes, "Begin"])
 		abline(v=x[pos_genes, "End"],

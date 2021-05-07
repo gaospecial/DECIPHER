@@ -36,6 +36,8 @@
 #include "DECIPHER.h"
 
 // in-place fills missing sequence in the input
+// replaces values in consecutive positions that are discontinuous
+// e.g., 51703 51656 51705 would become 51703 51704 51705
 SEXP fillOverlaps(SEXP m, SEXP n)
 {
 	if (MAYBE_SHARED(m))

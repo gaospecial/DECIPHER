@@ -2,6 +2,7 @@ FindNonCoding <- function(x,
 	myXStringSet,
 	minScore=16,
 	allScores=FALSE,
+	processors=1,
 	verbose=TRUE) {
 	
 	# error checking
@@ -25,12 +26,26 @@ FindNonCoding <- function(x,
 		stop("Unknown characters ('.') are not allowed in myXStringSet.")
 	if (!is.numeric(minScore))
 		stop("minScore must be a numeric.")
-	if (length(minScore) != 1L)
-		stop("minScore must be a single numeric.")
-	if (minScore < 0)
+	if (any(minScore < 0))
 		stop("minScore must be at least zero.")
+	if (length(minScore) == 1L) {
+		minScore <- rep(minScore, length(x))
+	} else if (length(minScore) != length(x)) {
+		stop("minScore must be a single numeric.")
+	}
 	if (!is.logical(allScores))
 		stop("allScores must be a logcial.")
+	if (!is.null(processors) && !is.numeric(processors))
+		stop("processors must be a numeric.")
+	if (!is.null(processors) && floor(processors)!=processors)
+		stop("processors must be a whole number.")
+	if (!is.null(processors) && processors < 1)
+		stop("processors must be at least 1.")
+	if (is.null(processors)) {
+		processors <- detectCores()
+	} else {
+		processors <- as.integer(processors)
+	}
 	if (!is.logical(verbose))
 		stop("verbose must be a logcial.")
 	
@@ -45,6 +60,7 @@ FindNonCoding <- function(x,
 	mult1 <- 0.6 # fraction of minScore required without hairpins
 	mult2 <- 0.4 # fraction of minScore required from motifs alone
 	mult3 <- 1 # fraction of minScore required from motifs and hairpins
+	minConsider <- -10 # score required for consideration of begin or end
 	myXString <- unlist(myXStringSet)
 	myXString <- DNAString(myXString)
 	myXString <- c(myXString,
@@ -61,9 +77,11 @@ FindNonCoding <- function(x,
 	max_dG <- 0
 	
 	K <- sapply(x, attr, which="K")
+	annotations <- names(x)
 	O <- order(K)
 	x <- x[O]
 	K <- K[O]
+	minScore <- minScore[O]
 	
 	results <- matrix(0,
 		nrow=0L,
@@ -90,19 +108,20 @@ FindNonCoding <- function(x,
 	for (k in seq_along(x)) {
 		minLength <- attr(x[[k]], "minLength")
 		maxLength <- attr(x[[k]], "maxLength")
-		lenScores <- attr(x[[k]], "lengthScores")
+		lenScores <- x[[k]]$lengthScores
+		depend <- x[[k]]$dependence
 		params <- attr(x[[k]], "background")
 		mean <- params[1]
 		if (any(is.na(mean))) {
-			minS <- minScore
+			minS <- minScore[k]
 		} else {
 			sd <- params[2]
-			minS <- qlnorm(exp(-minScore),
+			minS <- qlnorm(exp(-minScore[k]),
 				mean,
 				sd,
 				lower.tail=FALSE)
-			if (minS < minScore)
-				minS <- minScore
+			if (minS < minScore[k])
+				minS <- minScore[k]
 		}
 		
 		windowSize <- maxLength*20L # maximally 5% of region
@@ -133,23 +152,30 @@ FindNonCoding <- function(x,
 		
 		# find motifs
 		motifs <- x[[k]]$motifs
-		for (i in seq_len(nrow(motifs))) {
+		n1 <- nrow(motifs)
+		if (!is.null(depend))
+			indices <- vector("list", n1)
+		for (i in seq_len(n1)) {
 			bins <- motifs[i, "minscore"][[1L]]
-			suppressWarnings({
-				p <- matchPWM(log(motifs[i, "pwm"][[1L]]/0.25),
-					myXString,
-					min.score=bins[1L],
-					with.score=TRUE)
-				})
+			m <- log(motifs[i, "pwm"][[1L]]/0.25)
+			p <- .Call("scorePWM",
+				m,
+				myXString,
+				bins[1L],
+				processors,
+				PACKAGE="DECIPHER")
 			
-			index_s <- .getIndex(start(p),
+			index_s <- .getIndex(p[[1L]],
 				-motifs[i, "begin_high"],
 				-motifs[i, "begin_low"],
-				.bincode(mcols(p)$score, bins))
-			index_e <- .getIndex(end(p),
-				motifs[i, "end_low"],
-				motifs[i, "end_high"],
-				.bincode(mcols(p)$score, bins))
+				.bincode(p[[2L]], bins))
+			index_e <- .getIndex(p[[1L]],
+				motifs[i, "end_low"] + ncol(m) - 1L,
+				motifs[i, "end_high"] + ncol(m) - 1L,
+				.bincode(p[[2L]], bins))
+			
+			if (!is.null(depend))
+				indices[[i]] <- list(index_s, index_e)
 			
 			delta_starts <- motifs[i, "begin_high"] - motifs[i, "begin_low"]
 			delta_ends <- motifs[i, "end_high"] - motifs[i, "end_low"]
@@ -197,8 +223,9 @@ FindNonCoding <- function(x,
 			kmers,
 			K[[k]],
 			-O[k],
-			minS*mult1, # require high score without hairpins
-			minS*mult2, # require part of score from motifs
+			minS*mult1,
+			minS*mult2,
+			minConsider,
 			PACKAGE="DECIPHER")
 		
 		if (nrow(result) == 0L) {
@@ -207,9 +234,20 @@ FindNonCoding <- function(x,
 			next
 		}
 		
+		if (!is.null(depend))
+			indices <- lapply(indices,
+				function(x)
+					pmax(x[[1L]][result[, 3]],
+						x[[2L]][result[, 4]]) + 1L)
+		
 		# find hairpins
 		hairpins <- x[[k]]$hairpins
-		if (nrow(hairpins) > 0) {
+		n2 <- nrow(hairpins)
+		if (n2 > 0) {
+			if (!is.null(depend))
+				indices <- c(indices,
+					vector("list", n2))
+			
 			# select positions of potential matches
 			r <- result
 			r[, 3] <- r[, 3] - pad
@@ -300,7 +338,7 @@ FindNonCoding <- function(x,
 					
 					s <- as.integer(result[, 3])
 					e <- as.integer(result[, 4])
-					for (i in seq_len(nrow(hairpins))) {
+					for (i in seq_len(n2)) {
 						delta_start <- hairpins[i, "begin_high"] - hairpins[i, "begin_low"]
 						delta_end <- hairpins[i, "end_high"] - hairpins[i, "end_low"]
 						delta_width <- hairpins[i, "width_high"] - hairpins[i, "width_low"]
@@ -357,12 +395,30 @@ FindNonCoding <- function(x,
 								index[index != 0] <- p_dG2[index[index != 0]]
 							}
 						}
+						
 						index <- .bincode(index,
 							hairpins[i, "dG"][[1L]])
+						if (!is.null(depend))
+							indices[[i + n1]] <- index
+						
 						scores <- hairpins[i, "prevalence"][[1L]]/hairpins[i, "background"][[1L]]
 						scores <- log(scores)
 						result[, 5] <- result[, 5] + scores[index] # TotalScore
 						result[, 9] <- result[, 9] + scores[index] # score from patterns alone
+					}
+				}
+			}
+		}
+		
+		if (!is.null(depend)) {
+			# add score for dependencies among patterns
+			count <- 0L
+			for (i in seq_len(n1 + n2 - 1L)) {
+				for (j in (i + 1L):(n1 + n2)) {
+					count <- count + 1L
+					if (!is.null(depend[[count]])) {
+						index <- cbind(indices[[i]], indices[[j]])
+						result[, 5] <- result[, 5] + depend[[count]][index]
 					}
 				}
 			}
@@ -415,6 +471,12 @@ FindNonCoding <- function(x,
 	class(results) <- "Genes"
 	attr(results, "widths") <- setNames(width(myXStringSet),
 		names(myXStringSet))
+	if (!is.null(annotations)) {
+		lkup <- sort(unique(results[, "Gene"]),
+			decreasing=TRUE)
+		attr(results, "annotations") <- setNames(lkup,
+			annotations[-lkup])
+	}
 	
 	if (verbose) {
 		close(pBar)

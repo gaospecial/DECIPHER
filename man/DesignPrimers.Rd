@@ -139,7 +139,7 @@ ES Wright et al. (2013) "Exploiting Extension Bias in PCR to Improve Primer Spec
 Erik Wright \email{eswright@pitt.edu}
 }
 \note{
-The program OligoArrayAux (\url{http://mfold.rna.albany.edu/?q=DINAMelt/OligoArrayAux}) must be installed in a location accessible by the system.  For example, the following code should print the installed OligoArrayAux version when executed from the R console:
+The program OligoArrayAux (\url{http://www.unafold.org/Dinamelt/software/oligoarrayaux.php}) must be installed in a location accessible by the system.  For example, the following code should print the installed OligoArrayAux version when executed from the R console:
 
 \code{system("hybrid-min -V")}
 

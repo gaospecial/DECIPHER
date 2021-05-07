@@ -549,7 +549,7 @@ fas <- system.file("extdata",
 	package="DECIPHER")
 genome <- readDNAStringSet(fas)
 genes <- FindGenes(genome, verbose=FALSE)
-test <- Extract(genes, genome, type="AAStringSet")
+test <- ExtractGenes(genes, genome, type="AAStringSet")
 test
 @
 

@@ -2,6 +2,9 @@ LearnNonCoding <- function(myXStringSet,
 	threshold=0.3,
 	weight=NA,
 	maxLoopLength=500,
+	maxPatterns=20,
+	scoreDependence=FALSE,
+	structure=NULL,
 	processors=1) {
 	
 	# error checking
@@ -29,6 +32,36 @@ LearnNonCoding <- function(myXStringSet,
 		stop("maxLoopLength must be a single numeric.")
 	if (maxLoopLength <= 11)
 		stop("maxLoopLength must be at least 12.")
+	if (!is.numeric(maxPatterns))
+		stop("maxPatterns must be a numeric.")
+	if (length(maxPatterns) == 1L) {
+		maxPatterns <- rep(maxPatterns, 2L)
+	} else if (length(maxPatterns) != 2L) {
+		stop("maxPatterns must be one or two numerics.")
+	}
+	if (!is.logical(scoreDependence))
+		stop("scoreDependence must be a logical.")
+	if (!is.null(structure)) {
+		if (is.character(structure)) {
+			if (length(structure) > 1)
+				stop("structure must be a character vector of length one.")
+			if (nchar(structure) != uw)
+				stop("structure must be a character string with the same number of characters as the width of myXStringSet.")
+			structure <- .parseDBN(structure)
+		} else if (is.numeric(structure)) {
+			if (!is.matrix(structure))
+				stop("structure must be a matrix.")
+			if (ncol(structure) < 2)
+				stop("structure must be a matrix with at least two columns.")
+			structure <- structure[, 1:2]
+			if (any(floor(structure) != structure))
+				stop("structure must be a matrix of whole numbers.")
+			if (any(structure < 1))
+				stop("All values in structure must be at least 1.")
+		} else {
+			stop("structure must be a character string or matrix.")
+		}
+	}
 	if (!is.null(processors) && !is.numeric(processors))
 		stop("processors must be a numeric.")
 	if (!is.null(processors) && floor(processors)!=processors)
@@ -67,8 +100,13 @@ LearnNonCoding <- function(myXStringSet,
 		o <- as.integer(o)
 		oligos <- o
 	}
-	if (K == 0L)
-		stop("Not enough diversity among sequences in myXStringSet.")
+	if (K == 0L) {
+		if (any(o == 0)) {
+			stop("Not enough diversity among sequences in myXStringSet.")
+		} else {
+			oligos <- o <- as.integer(o)
+		}
+	}
 	if (avgWidth < K)
 		stop("Sequences in myXStringSet are too short.")
 	
@@ -77,7 +115,6 @@ LearnNonCoding <- function(myXStringSet,
 	maxEntropy <- 1.8 # maximum entropy of kept positions (in bits)
 	quants_bounds <- 0.1 # quantile for boundaries
 	quants_bounds <- c(quants_bounds, 1 - quants_bounds)
-	maxPatterns <- 10 # maximum number of patterns to return
 	maxIndels <- 0.05 # maximum cumulative indels in motifs
 	length_params <- c(-2, mean(wS), 1) # initial parameters for fitting a distribution of sequence lengths
 	N <- 1e6 # number of nucleotides in random sequences
@@ -85,7 +122,10 @@ LearnNonCoding <- function(myXStringSet,
 	maxNucs <- ceiling(log(1000*avgWidth, 4)) # maximum number of equivalent nucleotides in motifs
 	windowSize <- 1 # points to left and right of center for moving average
 	nBins <- 10 # maximum number of bins for scoring
-	minBinSize <- 1 # minimum bin size for scoring
+	minBinSize <- 1 # minimum bin size for scoring free energy
+	minBinCount <- 10 # minimum count per bin to score dependency among patterns
+	alpha <- 0.01 # p-value threshold for scoring dependency among patterns
+	maxDiscerningPower <- 100 # adequate total discerning power from motifs
 	
 	ions <- 1
 	temp <- 37
@@ -256,7 +296,8 @@ LearnNonCoding <- function(myXStringSet,
 		pwm=I(consensus),
 		minscore=I(vector("list", length(consensus))),
 		prevalence=I(vector("list", length(consensus))),
-		background=I(vector("list", length(consensus))))
+		background=I(vector("list", length(consensus))),
+		hits=I(vector("list", length(consensus))))
 	for (i in seq_along(consensus)) {
 		motif <- log(motifs[i, "pwm"][[1]]/0.25)
 		
@@ -265,11 +306,15 @@ LearnNonCoding <- function(myXStringSet,
 			min.score=0)
 		v[[3L]] <- mapply(function(a, b) b[a],
 			v[[1L]],
-			pos)
-		m <- sapply(v[[3]], match, x=ungapped[start[i]])
-		hits <- mapply(`[`, v[[2]], m)
-		begin <- mapply(`[`, v[[1]], m)
-		w <- which(!is.na(begin))
+			pos,
+			SIMPLIFY=FALSE)
+		# v[[1]]: positions of hits in noGaps
+		# v[[2]]: scores of hits in noGaps
+		# v[[3]]: positions of hits in the alignment
+		m <- sapply(v[[3]], match, x=ungapped[start[i]]) # index of hits to expected position
+		hits <- mapply(`[`, v[[2]], m) # score of hits to expected position
+		begin <- mapply(`[`, v[[1]], m) # position in noGaps of hits to expected position
+		w <- which(!is.na(begin)) # indices of hits in noGaps
 		
 		len <- ncol(motif)
 		motifs[i, "begin_low"] <- floor(quantile(begin[w] - 1L, quants_bounds[1]))
@@ -281,9 +326,9 @@ LearnNonCoding <- function(myXStringSet,
 		
 		# separate scores into appoximately even bins
 		o <- order(hits, na.last=FALSE)
-		bins <- hits[o[seq(1, length(hits), length.out=nBins)]]
-		bins <- unique(bins)
+		bins <- hits[o[seq(1, length(o), length.out=nBins)]]
 		bins <- bins[!is.na(bins)]
+		bins <- unique(bins)
 		bins[length(bins)] <- Inf
 		bins <- c(0, bins)
 		
@@ -299,17 +344,26 @@ LearnNonCoding <- function(myXStringSet,
 		delta <- min(delta_starts, delta_ends) + 1
 		bg <- 1 - (1 - bg)^delta
 		
-		hits <- .bincode(hits, bins)
-		hits <- tabulate(hits)/l
-		w <- which(hits > bg)
+		h <- .bincode(hits, bins)
+		h <- tabulate(h)/l
+		w <- which(h > bg)
 		if (length(w) == 0L)
 			next
 		bins <- bins[w[1]:length(bins)]
+		motifs[i, "minscore"][[1]] <- list(bins)
+		
 		bg <- bg[w[1]:length(bg)]
 		bg <- c(1 - sum(bg), bg)
 		names(bg) <- seq_along(bg) - 1L
 		motifs[i, "background"][[1L]] <- list(bg)
-		motifs[i, "minscore"][[1]] <- list(bins)
+		
+		if (scoreDependence) {
+			hits <- .bincode(hits, bins)
+			hits[is.na(hits)] <- 0L
+			motifs[i, "hits"][[1L]] <- list(hits)
+		} else {
+			vec <- NULL
+		}
 		
 		found <- integer(length(v[[1]]))
 		for (j in seq_along(v[[1]])) {
@@ -412,12 +466,16 @@ LearnNonCoding <- function(myXStringSet,
 		}
 	}
 	
-	p <- PredictDBN(myXStringSet,
-		type="pairs",
-		minOccupancy=1 - maxFractionGaps,
-		weight=weight,
-		verbose=FALSE,
-		processors=processors)
+	if (is.null(structure)) {
+		p <- PredictDBN(myXStringSet,
+			type="pairs",
+			minOccupancy=1 - maxFractionGaps,
+			weight=weight,
+			verbose=FALSE,
+			processors=processors)
+	} else {
+		p <- structure
+	}
 	p <- p[, 1:2, drop=FALSE]
 	p[] <- match(p, ungapped)
 	p <- p[rowSums(is.na(p)) == 0L,, drop=FALSE]
@@ -554,6 +612,12 @@ LearnNonCoding <- function(myXStringSet,
 					}
 				}
 				
+				if (scoreDependence) {
+					vec <- numeric(l)
+					vec[hairpins[w, "index"]] <- hairpins[w, "dG"]
+					vec <- .bincode(vec, bins)
+				}
+				
 				t <- .bincode(hairpins[w, "dG"], bins)
 				t <- tapply(weight[hairpins[w, "index"]],
 					t,
@@ -638,7 +702,8 @@ LearnNonCoding <- function(myXStringSet,
 						length_high=numeric(),
 						dG=I(list()),
 						prevalence=I(list()),
-						background=I(list()))
+						background=I(list()),
+						hits=I(list()))
 				} else {
 					data.frame(begin_low=begin_low,
 						begin_high=begin_high,
@@ -650,7 +715,8 @@ LearnNonCoding <- function(myXStringSet,
 						length_high=length_high,
 						dG=I(list(bins)),
 						prevalence=I(list(hits)),
-						background=I(list(bg)))
+						background=I(list(bg)),
+						hits=I(list(vec)))
 				}
 			},
 			simplify=FALSE)
@@ -683,7 +749,7 @@ LearnNonCoding <- function(myXStringSet,
 	score_hairpins <- mapply(f,
 		hairpins[["prevalence"]],
 		hairpins[["background"]])
-	prob <- c(score_motifs, score_hairpins)
+	prob <- unlist(c(score_motifs, score_hairpins))
 	keep <- prob > 0
 	
 	# remove overlapping motifs
@@ -733,32 +799,87 @@ LearnNonCoding <- function(myXStringSet,
 	}
 	
 	motifs <- motifs[keep[seq_len(n1)],]
-	if (nrow(motifs) > maxPatterns) {
+	if (nrow(motifs) > maxPatterns[1L]) {
 		w <- which(keep[seq_len(n1)])
 		o <- order(prob[w],
 			decreasing=TRUE)
+		tot <- which(cumsum(prob[w[o]]) < maxDiscerningPower)
+		tot <- tot[length(tot)]
+		if (is.na(tot))
+			tot <- maxPatterns[1L]
 		motifs <- motifs[o,]
-		motifs <- motifs[seq_len(maxPatterns),]
+		motifs <- motifs[seq_len(min(maxPatterns[1L], tot)),]
 	} else if (nrow(motifs) == 0L) {
 		stop("No conserved motifs found in myXStringSet.")
 	}
 	motifs <- motifs[order(motifs[, "begin_low"], -motifs[, "end_low"]),]
 	hairpins <- hairpins[keep[n1 + seq_len(n2)],]
-	if (nrow(hairpins) > maxPatterns) {
+	if (nrow(hairpins) > maxPatterns[2L]) {
 		w <- which(keep[n1 + seq_len(n2)])
 		o <- order(prob[w],
 			decreasing=TRUE)
 		hairpins <- hairpins[o,]
-		hairpins <- hairpins[seq_len(maxPatterns),]
+		hairpins <- hairpins[seq_len(maxPatterns[2L]),]
 	}
 	hairpins <- hairpins[order(hairpins[, "begin_low"]),]
 	
 	rownames(motifs) <- NULL
 	rownames(hairpins) <- NULL
 	
-	result <- list(motifs=motifs,
-		hairpins=hairpins,
-		kmers=oligos)
+	if (scoreDependence) {
+		# calculate dependence among motifs and hairpins
+		n1 <- nrow(motifs)
+		n2 <- nrow(hairpins)
+		scores <- vector("list", (n1 + n2)*(n1 + n2 - 1)/2)
+		alpha <- alpha/length(scores) # multiple testing correction
+		k <- 0L
+		for (i in seq_len(n1 + n2 - 1L)) {
+			for (j in (i + 1L):(n1 + n2)) {
+				k <- k + 1L
+				if (i > n1) {
+					t1 <- hairpins[[i - n1, "hits"]]
+					p1 <- paste0("hairpin", i - n1)
+				} else {
+					t1 <- motifs[[i, "hits"]] + 1L # offset because missing hits recorded as zero
+					p1 <- paste0("motif", i)
+				}
+				if (j > n1) {
+					t2 <- hairpins[[j - n1, "hits"]]
+					p2 <- paste0("hairpin", j - n1)
+				} else {
+					t2 <- motifs[[j, "hits"]] + 1L # offset because missing hits recorded as zero
+					p2 <- paste0("motif", j)
+				}
+				names(scores)[k] <- paste(p1, p2, sep=" / ")
+				
+				m1 <- max(t1)
+				m2 <- max(t2)
+				observed <- matrix(0, m1, m2)
+				for (i1 in seq_len(m1))
+					for (i2 in seq_len(m2))
+						observed[i1, i2] <- sum(weight[t1 == i1 & t2 == i2])
+				
+				expected <- outer(rowSums(observed), colSums(observed))/sum(observed)
+				suppressWarnings(p <- chisq.test(observed, p=expected, rescale.p=TRUE)$p.value)
+				if (is.na(p) || p >= alpha)
+					next
+				
+				eliminate <- expected < minBinCount & observed < minBinCount
+				eliminate <- eliminate | observed == 0
+				eliminate <- eliminate |
+					(observed < qbinom(0.975, l, expected/l) &
+					observed > qbinom(0.025, l, expected/l))
+				if (!all(eliminate)) {
+					scores[[k]] <- log(observed/expected)
+					scores[[k]][eliminate] <- 0
+				}
+			}
+		}
+	} else {
+		scores <- NULL
+	}
+	motifs <- motifs[, -ncol(motifs)] # drop "hits"
+	hairpins <- hairpins[, -ncol(hairpins)] # drop "hits"
 	
 	# compute log-odds length scores
 	.PDF <- function(x, p)
@@ -815,11 +936,15 @@ LearnNonCoding <- function(myXStringSet,
 	lenScores <- lenScores*(maxLength - minLength + 1) # assume a uniform distribution of background lengths
 	lenScores <- log(lenScores)
 	
+	result <- list(motifs=motifs,
+		hairpins=hairpins,
+		kmers=oligos,
+		lengthScores=lenScores,
+		dependence=scores)
 	class(result) <- "NonCoding"
 	attr(result, "K") <- K
 	attr(result, "minLength") <- minLength
 	attr(result, "maxLength") <- maxLength
-	attr(result, "lengthScores") <- lenScores
 	attr(result, "maxLoopLength") <- maxLoopLength
 	attr(result, "background") <- c(meanlog=NA_real_,
 		sdlog=NA_real_)
@@ -836,6 +961,7 @@ LearnNonCoding <- function(myXStringSet,
 	bg <- FindNonCoding(result,
 		DNAStringSet(random),
 		minScore=0,
+		processors=processors,
 		verbose=FALSE)[, "TotalScore"]
 	AT <- AT/2 # relative frequency of A or T
 	for (i in seq_along(AT)) {
@@ -850,6 +976,7 @@ LearnNonCoding <- function(myXStringSet,
 		temp <- FindNonCoding(result,
 			DNAStringSet(random),
 			minScore=0,
+			processors=processors,
 			verbose=FALSE)[, "TotalScore"]
 		if (length(bg) == 0L ||
 			(length(temp) > 0L &&
@@ -859,7 +986,7 @@ LearnNonCoding <- function(myXStringSet,
 		}
 	}
 	if (length(bg) > 0 &&
-		max(bg) > log(N)/2) {
+		max(bg) > log(N)/4) {
 		# calibrate log-odds scores
 		count <- 1L
 		while (length(bg) < 1e4 &&
@@ -873,15 +1000,14 @@ LearnNonCoding <- function(myXStringSet,
 				FindNonCoding(result,
 					DNAStringSet(random),
 					minScore=0,
+					processors=processors,
 					verbose=FALSE)[, "TotalScore"])
 			count <- count + 1L
-#			hist(bg, xlim=c(0, 50), breaks=25)
 		}
 		
 		# select tail of background distribution
 		cutoff <- quantile(bg, 0.9)
 		bg <- bg[bg > cutoff]
-#		hist(bg, xlim=c(0, 50), breaks=25)
 		
 		# fit censored log-normal distribution
 		missing <- count*N*2 - length(bg) # 2 for both strands
@@ -898,9 +1024,6 @@ LearnNonCoding <- function(myXStringSet,
 		if (qlnorm(1.125352e-07, mean, sd, lower.tail=FALSE) > 16)
 			attr(result, "background") <- c(meanlog=mean,
 				sdlog=sd)
-#		abline(v=cutoff)
-#		abline(v=qlnorm(1.125352e-07, mean, sd, lower.tail=FALSE))
-#		lines(0:50, dlnorm(0:50, mean, sd)*count*N*2) # 2 for both strands
 	}
 	
 	return(result)

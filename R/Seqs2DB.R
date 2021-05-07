@@ -25,7 +25,7 @@ Seqs2DB <- function(seqs,
 	if (length(type) > 1)
 		stop("type must be length 1.")
 	if (!is.character(identifier))
-		stop("Identifier must be a character!")
+		stop("Identifier must be a character.")
 	if (!is.character(tblName))
 		stop("tblName must be a character string.")
 	if (substr(tblName, 1, 1)=="_")

@@ -63,8 +63,8 @@ options(width=80)
 \item Sequence alignment: accurately align thousands of DNA, RNA, or amino acid sequences. Quickly find and align the syntenic regions of multiple genomes.
 \item Oligo design: test oligos in silico, or create new primer and probe sequences optimized for a variety of objectives.
 \item Manipulate sequences: trim low quality regions, correct frameshifts, reorient nucleotides, determine consensus, or digest with restriction enzymes.
-\item Analyze sequences: find chimeras, classify into a taxonomy of organisms or functions, predict secondary structure, create phylogenetic trees, and reconstruct ancestral states.
-\item Gene finding: predict genes in a genome, extract them from the genome, and export them to a file.
+\item Analyze sequences: find chimeras, classify into a taxonomy of organisms or functions, detect repeats, predict secondary structure, create phylogenetic trees, and reconstruct ancestral states.
+\item Gene finding: predict coding and non-coding genes in a genome, extract them from the genome, and export them to a file.
 \end{itemize}
 \Rpackage{DECIPHER} is available under the terms of the \underline{\href{http://www.gnu.org/copyleft/gpl.html}{GNU Public License version 3}}.
 
@@ -115,7 +115,7 @@ The functions of DECIPHER can be grouped into several categories based on intend
 \item Manipulating sequences:
 \begin{enumerate} \item \Rfunction{CorrectFrameshifts} \item \Rfunction{OrientNucleotides} \item \Rfunction{RemoveGaps} \item \Rfunction{TrimDNA} \end{enumerate}
 \item Analyzing sequences:
-\begin{enumerate} \item \Rfunction{DigestDNA} \item \Rfunction{PredictDBN} \item \Rfunction{PredictHEC} \end{enumerate}
+\begin{enumerate} \item \Rfunction{DetectRepeats} \item \Rfunction{DigestDNA} \item \Rfunction{PredictDBN} \item \Rfunction{PredictHEC} \end{enumerate}
 \item Multiple sequence alignment:
 \begin{enumerate} \item \Rfunction{AdjustAlignment} \item \Rfunction{AlignDB} \item \Rfunction{AlignProfiles} \item \Rfunction{AlignSeqs} \item \Rfunction{AlignTranslation} \end{enumerate}
 \item Comparison of sequences that are not collinear (i.e., genomes):

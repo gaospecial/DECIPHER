@@ -11,6 +11,7 @@ FindNonCoding(x,
               myXStringSet,
               minScore = 16,
               allScores = FALSE,
+              processors = 1,
               verbose = TRUE)
 }
 \arguments{
@@ -21,10 +22,13 @@ A \code{NonCoding} object or a list of \code{NonCoding} objects for searching.
 A \code{DNAStringSet} or \code{RNAStringSet} object of unaligned sequences, typically representing a genome.
 }
   \item{minScore}{
-Numeric giving the minimum log-odds score of matches to \code{x} in \code{myXStringSet} to report.  The maximum false discovery rate is approximately \code{exp(-minScore)} per nucleotide per object in \code{x}.
+Numeric giving the minimum log-odds score of matches to \code{x} in \code{myXStringSet} to report, or a vector of numerics specifying the minimum score per \code{NonCoding} object in \code{x}.  The maximum false discovery rate is approximately \code{exp(-minScore)} per nucleotide per object in \code{x}.
 }
   \item{allScores}{
 Logical specifying whether all matches should be returned (\code{TRUE}) or only the top matches when there are multiple matches in the same region.
+}
+  \item{processors}{
+The number of processors to use, or \code{NULL} to automatically detect and use all available processors.
 }
   \item{verbose}{
 Logical indicating whether to display progress.
@@ -55,7 +59,10 @@ genome <- readDNAStringSet(fas)
 
 z <- FindNonCoding(x, genome)
 z
-sort(table(names(x)[-z[, "Gene"]]))
+
+annotations <- attr(z, "annotations")
+m <- match(z[, "Gene"], annotations)
+sort(table(names(annotations)[m]))
 
 genes <- ExtractGenes(z, genome, type="RNAStringSet")
 genes

@@ -87,31 +87,27 @@ to.dendrogram <- function(object, states=NULL) {
 			
 			if ((h - h1) <= collapse || (h - h2) <= collapse) {
 				# make multifurcating
-				m1 <- attr(stack[[pos]][[1]], "members")
-				m2 <- attr(stack[[pos]][[2]], "members")
-				states <- c(attr(stack[[pos]][[1]], "state"),
-					attr(stack[[pos]][[2]], "state"))
+				m1 <- attr(stack[[pos]][[1L]], "members")
+				m2 <- attr(stack[[pos]][[2L]], "members")
+				states <- c(attr(stack[[pos]][[1L]], "state"),
+					attr(stack[[pos]][[2L]], "state"))
 				m <- m1 + m2
 				if ((h - h1) <= collapse && (h - h2) <= collapse) {
-					l1 <- length(stack[[pos]][[1]])
-					l2 <- length(stack[[pos]][[2]])
+					l1 <- length(stack[[pos]][[1L]])
+					l2 <- length(stack[[pos]][[2L]])
 					x <- vector("list", l1 + l2)
-					for (i in seq_len(l1))
-						x[i] <- stack[[pos]][[1]][i]
-					for (i in seq_len(l2))
-						x[i + l1] <- stack[[pos]][[2]][i]
+					x[seq_len(l1)] <- stack[[pos]][[1L]][seq_len(l1)]
+					x[seq_len(l2) + l1] <- stack[[pos]][[2L]][seq_len(l2)]
 				} else if ((h - h1) <= collapse) {
-					l <- length(stack[[pos]][[1]])
-					x <- vector("list", l + 1)
-					for (i in seq_len(l))
-						x[i] <- stack[[pos]][[1]][i]
-					x[l + 1] <- stack[[pos]][-1]
+					l <- length(stack[[pos]][[1L]])
+					x <- vector("list", l + 1L)
+					x[seq_len(l)] <- stack[[pos]][[1L]][seq_len(l)]
+					x[l + 1L] <- stack[[pos]][-1L]
 				} else if ((h - h2) <= collapse) {
-					l <- length(stack[[pos]][[2]])
-					x <- vector("list", l + 1)
-					x[1] <- stack[[pos]][-2]
-					for (i in seq_len(l))
-						x[i + 1] <- stack[[pos]][[2]][i]
+					l <- length(stack[[pos]][[2L]])
+					x <- vector("list", l + 1L)
+					x[1L] <- stack[[pos]][-2L]
+					x[seq_len(l) + 1L] <- stack[[pos]][[2L]][seq_len(l)]
 				}
 				stack[[pos]] <- x
 				

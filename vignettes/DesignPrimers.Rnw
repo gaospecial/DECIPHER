@@ -72,7 +72,7 @@ Improved specificity to the target group is achieved in two ways:  first by decr
 
 \subsection{Installing OligoArrayAux}
 
-The program OligoArrayAux (\underline{\url{http://mfold.rna.albany.edu/?q=DINAMelt/OligoArrayAux}}) is used to predict hybridization efficiency and must be installed in a location accessible by the system.  For example, the following code should print the installed OligoArrayAux version when executed from the \term{R} console:
+The program OligoArrayAux (\underline{\url{http://www.unafold.org/Dinamelt/software/oligoarrayaux.php}}) is used to predict hybridization efficiency and must be installed in a location accessible by the system.  For example, the following code should print the installed OligoArrayAux version when executed from the \term{R} console:
 
 <<expr0,eval=FALSE>>=
 system("hybrid-min -V")

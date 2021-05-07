@@ -19,7 +19,7 @@ Other optional parameters.
 }
 }
 \details{
-Objects of class \code{NonCoding} are stored as lists containing a compact representation of a family of non-coding RNAs.  The first list component is a matrix of sequence motifs that identify the non-coding RNAs, the second is a matrix of hairpin loops that are conserved across the family, and the third is a list of k-mer frequencies derived from representative sequences.  Patterns are defined by their distance to either end of the non-coding RNA, which helps to identify the boundaries of the non-coding RNA in a genome.
+Objects of class \code{NonCoding} are stored as lists containing a compact representation of a family of non-coding RNAs.  The first list component is a matrix of sequence motifs that identify the non-coding RNAs, the second is a matrix of hairpin loops that are conserved across the family, the third is a list of k-mer frequencies derived from representative sequences, and the fourth is a vector of log-odds scores for sequence lengths.  An optional fifth list component denotes the log-odds scores for dependencies among patterns.  Patterns are defined by their distance to either end of the non-coding RNA, which helps to identify the boundaries of the non-coding RNA in a genome.
 }
 \author{
 Erik Wright \email{eswright@pitt.edu}

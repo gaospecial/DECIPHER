@@ -388,13 +388,21 @@ FindSynteny <- function(dbFile,
 					store[g2][[1L]][["O"]][["nt"]][[N]] <- o2
 			}
 			
-			# match E1 to e2
-			m <- .Call("intMatchOnce",
-				E1,
-				e2,
-				O1,
-				o2,
-				PACKAGE="DECIPHER")
+			if (identifier[g1] != identifier[g2]) {
+				# match E1 to e2
+				m <- .Call("intMatchOnce",
+					E1,
+					e2,
+					O1,
+					o2,
+					PACKAGE="DECIPHER")
+			} else {
+				# match E1 to itself
+				m <- .Call("intMatchSelfOnce",
+					E1,
+					O1,
+					PACKAGE="DECIPHER")
+			}
 			m <- .Call("fillOverlaps", m, N, PACKAGE="DECIPHER") # in-place change of m
 			r <- Rle(.Call("intDiff", m, PACKAGE="DECIPHER"))
 			w <- which(r@values==1)
@@ -542,13 +550,21 @@ FindSynteny <- function(dbFile,
 								store[g2][[1L]][["O"]][["aa"]][[rF2]][[N_AA]] <- o2
 						}
 						
-						# match e1 to e2
-						m <- .Call("intMatchOnce",
-							e1,
-							e2,
-							o1,
-							o2,
-							PACKAGE="DECIPHER")
+						if (identifier[g1] != identifier[g2]) {
+							# match e1 to e2
+							m <- .Call("intMatchOnce",
+								e1,
+								e2,
+								o1,
+								o2,
+								PACKAGE="DECIPHER")
+						} else {
+							# match E1 to itself
+							m <- .Call("intMatchSelfOnce",
+								e1,
+								o1,
+								PACKAGE="DECIPHER")
+						}
 						m <- .Call("fillOverlaps", m, N_AA, PACKAGE="DECIPHER") # in-place change of m
 						r <- Rle(.Call("intDiff", m, PACKAGE="DECIPHER"))
 						w <- which(r@values==1)

@@ -242,7 +242,9 @@ class(rnas)
 Wow!  That has to be one of life's simplest pleasures.  \Rfunction{FindNonCoding} returned an object of class \Rclass{Genes}.  By convention, the starting position of non-coding RNAs on the forward (\code{0}) \code{Strand} is at \code{Begin}, while those on the reverse (\code{1}) \code{Strand} start at \code{End}.  We can take a look at which RNAs were found:
 
 <<expr14,eval=TRUE>>=
-sort(table(names(x)[-rnas[, "Gene"]]))
+annotations <- attr(rnas, "annotations")
+m <- match(rnas[, "Gene"], annotations)
+sort(table(names(annotations)[m]))
 @
 
 We see that the \emph{C. trachomatis} genome has multiple tRNA genes, two copies of each ribosomal RNA gene, and the RNaseP and tmRNA genes.  Finally, it is possible to extract the non-coding RNAs from the genome:

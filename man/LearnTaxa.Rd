@@ -147,13 +147,13 @@ taxonomy <- paste("Root", genus, species, sep="; ")
 head(taxonomy)
 
 # train the classifier
-\dontrun{
 trainingSet <- LearnTaxa(dna, taxonomy)
 trainingSet
 
 # view information about the classifier
 plot(trainingSet)
 
+\dontrun{
 # train the classifier with amino acid sequences
 aa <- translate(dna)
 trainingSetAA <- LearnTaxa(aa, taxonomy)

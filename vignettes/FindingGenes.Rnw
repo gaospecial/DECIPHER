@@ -250,8 +250,10 @@ Certainly some of the magic of gene finding is having a lot of scores!  We can s
 	\item Gene content signals
 	\begin{enumerate}
 		\item \emph{Coding Score} - Usage of codons or pairs of codons within the open reading frame.
+		\item \emph{Codon Model} - Number of the codon model that best fit each open reading frame.
 		\item \emph{Length Score} - Length of the open reading frame relative to the background of lengths expected by chance.
 		\item \emph{Autocorrelation Score} - The degree to which the same or different codons are used sequentially to code for an amino acid.
+		\item \emph{Coupling Score} - Likelihood of observing neighboring amino acids in real proteins.
 	\end{enumerate}
 	\item Termination signals
 	\begin{enumerate}
@@ -345,7 +347,9 @@ rnas
 Tada!  \Rfunction{FindNonCoding} outputs an object of class \Rclass{Genes} just like \Rfunction{FindGenes}.  However, non-coding RNAs are denoted with negative numbers in the \code{Gene} column.  Each number corresponds to the model that was identified.  We can look at the set of non-coding RNAs that were found in the \emph{C. trachomatis} genome:
 
 <<expr21,eval=TRUE>>=
-sort(table(names(x)[-rnas[, "Gene"]]))
+annotations <- attr(rnas, "annotations")
+m <- match(rnas[, "Gene"], annotations)
+sort(table(names(annotations)[m]))
 @
 
 There was at least one tRNA gene found for each amino acid, as well as two copies of each ribosomal RNA gene, and the RNaseP and tmRNA genes.  Now, we can easily include these non-coding RNAs into our gene calls.
@@ -358,12 +362,73 @@ genes
 That worked like magic!  Now the \Rclass{Genes} object contains both protein coding genes and non-coding RNAs.
 
 %------------------------------------------------------------
+\section{Annotating the protein coding genes}
+%------------------------------------------------------------
+
+The magic doesn't have to end there.  We can annotate our protein coding genes just like we did with the non-coding RNAs.  To master this sleight of hand, we first need a training set of labeled protein sequences.  We have exactly that included in \Rpackage{DECIPHER} for \emph{Chlamydia}.
+
+<<expr23,eval=TRUE>>=
+fas <- system.file("extdata",
+	"PlanctobacteriaNamedGenes.fas.gz",
+	package="DECIPHER")
+prot <- readAAStringSet(fas)
+prot
+head(names(prot))
+@
+
+The training sequences are named by their enzyme commission (EC) number and three or four-letter gene name.  The process of training a classifier is described elsewhere.  For now, let's jump straight to the solution:
+
+<<expr24,eval=TRUE>>=
+trainingSet <- LearnTaxa(train=prot,
+	taxonomy=names(prot),
+	maxChildren=1)
+trainingSet
+@
+
+Now we need to take the proteins we just found with \Rfunction{FindGenes} and classify them using our classifier.
+
+\begin{centerfig}
+<<expr25,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6>>=
+w <- which(genes[, "Gene"] > 0)
+aa <- ExtractGenes(genes[w], genome, type="AAStringSet")
+ids <- IdTaxa(aa,
+	trainingSet,
+	fullLength=0.99,
+	threshold=50,
+	processors=1)
+ids
+plot(trainingSet, ids[grep("unclassified", ids, invert=TRUE)])
+@
+\caption{\label{f5} Annotations of protein coding sequences in \emph{C. trachomatis} and their distribution on the taxonomy of functions.}
+\end{centerfig}
+
+Finally, we can assign each of our protein coding sequences to a classification in the \Rclass{Genes} object:
+
+<<expr26,eval=TRUE>>=
+annotations <- sapply(ids, function(x) paste(x$taxon[-1], collapse="; "))
+u_annotations <- unique(annotations)
+genes[w, "Gene"] <- match(annotations, u_annotations) + 1L
+attr(genes, "annotations") <- c(attr(genes, "annotations"),
+	setNames(seq_along(u_annotations) + 1L,
+		u_annotations))
+genes
+@
+
+With a little wizardry, we can now look at the top annotations in the genome.
+
+<<expr27,eval=TRUE>>=
+annotations <- attr(genes, "annotations")
+m <- match(genes[, "Gene"], annotations)
+head(sort(table(names(annotations)[m]), decreasing=TRUE))
+@
+
+%------------------------------------------------------------
 \section{Guaranteeing repeatability}
 %------------------------------------------------------------
 
 \Rfunction{FindGenes} sometimes uses random sampling to increase speed of the algorithm.  For this reason, gene predictions may change slightly if the prediction process is repeated with the same inputs.  For some applications this randomness is undesirable, and it can easily be avoided by setting the random seed before using \Rfunction{FindGenes}.  The process of setting and then unsetting the seed in \R{} is straightforward:
 
-<<expr23,eval=FALSE>>=
+<<expr28,eval=FALSE>>=
 set.seed(123) # choose a whole number as the random seed
 # then make gene predictions with FindGenes (not shown)
 set.seed(NULL) # return to the original state by unsetting the seed

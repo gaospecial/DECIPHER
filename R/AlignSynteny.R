@@ -35,8 +35,6 @@ AlignSynteny <- function(synteny,
 	} else {
 		stop("identifier must be character or numeric.")
 	}
-	if (any(duplicated(identifier)))
-		stop("identifers must be distinct.")
 	l <- length(identifier)
 	if (l < 2)
 		stop("At least two identifiers are required.")

@@ -32,7 +32,7 @@
 
 // first matches of x[z...] == y[1]
 SEXP multiMatch(SEXP x, SEXP y, SEXP z)
-{	
+{
 	int i, size = length(x);
 	int *v = INTEGER(x);
 	int *w = INTEGER(y);
@@ -71,7 +71,7 @@ SEXP multiMatch(SEXP x, SEXP y, SEXP z)
 
 // first matches of x[z...] >= y[1]
 SEXP multiMatchUpper(SEXP x, SEXP y, SEXP z)
-{	
+{
 	int i, size = length(x);
 	int *v = INTEGER(x);
 	int *w = INTEGER(y);
@@ -110,7 +110,7 @@ SEXP multiMatchUpper(SEXP x, SEXP y, SEXP z)
 
 // first matches of x[...z] <= y[1]
 SEXP multiMatchLower(SEXP x, SEXP y, SEXP z)
-{	
+{
 	int i, size = length(x);
 	int *v = INTEGER(x);
 	int *w = INTEGER(y);
@@ -149,7 +149,7 @@ SEXP multiMatchLower(SEXP x, SEXP y, SEXP z)
 
 // index of first non-NA elements
 SEXP multiMatchCharNotNA(SEXP x)
-{	
+{
 	int i, size = length(x);
 	int stop = 0;
 	
@@ -175,7 +175,7 @@ SEXP multiMatchCharNotNA(SEXP x)
 
 // same as x %in% y for ordered integer vectors
 SEXP intMatch(SEXP x, SEXP y)
-{	
+{
 	int *v = INTEGER(x);
 	int *w = INTEGER(y);
 	int i, j;
@@ -207,7 +207,7 @@ SEXP intMatch(SEXP x, SEXP y)
 
 // first match in y >= x[...]
 SEXP firstMatchUpper(SEXP x, SEXP y, SEXP nThreads)
-{	
+{
 	int i, j, size_x = length(x), size_y = length(y);
 	double *v = REAL(x);
 	double *w = REAL(y);
@@ -235,7 +235,7 @@ SEXP firstMatchUpper(SEXP x, SEXP y, SEXP nThreads)
 // matrix of d[i, j] = 1 - length x[i] %in% x[j] / min(length)
 // requires a list of ordered integers
 SEXP matchLists(SEXP x, SEXP verbose, SEXP pBar, SEXP nThreads)
-{	
+{
 	int i, j, size_x = length(x), before, v, *rPercentComplete;
 	int o, p, start, lx, ly, *X, *Y, count;
 	SEXP ans;
@@ -343,7 +343,7 @@ SEXP matchLists(SEXP x, SEXP verbose, SEXP pBar, SEXP nThreads)
 // matrix of d[i, j] = length x[i] %in% y[j] / min(length)
 // requires a list of ordered integers
 SEXP matchListsDual(SEXP x, SEXP y, SEXP verbose, SEXP pBar, SEXP nThreads)
-{	
+{
 	int i, j, size_x = length(x), size_y = length(y), before, v, *rPercentComplete;
 	int o, p, start, lx, ly, *X, *Y, count;
 	SEXP ans;
@@ -444,7 +444,7 @@ SEXP matchListsDual(SEXP x, SEXP y, SEXP verbose, SEXP pBar, SEXP nThreads)
 // dist matrix = ordered matches (x[i], x[j]) / min(length)
 // requires a list of unsorted integers retaining the order of x
 SEXP matchOrder(SEXP x, SEXP verbose, SEXP pBar, SEXP nThreads)
-{	
+{
 	R_xlen_t i, j, size_x = xlength(x);
 	int before, v, *rPercentComplete;
 	int lx, ly, *X, *Y;
@@ -559,7 +559,7 @@ SEXP matchOrder(SEXP x, SEXP verbose, SEXP pBar, SEXP nThreads)
 // matrix of d[i, j] = ordered matches (x[i], y[j]) / min(length bound by consecutive matches)
 // requires dual lists of unsorted integers retaining the order of x (typically length(x) < length(y))
 SEXP matchOrderDual(SEXP x, SEXP y, SEXP nThreads)
-{	
+{
 	int i, j, size_x = length(x), size_y = length(y);
 	int lx, ly, *X, *Y;
 	SEXP ans;
@@ -640,7 +640,7 @@ SEXP matchOrderDual(SEXP x, SEXP y, SEXP nThreads)
 
 // returns shared ranges between pairs in two unordered lists
 SEXP matchRanges(SEXP x, SEXP y, SEXP wordSize, SEXP maxLength, SEXP threshold)
-{	
+{
 	int i, j, size_x = length(x), size_y = length(y), size;
 	int lx, ly, *X, *Y, *X_pos, *Y_pos, wS, *rans;
 	int l = asInteger(maxLength);
@@ -757,7 +757,7 @@ SEXP matchRanges(SEXP x, SEXP y, SEXP wordSize, SEXP maxLength, SEXP threshold)
 // which (bl <= x <= bu)
 // x must be in ascending order
 SEXP boundedMatches(SEXP x, SEXP bl, SEXP bu)
-{	
+{
 	int i, mid, start = 0, end = length(x), count = 0, size_x = length(x);
 	int lowBound = asInteger(bl);
 	int upBound = asInteger(bu);
@@ -800,7 +800,7 @@ SEXP boundedMatches(SEXP x, SEXP bl, SEXP bu)
 // ans[o1] <- o2[intMatchOnce(x[o1], y[o2])] + 1
 // where o1 and o2 are indexed starting at zero, and ans starts at 1
 SEXP intMatchOnce(SEXP x, SEXP y, SEXP o1, SEXP o2)
-{	
+{
 	int *v = INTEGER(x);
 	int *w = INTEGER(y);
 	int *p = INTEGER(o1);
@@ -844,6 +844,62 @@ SEXP intMatchOnce(SEXP x, SEXP y, SEXP o1, SEXP o2)
 			rans[p[i]] = NA_INTEGER;
 		} else {
 			rans[p[i]] = q[temp] + 1;
+		}
+	}
+	
+	UNPROTECT(1);
+	
+	return ans;
+}
+
+// first unmatched occurrence of x in x for ascending order integer vectors
+// prevents matches between the same positions in x (otherwise ans = 1, 2, ...)
+// requires NAs to be first in the ordering (treated as the most negative)
+// performs the following reorderings of the inputs and output:
+// ans[o1] <- o1[intMatchOnce(x[o1], x[o1])] + 1
+// where o1 is indexed starting at zero, and ans starts at 1
+SEXP intMatchSelfOnce(SEXP x, SEXP o1)
+{
+	int *v = INTEGER(x);
+	int *p = INTEGER(o1);
+	
+	int i, j, k, temp, start = 0;
+	int size_x = length(x);
+	
+	SEXP ans;
+	PROTECT(ans = allocVector(INTSXP, size_x));
+	int *rans = INTEGER(ans);
+	
+	for (i = 0; i < size_x; i++) {
+		rans[p[i]] = NA_INTEGER;
+		if (v[p[i]] != NA_INTEGER)
+			break;
+	}
+	
+	for (; i < size_x; i++) { // i = i
+		temp = NA_INTEGER;
+		for (j = i + 1; j < size_x; j++) {
+			if (v[p[i]] < v[p[j]]) {
+				start = j;
+				break;
+			} else if (v[p[i]] == v[p[j]]) {
+				k = j + 1;
+				if (k < size_x &&
+					v[p[j]] == v[p[k]]) {
+					start = k; // prevent repeated matching
+					temp = j;
+				} else {
+					start = j; // allow repeated matching
+					temp = j;
+				}
+				break;
+			}
+		}
+		
+		if (temp == NA_INTEGER) {
+			rans[p[i]] = NA_INTEGER;
+		} else {
+			rans[p[i]] = p[temp] + 1;
 		}
 	}
 	

@@ -43,7 +43,7 @@ Logical indicating whether to display progress.
 }
 }
 \details{
-The uncorrected distance matrix represents the hamming distance between each of the sequences in \code{myXStringSet}.  Ambiguity can be represented using the characters of the \code{IUPAC_CODE_MAP} for \code{DNAStringSet} and \code{RNAStringSet} inputs, or using the \code{AMINO_ACID_CODE} for an \code{AAStringSet} input.  For example, the distance between an 'N' and any other nucleotide base is zero.  The letters B (N or D), J (I or L), Z (Q or E), and X (any letter) are degenerate in the \code{AMINO_ACID_CODE}.
+The uncorrected (\code{correction = "none"}) distance matrix represents the hamming distance between each of the sequences in \code{myXStringSet}.  Ambiguity can be represented using the characters of the \code{IUPAC_CODE_MAP} for \code{DNAStringSet} and \code{RNAStringSet} inputs, or using the \code{AMINO_ACID_CODE} for an \code{AAStringSet} input.  For example, the distance between an 'N' and any other nucleotide base is zero.  The letters B (N or D), J (I or L), Z (Q or E), and X (any letter) are degenerate in the \code{AMINO_ACID_CODE}.
 
 If \code{includeTerminalGaps = FALSE} then terminal gaps ("-" or "." characters) are not included in sequence length.  This can be faster since only the positions common to each pair of sequences are compared.    Sequences with no overlapping region in the alignment are given a value of \code{NA}, unless \code{includeTerminalGaps = TRUE}, in which case distance is 100\%.
 

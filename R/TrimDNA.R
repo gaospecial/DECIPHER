@@ -40,6 +40,8 @@ TrimDNA <- function(myDNAStringSet,
 	} else if (!is.character(rightPatterns)) {
 		stop("rightPatterns must be a DNAStringSet or character vector.")
 	}
+	if (length(type) != 1L)
+		stop("type must be a character string of length one.")
 	TYPES <- c("ranges", "sequences", "both")
 	type <- pmatch(type, TYPES)
 	if (is.na(type))

@@ -108,6 +108,57 @@
 	return(weight)
 }
 
+.parseDBN <- function(dbn) {
+	s <- strsplit(dbn, "")[[1]]
+	n <- sum(s != "." & s != "-")
+	c1 <- c2 <- c3 <- integer(n/2)
+	i <- 0L
+	parens <- square <- curly <- straight <- integer()
+	for (j in seq_along(s)) {
+		if (s[j] != "." && s[j] != "-") {
+			if (s[j]=="(") {
+				parens <- c(parens, j)
+			} else if (s[j]==")") {
+				i <- i + 1L
+				c1[i] <- parens[length(parens)]
+				c2[i] <- j
+				length(parens) <- length(parens) - 1L
+			} else if (s[j]=="[") {
+				square <- c(square, j)
+			} else if (s[j]=="]") {
+				i <- i + 1L
+				c1[i] <- square[length(square)]
+				c2[i] <- j
+				c3[i] <- 1L
+				length(square) <- length(square) - 1L
+			} else if (s[j]=="{") {
+				curly <- c(curly, j)
+			} else if (s[j]=="}") {
+				i <- i + 1L
+				c1[i] <- curly[length(curly)]
+				c2[i] <- j
+				c3[i] <- 2L
+				length(curly) <- length(curly) - 1L
+			} else if (s[j]=="<") {
+				straight <- c(straight, j)
+			} else if (s[j]==">") {
+				i <- i + 1L
+				c1[i] <- straight[length(straight)]
+				c2[i] <- j
+				c3[i] <- 3L
+				length(straight) <- length(straight) - 1L
+			} else {
+				stop("Unrecognized character in structure: ", s[j])
+			}
+		}
+	}
+	
+	o <- order(c3, c1, c2)
+	matrix(c(c1[o], c2[o], c3[o]),
+		ncol=3,
+		dimnames=list(NULL, c("(", ")", "order")))
+}
+
 PredictDBN <- function(myXStringSet,
 	type="states",
 	minOccupancy=0.5,
@@ -357,52 +408,7 @@ PredictDBN <- function(myXStringSet,
 		PACKAGE="DECIPHER")
 	
 	if (type==2L) {
-		s <- strsplit(ans, "")[[1]]
-		n <- sum(s != "." & s != "-")
-		c1 <- c2 <- c3 <- integer(n/2)
-		i <- 0L
-		parens <- square <- curly <- straight <- integer()
-		for (j in seq_along(s)) {
-			if (s[j] != "." && s[j] != "-") {
-				if (s[j]=="(") {
-					parens <- c(parens, j)
-				} else if (s[j]==")") {
-					i <- i + 1L
-					c1[i] <- parens[length(parens)]
-					c2[i] <- j
-					length(parens) <- length(parens) - 1L
-				} else if (s[j]=="[") {
-					square <- c(square, j)
-				} else if (s[j]=="]") {
-					i <- i + 1L
-					c1[i] <- square[length(square)]
-					c2[i] <- j
-					c3[i] <- 1L
-					length(square) <- length(square) - 1L
-				} else if (s[j]=="{") {
-					curly <- c(curly, j)
-				} else if (s[j]=="}") {
-					i <- i + 1L
-					c1[i] <- curly[length(curly)]
-					c2[i] <- j
-					c3[i] <- 2L
-					length(curly) <- length(curly) - 1L
-				} else if (s[j]=="<") {
-					straight <- c(straight, j)
-				} else if (s[j]==">") {
-					i <- i + 1L
-					c1[i] <- straight[length(straight)]
-					c2[i] <- j
-					c3[i] <- 3L
-					length(straight) <- length(straight) - 1L
-				}
-			}
-		}
-		
-		o <- order(c3, c1, c2)
-		ans <- matrix(c(c1[o], c2[o], c3[o]),
-			ncol=3,
-			dimnames=list(NULL, c("(", ")", "order")))
+		ans <- .parseDBN(ans)
 	} else if (type==3L) {
 		rownames(ans) <- c(".", "(", ")")
 	} else if (type==4L) {

@@ -22,6 +22,11 @@
 // for math functions
 #include <math.h>
 
+// for OpenMP parallel processing
+#ifdef SUPPORT_OPENMP
+#include <omp.h>
+#endif
+
 /*
  * Biostrings_interface.h is needed for the DNAencode(), get_XString_asRoSeq(),
  * init_match_reporting(), report_match() and reported_matches_asSEXP()
@@ -97,22 +102,39 @@ char getBaseLetterRC(const char p)
 	}
 }
 
-int nextCount(int count, int tot, int *orfs, int minL)
+int nextCount(int c, int tot, int *orfs, int minL, double *scores)
 {
-	int c = count;
-	while ((c < tot &&
-		(orfs[c + 3*tot] - orfs[c + 2*tot] + 1) < minL) ||
-		((c + 1) < tot &&
-		((orfs[c + 3*tot]==orfs[c + 3*tot + 1] &&
-		orfs[c + tot]==0) ||
-		(orfs[c + 2*tot]==orfs[c + 2*tot + 1] &&
-		orfs[c + tot]==1)) &&
-		orfs[c]==orfs[c + 1]))
-		c++;
-	if (c==tot)
-		c--;
+	if (c > 0) { // go to next ORF
+		while (c < tot && // current in bounds
+			((orfs[c + 3*tot]==orfs[c + 3*tot - 1] && // same end
+			orfs[c + tot]==0) || // forward strand
+			(orfs[c + 2*tot]==orfs[c + 2*tot - 1] && // same begin
+			orfs[c + tot]==1)) && // reverse strand
+			orfs[c]==orfs[c - 1]) // same index
+			c++;
+	}
 	
-	return c;
+	while (c < tot && // current in bounds
+		((orfs[c + 3*tot] - orfs[c + 2*tot] + 1) < minL || // length less than minL
+		scores[c] < 0)) // score less than zero
+		c++;
+	
+	int max = c;
+	while ((c + 1) < tot && // next in bounds
+		((orfs[c + 3*tot]==orfs[c + 3*tot + 1] && // same end
+		orfs[c + tot]==0) || // forward strand
+		(orfs[c + 2*tot]==orfs[c + 2*tot + 1] && // same begin
+		orfs[c + tot]==1)) && // reverse strand
+		orfs[c]==orfs[c + 1]) { // same index
+		c++;
+		if (scores[max] < scores[c])
+			max = c;
+	}
+	
+	if (max==tot)
+		max--;
+	
+	return max;
 }
 
 SEXP getORFs(SEXP x, SEXP start_codons, SEXP stop_codons, SEXP min_gene_length, SEXP allow_edges)
@@ -219,7 +241,7 @@ SEXP getORFs(SEXP x, SEXP start_codons, SEXP stop_codons, SEXP min_gene_length, 
 	return ans;
 }
 
-SEXP codonModel(SEXP x, SEXP orftable, SEXP stop_codons, SEXP min_orf_length)
+SEXP codonModel(SEXP x, SEXP orftable, SEXP stop_codons, SEXP min_orf_length, SEXP coding_scores)
 {
 	int i, j, k, rf, s, val, x_length;
 	int lstops = length(stop_codons);
@@ -227,6 +249,7 @@ SEXP codonModel(SEXP x, SEXP orftable, SEXP stop_codons, SEXP min_orf_length)
 	int minL = asInteger(min_orf_length);
 	int tot = length(orftable)/4; // number of rows
 	int *orfs = INTEGER(orftable);
+	double *scores = REAL(coding_scores);
 	int inside = 0;
 	
 	int *freq = Calloc(64, int);
@@ -238,7 +261,7 @@ SEXP codonModel(SEXP x, SEXP orftable, SEXP stop_codons, SEXP min_orf_length)
 	x_length = get_length_from_XStringSet_holder(&x_set);
 	
 	// start at first ORF that is at least minL in length
-	int count = nextCount(0, tot, orfs, minL);
+	int count = nextCount(0, tot, orfs, minL, scores);
 	
 	for (i = 0; i < x_length; i++) {
 		x_i = get_elt_from_XStringSet_holder(&x_set, i);
@@ -263,14 +286,14 @@ SEXP codonModel(SEXP x, SEXP orftable, SEXP stop_codons, SEXP min_orf_length)
 						if (s) { // negative strand
 							if ((x_i.length - j - 1)==orfs[count + 3*tot]) {
 								inside = 0;
-								count = nextCount(++count, tot, orfs, minL);
+								count = nextCount(++count, tot, orfs, minL, scores);
 							} else if (val < 64) {
 								freq[val]++;
 							}
 						} else { // positive strand
 							if ((j + 2)==orfs[count + 2*tot]) {
 								inside = 0;
-								count = nextCount(++count, tot, orfs, minL);
+								count = nextCount(++count, tot, orfs, minL, scores);
 							} else if (val < 64) {
 								freq[val]++;
 							}
@@ -738,8 +761,8 @@ SEXP startCodonModel(SEXP x, SEXP orftable, SEXP indices, SEXP start_codons)
 	int count = 0;
 	int curr_i = 0;
 	
-	int *freq = Calloc(64, int);
-	int *bg = Calloc(64, int);
+	double *freq = Calloc(64, double);
+	double *bg = Calloc(64, double);
 	
 	XStringSet_holder x_set;
 	Chars_holder x_i;
@@ -782,8 +805,8 @@ SEXP startCodonModel(SEXP x, SEXP orftable, SEXP indices, SEXP start_codons)
 	}
 	
 	// normalize the frequencies
-	int sumfreq = 0;
-	int sumbg = 0;
+	double sumfreq = 0;
+	double sumbg = 0;
 	int isstart;
 	for (i = 0; i < 64; i++) {
 		isstart = 0;
@@ -795,9 +818,9 @@ SEXP startCodonModel(SEXP x, SEXP orftable, SEXP indices, SEXP start_codons)
 		}
 		if (isstart) {
 			if (freq[i]==0)
-				freq[i] = 1; // add pseudocount
+				freq[i] = 0.01; // add pseudocount
 			if (bg[i]==0)
-				bg[i] = 1; // add pseudocount
+				bg[i] = 0.01; // add pseudocount
 			sumfreq += freq[i];
 			sumbg += bg[i];
 		}
@@ -816,7 +839,7 @@ SEXP startCodonModel(SEXP x, SEXP orftable, SEXP indices, SEXP start_codons)
 			}
 		}
 		if (isstart) {
-			rans[i] = log(((double)freq[i]/(double)sumfreq)/((double)bg[i]/(double)sumbg));
+			rans[i] = log((freq[i]/sumfreq)/(bg[i]/sumbg));
 		} else {
 			rans[i] = 0;
 		}
@@ -1206,7 +1229,7 @@ SEXP scoreTerminationCodonModel(SEXP x, SEXP orftable, SEXP ter_scores)
 	return ans;
 }
 
-SEXP getRegion(SEXP x, SEXP orftable, SEXP width, SEXP offset)
+SEXP getRegion(SEXP x, SEXP orftable, SEXP width, SEXP offset, SEXP toStart)
 {
 	int i, j, k, up, s;
 	int tot = length(orftable)/4; // number of rows
@@ -1220,6 +1243,7 @@ SEXP getRegion(SEXP x, SEXP orftable, SEXP width, SEXP offset)
 	}
 	int curr_i = 0;
 	int off = asInteger(offset);
+	int tS = asInteger(toStart); // relative to start (TRUE) or stop (FALSE)
 	
 	XStringSet_holder x_set;
 	Chars_holder x_i;
@@ -1242,13 +1266,21 @@ SEXP getRegion(SEXP x, SEXP orftable, SEXP width, SEXP offset)
 		
 		if (up) { // upstream
 			if (s) { // negative strand
-				j = orfs[i + 3*tot] + w - 1 - off;
+				if (tS) { // relative to start
+					j = orfs[i + 3*tot] + w - 1 - off;
+				} else { // relative to stop
+					j = orfs[i + 2*tot] + w - 1 - off;
+				}
 			} else { // positive strand
-				j = orfs[i + 2*tot] - w - 1 + off;
+				if (tS) { // relative to start
+					j = orfs[i + 2*tot] - w - 1 + off;
+				} else { // relative to stop
+					j = orfs[i + 3*tot] - w - 1 + off;
+				}
 			}
 			
-			if ((s==1 && j < x_i.length) ||
-				(s==0 && j >= 0)) {
+			if ((s==1 && j < x_i.length && j - w + 1 >= 0) ||
+				(s==0 && j >= 0 && j + w <= x_i.length)) {
 				for (k = 0; k < w; k++) {
 					if (s) { // negative strand
 						seq[k] = getBaseLetterRC(x_i.ptr[j--]);
@@ -1261,13 +1293,21 @@ SEXP getRegion(SEXP x, SEXP orftable, SEXP width, SEXP offset)
 			}
 		} else { // downstream
 			if (s) { // negative strand
-				j = orfs[i + 3*tot] - 4 - off;
+				if (tS) { // relative to start
+					j = orfs[i + 3*tot] - 4 - off;
+				} else { // relative to stop
+					j = orfs[i + 2*tot] - 4 - off;
+				}
 			} else { // positive strand
-				j = orfs[i + 2*tot] + 2 + off;
+				if (tS) { // relative to start
+					j = orfs[i + 2*tot] + 2 + off;
+				} else { // relative to stop
+					j = orfs[i + 3*tot] + 2 + off;
+				}
 			}
 			
-			if ((s==1 && (j + w - 1) < x_i.length) ||
-				(s==0 && (j - w + 1) >= 0)) {
+			if ((s==1 && j < x_i.length && j - w + 1 >= 0) ||
+				(s==0 && j >= 0 && j + w <= x_i.length)) {
 				for (k = 0; k < w; k++) {
 					if (s) { // negative strand
 						seq[k] = getBaseLetterRC(x_i.ptr[j--]);
@@ -1505,6 +1545,222 @@ SEXP scoreAutocorrelationModel(SEXP x, SEXP orftable, SEXP codon_scores, SEXP aa
 	
 	Free(prev);
 	Free(pos);
+	
+	UNPROTECT(1);
+	
+	return ans;
+}
+
+SEXP couplingModel(SEXP x, SEXP orftable, SEXP indices, SEXP aatable, SEXP maxDist)
+{
+	int i, j, k, fin, s, val, count;
+	int *orfs = INTEGER(orftable);
+	int *index = INTEGER(indices);
+	int tot = length(orftable)/4; // number of rows
+	int *AAs = INTEGER(aatable);
+	int l = length(indices);
+	int maxD = asInteger(maxDist);
+	int curr_i = 0;
+	
+	int *freq = Calloc(400*maxD, int); // 20 x 20 x maxD
+	int *vals = Calloc(maxD, int);
+	int *counts = Calloc(20, int);
+	
+	XStringSet_holder x_set;
+	Chars_holder x_i;
+	x_set = hold_XStringSet(x);
+	
+	// loop through each candidate ORF
+	for (i = 0; i < l; i++) {
+		// get the current sequence
+		if (orfs[index[i] - 1] != curr_i) {
+			curr_i = orfs[index[i] - 1];
+			x_i = get_elt_from_XStringSet_holder(&x_set, curr_i - 1);
+		}
+		
+		// get the start position
+		s = orfs[index[i] - 1 + tot];
+		if (s) { // negative strand
+			fin = orfs[index[i] - 1 + 3*tot] - 3; // finish at start codon - 1 codon
+			j = orfs[index[i] - 1 + 2*tot] + 2; // start at stop codon + 1 codon
+		} else { // positive strand
+			fin = orfs[index[i] - 1 + 2*tot] + 1; // finish at start codon + 1 codon
+			j = orfs[index[i] - 1 + 3*tot] - 4; // start at stop codon - 1 codon
+		}
+		
+		count = 0;
+		while (1) {
+			if (s) { // negative strand
+				val = getBaseRC(x_i.ptr[j++]);
+				val += 4*getBaseRC(x_i.ptr[j++]);
+				val += 16*getBaseRC(x_i.ptr[j++]);
+			} else { // positive strand
+				val = getBase(x_i.ptr[j--]);
+				val += 4*getBase(x_i.ptr[j--]);
+				val += 16*getBase(x_i.ptr[j--]);
+			}
+			
+			if (val < 64) {
+				val = AAs[val];
+				counts[val]++;
+				for (k = 0; k < count && k < maxD; k++)
+					freq[k*400 + vals[k]*20 + val]++;
+				k = maxD <= count ? maxD - 1 : count;
+				while (k > 0) {
+					vals[k] = vals[k - 1];
+					k--;
+				}
+				vals[0] = val;
+				count++;
+			} else {
+				count = 0;
+			}
+			
+			if (j==fin)
+				break;
+		}
+	}
+	
+	Free(vals);
+	
+	count = 0;
+	for (i = 0; i < 20; i++) {
+		if (counts[i]==0)
+			counts[i] = 1; // add pseudocount
+		count += counts[i];
+	}
+	
+	// calculate the row sums
+	int *colSums = Calloc(maxD, int);
+	for (j = 0; j < maxD; j++)
+		for (i = 0; i < 400; i++)
+			colSums[j] += freq[j*400 + i];
+	
+	SEXP ans;
+	PROTECT(ans = allocMatrix(REALSXP, 400, maxD));
+	double *rans = REAL(ans);
+	
+	for (j = 0; j < maxD; j++) {
+		for (i = 0; i < 20; i++) {
+			for (k = 0; k < 20; k++) {
+				if (freq[j*400 + i*20 + k]==0 || colSums[j]==0) {
+					rans[j*400 + i*20 + k] = 0;
+				} else {
+					rans[j*400 + i*20 + k] = log(((double)freq[j*400 + i*20 + k]/(double)colSums[j])/(((double)counts[i]/(double)count)*((double)counts[k]/(double)count)));
+				}
+			}
+		}
+	}
+	
+	Free(freq);
+	Free(colSums);
+	Free(counts);
+	
+	UNPROTECT(1);
+	
+	return ans;
+}
+
+SEXP scoreCouplingModel(SEXP x, SEXP orftable, SEXP coupling_scores, SEXP aatable)
+{
+	int i, j, k, s, fin, val, count;
+	int tot = length(orftable)/4; // number of rows
+	int *orfs = INTEGER(orftable);
+	double *coupling = REAL(coupling_scores);
+	int *AAs = INTEGER(aatable);
+	int maxD = length(coupling_scores)/400;
+	int curr_i = 0;
+	double score;
+	
+	int *vals = Calloc(maxD, int);
+	
+	XStringSet_holder x_set;
+	Chars_holder x_i;
+	x_set = hold_XStringSet(x);
+	
+	SEXP ans;
+	PROTECT(ans = allocVector(REALSXP, tot));
+	double *rans = REAL(ans);
+	
+	// loop through each candidate ORF
+	for (i = 0; i < tot;) {
+		// get the current sequence
+		if (orfs[i] != curr_i) {
+			curr_i = orfs[i];
+			x_i = get_elt_from_XStringSet_holder(&x_set, curr_i - 1);
+		}
+		
+		// get the start and stop positions
+		s = orfs[i + tot];
+		if (s) { // negative strand
+			fin = orfs[i + 3*tot] - 3; // finish at start codon - 1 codon
+			j = orfs[i + 2*tot] + 2; // start at stop codon + 1 codon
+		} else { // positive strand
+			fin = orfs[i + 2*tot] + 1; // finish at start codon + 1 codon
+			j = orfs[i + 3*tot] - 4; // start at stop codon - 1 codon
+		}
+		
+		// sum score from j to fin
+		score = 0;
+		count = 0;
+		while (1) {
+			if (s) { // negative strand
+				val = getBaseRC(x_i.ptr[j++]);
+				val += 4*getBaseRC(x_i.ptr[j++]);
+				val += 16*getBaseRC(x_i.ptr[j++]);
+			} else { // positive strand
+				val = getBase(x_i.ptr[j--]);
+				val += 4*getBase(x_i.ptr[j--]);
+				val += 16*getBase(x_i.ptr[j--]);
+			}
+			
+			if (val < 64) {
+				val = AAs[val];
+				for (k = 0; k < count && k < maxD; k++)
+					score += coupling[k*400 + vals[k]*20 + val];
+				k = maxD <= count ? maxD - 1 : count;
+				while (k > 0) {
+					vals[k] = vals[k - 1];
+					k--;
+				}
+				vals[0] = val;
+				count++;
+			} else {
+				count = 0;
+			}
+			
+			if (j==fin) {
+				// record the score
+				rans[i] = score;
+				i++;
+				
+				// check whether still within bounds
+				if (s) { // negative strand
+					if (i != tot &&
+						orfs[i + 2*tot]==orfs[i + 2*tot - 1] &&
+						s==orfs[i + tot] &&
+						curr_i==orfs[i]) {
+						// continue scoring
+						fin = orfs[i + 3*tot] - 3;
+					} else {
+						break;
+					}
+				} else { // positive strand
+					if (i != tot &&
+						orfs[i + 3*tot]==orfs[i + 3*tot - 1] &&
+						s==orfs[i + tot] &&
+						curr_i==orfs[i]) {
+						// continue scoring
+						fin = orfs[i + 2*tot] + 1;
+					} else {
+						break;
+					}
+				}
+			}
+		}
+	}
+	
+	Free(vals);
 	
 	UNPROTECT(1);
 	
@@ -2680,11 +2936,10 @@ SEXP inBounds(SEXP vec1, SEXP vec3, SEXP lo1, SEXP hi1, SEXP hi3)
 	return ans;
 }
 
-SEXP getBounds(SEXP widths, SEXP start, SEXP end, SEXP minL, SEXP maxL, SEXP lenScores, SEXP kmer, SEXP Ksize, SEXP negOk, SEXP minS, SEXP partS)
+SEXP getBounds(SEXP widths, SEXP start, SEXP end, SEXP minL, SEXP maxL, SEXP lenScores, SEXP kmer, SEXP Ksize, SEXP negOk, SEXP minS, SEXP partS, SEXP minC)
 {
-	int j, e;
+	int i, j, e;
 	double score, temp;
-	int i = 1;
 	int s = 0;
 	int index = 0;
 	int strand = 0;
@@ -2700,6 +2955,7 @@ SEXP getBounds(SEXP widths, SEXP start, SEXP end, SEXP minL, SEXP maxL, SEXP len
 	int neg = asInteger(negOk);
 	double minScore = asReal(minS);
 	double partScore = asReal(partS);
+	double minConsider = asReal(minC);
 	
 	int midLength = 0;
 	for (i = 0; i < maxLength - minLength + 1; i++) {
@@ -2728,6 +2984,7 @@ SEXP getBounds(SEXP widths, SEXP start, SEXP end, SEXP minL, SEXP maxL, SEXP len
 	double *r = Calloc(size, double);
 	int count = 0;
 	
+	i = 1;
 	while (i < l) {
 		if (i >= ws[index]) {
 			index++;
@@ -2746,72 +3003,72 @@ SEXP getBounds(SEXP widths, SEXP start, SEXP end, SEXP minL, SEXP maxL, SEXP len
 			}
 		} else if (starts[i - 1] < starts[i]) { // ascended
 			s = i;
-		} else if (s >= 0 && starts[i - 1] > starts[i]) { // descended
-			for (j = s; j < i; j++)
-				if (kmers[s] > kmers[j])
-					s = j; // choose min
-			
-			e = s + minLength - 1;
-			if (e >= ws[index]) { // all out of bounds
-				i = ws[index];
-			} else if (starts[s] >= 0) {
-				score = ends[e];
-				score += kmers[e - k + 2] - kmers[s];
-				score += lS[e - s - minLength + 1];
-				for (j = e + 1; j < ws[index] && j < s + maxLength; j++) {
-					if (ends[j] >= 0 &&
-						starts[s] + ends[j] >= partScore) {
-						temp = ends[j];
-						if (j - s + 1 < midLength) { // add k-mer score
-							temp += kmers[j - k + 2] - kmers[s];
-						} else { // add average k-mer score for midLength
-							temp += (kmers[j - k + 2] - kmers[s])*midLength/(j - s + 1);
-						}
-						temp += lS[j - s - minLength + 1];
-						if (score < temp) {
-							e = j;
-							score = temp;
+		} else if (s >= 0) {
+			if (starts[i - 1] > starts[i]) { // descended
+				e = s + minLength - 1;
+				if (e >= ws[index]) { // all out of bounds
+					i = ws[index];
+				} else if (starts[s] >= minConsider) {
+					score = ends[e];
+					score += kmers[e - k + 2] - kmers[s];
+					score += lS[e - s - minLength + 1];
+					for (j = e + 1; j < ws[index] && j < s + maxLength; j++) {
+						if (ends[j] >= minConsider &&
+							starts[s] + ends[j] >= partScore) {
+							temp = ends[j];
+							if (j - s + 1 < midLength) { // add k-mer score
+								temp += kmers[j - k + 2] - kmers[s];
+							} else { // add average k-mer score for midLength
+								temp += (kmers[j - k + 2] - kmers[s])*midLength/(j - s + 1);
+							}
+							temp += lS[j - s - minLength + 1];
+							if (score < temp) {
+								e = j;
+								score = temp;
+							}
 						}
 					}
+					score += starts[s];
+					if (ends[e] >= minConsider &&
+						starts[s] + ends[e] >= partScore &&
+						score >= minScore) {
+						if (count + 9 >= size) {
+							size *= 2;
+							r = Realloc(r, size, double);
+						}
+						
+						if (strand) {
+							r[count++] = lX - index;
+						} else {
+							r[count++] = index + 1;
+						}
+						r[count++] = strand;
+						
+						// coordinates in XString
+						r[count++] = s + 1;
+						r[count++] = e + 1;
+						
+						r[count++] = score;
+						r[count++] = neg;
+						
+						// coordinates to XStringSet
+						if (strand) {
+							r[count++] = rev_width[index] - e + offsets[index];
+							r[count++] = rev_width[index] - s + offsets[index];
+						} else {
+							r[count++] = s - offsets[index] + 1;
+							r[count++] = e - offsets[index] + 1;
+						}
+						
+						r[count++] = starts[s] + ends[e];
+					}
+					
+					s = -1;
+				} else {
+					s = -1;
 				}
-				score += starts[s];
-				if (ends[e] >= 0 &&
-					starts[s] + ends[e] >= partScore &&
-					score >= minScore) {
-					if (count + 9 >= size) {
-						size *= 2;
-						r = Realloc(r, size, double);
-					}
-					
-					if (strand) {
-						r[count++] = lX - index;
-					} else {
-						r[count++] = index + 1;
-					}
-					r[count++] = strand;
-					
-					// coordinates in XString
-					r[count++] = s + 1;
-					r[count++] = e + 1;
-					
-					r[count++] = score;
-					r[count++] = neg;
-					
-					// coordinates to XStringSet
-					if (strand) {
-						r[count++] = rev_width[index] - e + offsets[index];
-						r[count++] = rev_width[index] - s + offsets[index];
-					} else {
-						r[count++] = s - offsets[index] + 1;
-						r[count++] = e - offsets[index] + 1;
-					}
-					
-					r[count++] = starts[s] + ends[e];
-				}
-				
-				s = -1;
-			} else {
-				s = -1;
+			} else if (kmers[s] > kmers[i]) { // starts[i - 1] == starts[i]
+				s = i; // choose min
 			}
 		}
 		
@@ -2978,4 +3235,112 @@ SEXP getHits(SEXP starts, SEXP ends, SEXP left1, SEXP left2, SEXP right1, SEXP r
 	UNPROTECT(1);
 	
 	return ans;
+}
+
+SEXP maxPerORF(SEXP orftable, SEXP scores)
+{
+	int i, j;
+	int tot = length(scores);
+	int *orfs = INTEGER(orftable); // tot rows
+	double *s = REAL(scores);
+	int myMax = 0; // index of max in ORF
+	int first = 0; // index of first row in ORF
+	
+	SEXP ans;
+	PROTECT(ans = allocVector(REALSXP, tot));
+	double *rans = REAL(ans);
+	
+	// loop through each candidate ORF
+	for (i = 1; i < tot; i++) {
+		if (orfs[first] != orfs[i] ||
+			orfs[first + tot] != orfs[i + tot]) {
+			for (j = first; j < i; j++)
+				rans[j] = s[myMax];
+			myMax = i;
+			first = i;
+		} else { // same index and strand
+			if (orfs[first + tot]) { // negative strand
+				if (orfs[first + 2*tot] != orfs[i + 2*tot]) { // switched ORF
+					for (j = first; j < i; j++)
+						rans[j] = s[myMax];
+					myMax = i;
+					first = i;
+				} else if (s[i] > s[myMax]) {
+					myMax = i;
+				}
+			} else { // positive strand
+				if (orfs[first + 3*tot] != orfs[i + 3*tot]) { // switched ORF
+					for (j = first; j < i; j++)
+						rans[j] = s[myMax];
+					myMax = i;
+					first = i;
+				} else if (s[i] > s[myMax]) {
+					myMax = i;
+				}
+			}
+		}
+	}
+	for (j = first; j < i; j++)
+		rans[j] = s[myMax];
+	
+	UNPROTECT(1);
+	
+	return ans;
+}
+
+SEXP scorePWM(SEXP pwm, SEXP x, SEXP minScore, SEXP nThreads)
+{
+	int i, j, k, c, lkup;
+	int count = 0;
+	// assume only IUPAC codes in x (no -, ., or +)
+	int lookup[16] = {-1, 0, 1, -1, 2, -1, -1, -1, 3, -1, -1, -1, -1, -1, -1, -1};
+	
+	double *p = REAL(pwm);
+	int l = length(pwm)/4; // length of pwm
+	double mS = asReal(minScore);
+	int nthreads = asInteger(nThreads);
+	
+	Chars_holder x_holder;
+	x_holder = hold_XRaw(x);
+	
+	double *scores = Calloc(x_holder.length, double);
+	#pragma omp parallel for private(i,j,k,lkup) num_threads(nthreads)
+	for (i = 0; i < x_holder.length - l + 1; i++) {
+		for (j = i, k = 0; j < i + l; j++, k += 4) {
+			lkup = lookup[(int)x_holder.ptr[j]];
+			if (lkup >= 0)
+				scores[i] += p[k + lkup];
+		}
+	}
+	for (i = 0; i < x_holder.length - l + 1; i++)
+		if (scores[i] >= mS)
+			count++;
+	
+	SEXP position, score;
+	PROTECT(position = allocVector(INTSXP, count));
+	int *pos = INTEGER(position);
+	PROTECT(score = allocVector(REALSXP, count));
+	double *sco = REAL(score);
+	
+	c = 0;
+	i = 0;
+	while (c < count) {
+		if (scores[i] >= mS) {
+			pos[c] = i + 1;
+			sco[c] = scores[i];
+			c++;
+		}
+		i++;
+	}
+	
+	Free(scores);
+	
+	SEXP ret_list;
+	PROTECT(ret_list = allocVector(VECSXP, 2));
+	SET_VECTOR_ELT(ret_list, 0, position);
+	SET_VECTOR_ELT(ret_list, 1, score);
+	
+	UNPROTECT(3);
+	
+	return ret_list;
 }
