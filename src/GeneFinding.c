@@ -27,6 +27,9 @@
 #include <omp.h>
 #endif
 
+// for calloc/free
+#include <stdlib.h>
+
 /*
  * Biostrings_interface.h is needed for the DNAencode(), get_XString_asRoSeq(),
  * init_match_reporting(), report_match() and reported_matches_asSEXP()
@@ -3292,18 +3295,31 @@ SEXP scorePWM(SEXP pwm, SEXP x, SEXP minScore, SEXP nThreads)
 {
 	int i, j, k, c, lkup;
 	int count = 0;
-	// assume only IUPAC codes in x (no -, ., or +)
-	int lookup[16] = {-1, 0, 1, -1, 2, -1, -1, -1, 3, -1, -1, -1, -1, -1, -1, -1};
 	
 	double *p = REAL(pwm);
 	int l = length(pwm)/4; // length of pwm
 	double mS = asReal(minScore);
 	int nthreads = asInteger(nThreads);
 	
+	int *lookup = calloc(256, sizeof(int));
+	for (i = 0; i < 256; i++) {
+		if (i == 1) {
+			lookup[i] = 0;
+		} else if (i == 2) {
+			lookup[i] = 1;
+		} else if (i == 4) {
+			lookup[i] = 2;
+		} else if (i == 8) {
+			lookup[i] = 3;
+		} else {
+			lookup[i] = -1;
+		}
+	}
+	
 	Chars_holder x_holder;
 	x_holder = hold_XRaw(x);
 	
-	double *scores = Calloc(x_holder.length, double);
+	double *scores = calloc(x_holder.length, sizeof(double));
 	#pragma omp parallel for private(i,j,k,lkup) num_threads(nthreads)
 	for (i = 0; i < x_holder.length - l + 1; i++) {
 		for (j = i, k = 0; j < i + l; j++, k += 4) {
@@ -3312,6 +3328,7 @@ SEXP scorePWM(SEXP pwm, SEXP x, SEXP minScore, SEXP nThreads)
 				scores[i] += p[k + lkup];
 		}
 	}
+	free(lookup);
 	for (i = 0; i < x_holder.length - l + 1; i++)
 		if (scores[i] >= mS)
 			count++;
@@ -3333,7 +3350,7 @@ SEXP scorePWM(SEXP pwm, SEXP x, SEXP minScore, SEXP nThreads)
 		i++;
 	}
 	
-	Free(scores);
+	free(scores);
 	
 	SEXP ret_list;
 	PROTECT(ret_list = allocVector(VECSXP, 2));
@@ -3343,4 +3360,98 @@ SEXP scorePWM(SEXP pwm, SEXP x, SEXP minScore, SEXP nThreads)
 	UNPROTECT(3);
 	
 	return ret_list;
+}
+
+// return the top scoring pwm hit starting at each begin + positions + 1
+SEXP scoreTopPWM(SEXP pwm, SEXP x, SEXP begin, SEXP positions, SEXP nThreads)
+{
+	int i, j, k, m, lkup;
+	double score;
+	
+	int *s = INTEGER(begin);
+	int l1 = length(begin);
+	int *pos = INTEGER(positions);
+	int l2 = length(positions);
+	double *p = REAL(pwm);
+	int l = length(pwm)/4; // length of pwm
+	int nthreads = asInteger(nThreads);
+	
+	int *lookup = calloc(256, sizeof(int));
+	for (i = 0; i < 256; i++) {
+		if (i == 1) {
+			lookup[i] = 0;
+		} else if (i == 2) {
+			lookup[i] = 1;
+		} else if (i == 4) {
+			lookup[i] = 2;
+		} else if (i == 8) {
+			lookup[i] = 3;
+		} else {
+			lookup[i] = -1;
+		}
+	}
+	
+	Chars_holder x_holder;
+	x_holder = hold_XRaw(x);
+	
+	SEXP ans;
+	PROTECT(ans = allocVector(REALSXP, l1));
+	double *rans = REAL(ans);
+	
+	#pragma omp parallel for private(i,j,k,m,lkup,score) num_threads(nthreads)
+	for (i = 0; i < l1; i++) {
+		rans[i] = -1e53;
+		
+		for (m = 0; m < l2; m++) {
+			score = 0;
+			for (j = s[i] + pos[m], k = 0; j < s[i] + pos[m] + l; j++, k += 4) {
+				lkup = lookup[(int)x_holder.ptr[j]];
+				if (lkup >= 0)
+					score += p[k + lkup];
+			}
+			if (score > rans[i])
+				rans[i] = score;
+		}
+	}
+	
+	free(lookup);
+	
+	UNPROTECT(1);
+	
+	return ans;
+}
+
+SEXP dist(SEXP x, SEXP nThreads)
+{
+	int i, j, k, m;
+	double d, z;
+	double *y = REAL(x);
+	SEXP dim = getAttrib(x, R_DimSymbol);
+	int nrow = INTEGER(dim)[0];
+	int ncol = INTEGER(dim)[1];
+	int nthreads = asInteger(nThreads);
+	
+	SEXP ans;
+	if (nrow < 2) { // there is only one sequence
+		PROTECT(ans = NEW_INTEGER(0));
+	} else {
+		PROTECT(ans = allocVector(REALSXP, nrow*(nrow - 1)/2));
+		double *rans = REAL(ans);
+		
+		#pragma omp parallel for private(i,j,k,d,m) num_threads(nthreads)
+		for (i = 0; i < nrow; i++) {
+			for (j = i + 1; j < nrow; j++) {
+				d = 0;
+				for (k = 0, m = 0; k < ncol; k++, m += nrow) {
+					z = y[m + i] - y[m + j];
+					d += z*z;
+				}
+				rans[nrow*i - i*(i + 1)/2 + j - i - 1] = sqrt(d);
+			}
+		}
+	}
+	
+	UNPROTECT(1);
+	
+	return ans;
 }

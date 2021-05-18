@@ -14,6 +14,7 @@ FindGenes(myDNAStringSet,
           allowEdges = TRUE,
           allScores = FALSE,
           showPlot = FALSE,
+          processors = 1,
           verbose = TRUE)
 }
 \arguments{
@@ -37,6 +38,9 @@ Logical indicating whether to return information about all possible open reading
 }
   \item{showPlot}{
 Logical determining whether a plot is displayed with the distribution of gene lengths and scores.  (See details section below.)
+}
+  \item{processors}{
+The number of processors to use, or \code{NULL} to automatically detect and use all available processors.
 }
   \item{verbose}{
 Logical indicating whether to print information about the predictions on each iteration.  (See details section below.)

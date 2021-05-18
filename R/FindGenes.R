@@ -8,7 +8,8 @@
 	minScore,
 	includeLength,
 	alternateScores,
-	startScores) {
+	startScores,
+	maxScore) {
 	
 	maxFracOverlap <- 0.25 # max overlap with adjacent genes
 	maxFracOverlapInclude <- 0.01 # max overlap for forcing inclusion
@@ -92,19 +93,21 @@
 	indices <- w[o[indices]]
 	
 	missing <- which(alllengths >= includeLength &
-		totScore < minScore &
+		maxScore < minScore &
 		alternateScores >= minScore &
 		startScores > 0)
-	currIndex <- 0L
+	currIndex <- 0
 	while (length(missing) > 0) {
 		if (currIndex != allstarts[missing[1L], 1L]) {
 			currIndex <- allstarts[missing[1L], 1L]
 			W <- which(allstarts[, 1L]==allstarts[missing[1L], 1L])
+			begins <- allstarts[W, 3L]
+			ends <- allstarts[W, 4L]
 		}
 		if (allstarts[missing[1], 2L]==1L) { # reverse strand
-			w <- W[allstarts[W, 3L]==allstarts[missing[1L], 3L]]
+			w <- W[begins==allstarts[missing[1L], 3L]]
 		} else { # forward strand
-			w <- W[allstarts[W, 4L]==allstarts[missing[1L], 4L]]
+			w <- W[ends==allstarts[missing[1L], 4L]]
 		}
 		if (all(totScore[w] < minScore)) { # could not be included already
 			# pick max scoring (long) ORF to include
@@ -348,6 +351,7 @@ FindGenes <- function(myDNAStringSet,
 	allowEdges=TRUE,
 	allScores=FALSE,
 	showPlot=FALSE,
+	processors=1,
 	verbose=TRUE) {
 	
 	# set default parameters
@@ -369,11 +373,11 @@ FindGenes <- function(myDNAStringSet,
 	temp <- 37 # degrees Celsius
 	ions <- 1 # Na+ equivalents
 	length_params <- c(-4, 1400, 0.25, -10, 200) # initial parameters for sigmoid fitting the distribution of gene lengths
-	includeMultiplier <- 1 # multiplier on x_intercept to seek inclusion despite negative score
+	includeMultiplier <- 2 # multiplier on x_intercept to seek inclusion despite negative score
 	startCodonDist <- c("ATG"=85, "GTG"=10, "TTG"=4.9996, "CTG"=0.0001, "ATA"=0.0001, "ATT"=0.0001, "ATC"=0.0001) # prior distribution of initial codon frequencies
 	signals <- matrix(c(3, 8, 1, 9, 12, 10, 4, 0, 2, 6, 7, 11),
 		nrow=3)
-	codonFreqCutoff <- c(0.10, 0.15, 0.25) # average distance of codon frequencies within models
+	codonFreqCutoff <- c(0.10, 0.15, 0.25) # maximum average distance of codon frequencies within models
 	improvement <- 20 # score increase required to choose an alternate codon model
 	lenScrMultiplier <- 2 # multiplier on positive length scores
 	staScrMultiplier <- 2 # multiplier on start scores
@@ -470,6 +474,17 @@ FindGenes <- function(myDNAStringSet,
 		stop("allScores must be a logical.")
 	if (!is.logical(showPlot))
 		stop("showPlot must be a logical.")
+	if (!is.null(processors) && !is.numeric(processors))
+		stop("processors must be a numeric.")
+	if (!is.null(processors) && floor(processors)!=processors)
+		stop("processors must be a whole number.")
+	if (!is.null(processors) && processors < 1)
+		stop("processors must be at least 1.")
+	if (is.null(processors)) {
+		processors <- detectCores()
+	} else {
+		processors <- as.integer(processors)
+	}
 	if (!is.logical(verbose))
 		stop("verbose must be a logical.")
 	
@@ -655,7 +670,12 @@ FindGenes <- function(myDNAStringSet,
 			alternateScores=c(preScr,
 				rep(0, length(includeScores))),
 			startScores=c(staScr,
-				rep(0, length(includeScores))))
+				rep(0, length(includeScores))),
+			maxScore=c(.Call("maxPerORF",
+					ORFs,
+					orf_scores,
+					PACKAGE="DECIPHER"),
+				includeScores))
 	} else {
 		indices <- .chainGenes(ORFs,
 			orf_scores,
@@ -667,7 +687,11 @@ FindGenes <- function(myDNAStringSet,
 			minScore=cutoff,
 			includeLength=includeMultiplier*x_intercept,
 			alternateScores=preScr,
-			startScores=staScr)
+			startScores=staScr,
+			maxScore=.Call("maxPerORF",
+				ORFs,
+				orf_scores,
+				PACKAGE="DECIPHER"))
 	}
 	
 	if (verbose) {
@@ -895,9 +919,15 @@ FindGenes <- function(myDNAStringSet,
 		if (multiModel) {
 			if (nrow(codFreqs) > 10000) # use a subset
 				codFreqs <- codFreqs[seq_len(10000),]
-			dists <- dist(codFreqs)
+			dists <- .Call("dist",
+				codFreqs,
+				processors,
+				PACKAGE="DECIPHER")
+			attr(dists, "Size") <- nrow(codFreqs)
+			class(dists) <- "dist"
 			clust <- IdClusters(dists,
 				cutoff=codonFreqCutoff,
+				processors=processors,
 				verbose=FALSE)
 			clusts <- list()
 			for (i in seq_along(codonFreqCutoff))
@@ -1250,10 +1280,12 @@ FindGenes <- function(myDNAStringSet,
 				motif <- DNAStringSet(motif)
 				
 				dists <- DistanceMatrix(motif,
+					processors=processors,
 					verbose=FALSE)
 				clusts <- IdClusters(dists,
 					method="complete",
 					cutoff=1/RBSk, # 1 mismatch
+					processors=processors,
 					verbose=FALSE)
 				clusts <- clusts$cluster
 				o <- tapply(score,
@@ -1304,18 +1336,13 @@ FindGenes <- function(myDNAStringSet,
 					upstreamWidth - RBSk,
 					1L)
 				for (i in seq_along(PWMs)) {
-					temp <- numeric(length(begin))
-					for (j in seq_along(pos)) {
-#						w <- which(pos[j] + RBSk <= width(upstream))
-						PWMscore <- PWMscoreStartingAt(PWMs[[i]],
-							merged,
-#							starting.at=begin[w] + pos[j] + 1L)
-							starting.at=begin + pos[j] + 1L)
-#						W <- which(PWMscore > scores[w])
-#						scores[w[W]] <- PWMscore[W]
-						W <- PWMscore > temp
-						temp[W] <- PWMscore[W]
-					}
+					temp <- .Call("scoreTopPWM",
+						PWMs[[i]],
+						merged,
+						begin,
+						pos,
+						processors,
+						PACKAGE="DECIPHER")
 					if (length(w) > 0) {
 						scores <- numeric(length(upstream))
 						scores[-w] <- temp
@@ -1465,7 +1492,12 @@ FindGenes <- function(myDNAStringSet,
 				alternateScores=c(preScr,
 					rep(0, length(includeScores))),
 				startScores=c(staScr,
-					rep(0, length(includeScores))))
+					rep(0, length(includeScores))),
+				maxScore=c(.Call("maxPerORF",
+						ORFs,
+						orf_scores,
+						PACKAGE="DECIPHER"),
+					includeScores))
 		} else {
 			indices <- .chainGenes(ORFs,
 				orf_scores,
@@ -1477,7 +1509,11 @@ FindGenes <- function(myDNAStringSet,
 				minScore=cutoff,
 				includeLength=includeMultiplier*x_intercept,
 				alternateScores=preScr,
-				startScores=staScr)
+				startScores=staScr,
+				maxScore=.Call("maxPerORF",
+					ORFs,
+					orf_scores,
+					PACKAGE="DECIPHER"))
 		}
 		
 		if (showPlot) {

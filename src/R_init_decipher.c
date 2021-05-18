@@ -150,6 +150,8 @@ static const R_CallMethodDef callMethods[] = { // method call, pointer, num args
 	{"replaceGaps", (DL_FUNC) &replaceGaps, 4},
 	{"intMatchSelfOnce", (DL_FUNC) &intMatchSelfOnce, 2},
 	{"scorePWM", (DL_FUNC) &scorePWM, 4},
+	{"scoreTopPWM", (DL_FUNC) &scoreTopPWM, 5},
+	{"dist", (DL_FUNC) &dist, 2},
 	{NULL, NULL, 0}
 };
 

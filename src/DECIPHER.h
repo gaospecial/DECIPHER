@@ -321,3 +321,7 @@ SEXP scoreCouplingModel(SEXP x, SEXP orftable, SEXP coupling_scores, SEXP aatabl
 SEXP maxPerORF(SEXP orftable, SEXP scores);
 
 SEXP scorePWM(SEXP pwm, SEXP x, SEXP minScore, SEXP nThreads);
+
+SEXP scoreTopPWM(SEXP pwm, SEXP x, SEXP begin, SEXP positions, SEXP nThreads);
+
+SEXP dist(SEXP x, SEXP nThreads);
