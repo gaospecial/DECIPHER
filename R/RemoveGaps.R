@@ -1,5 +1,6 @@
 RemoveGaps <- function(myXStringSet,
 	removeGaps="all",
+	includeMask=FALSE,
 	processors=1) {
 	
 	# error checking
@@ -18,6 +19,8 @@ RemoveGaps <- function(myXStringSet,
 		stop("Invalid removeGaps method.")
 	if (removeGaps == -1)
 		stop("Ambiguous removeGaps method.")
+	if (!is.logical(includeMask))
+		stop("includeMask must be a logical.")
 	if (!is.null(processors) && !is.numeric(processors))
 		stop("processors must be a numeric.")
 	if (!is.null(processors) && floor(processors)!=processors)
@@ -35,6 +38,7 @@ RemoveGaps <- function(myXStringSet,
 		myXStringSet <- .Call("removeGaps",
 			myXStringSet,
 			type,
+			includeMask,
 			processors,
 			PACKAGE="DECIPHER")
 		names(myXStringSet) <- ns
@@ -43,6 +47,7 @@ RemoveGaps <- function(myXStringSet,
 		myXStringSet <- .Call("removeCommonGaps",
 			myXStringSet,
 			type,
+			includeMask,
 			processors,
 			PACKAGE="DECIPHER")
 		names(myXStringSet) <- ns

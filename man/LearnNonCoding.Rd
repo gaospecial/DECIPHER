@@ -48,6 +48,9 @@ Non-coding RNAs belonging to the same family typically have conserved sequence m
 \value{
 An object of class \code{NonCoding}.
 }
+\references{
+Wright, E. S. (2021). FindNonCoding: rapid and simple detection of non-coding RNAs in genomes. Bioinformatics. https://doi.org/10.1093/bioinformatics/btab708
+}
 \author{
 Erik Wright \email{eswright@pitt.edu}
 }

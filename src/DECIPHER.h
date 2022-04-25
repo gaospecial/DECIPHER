@@ -12,9 +12,9 @@ SEXP consensusProfile(SEXP x, SEXP weight, SEXP structs);
 
 SEXP consensusProfileAA(SEXP x, SEXP weight, SEXP structs);
 
-SEXP colScores(SEXP x, SEXP subMatrix, SEXP go, SEXP ge, SEXP weights, SEXP structs, SEXP dbnMatrix);
+SEXP colScores(SEXP x, SEXP subMatrix, SEXP go, SEXP ge, SEXP terminalGaps, SEXP weights, SEXP structs, SEXP dbnMatrix);
 
-SEXP colScoresAA(SEXP x, SEXP subMatrix, SEXP go, SEXP ge, SEXP weights, SEXP structs, SEXP hecMatrix);
+SEXP colScoresAA(SEXP x, SEXP subMatrix, SEXP go, SEXP ge, SEXP terminalGaps, SEXP weights, SEXP structs, SEXP hecMatrix);
 
 SEXP shiftGaps(SEXP x, SEXP subMatrix, SEXP go, SEXP ge, SEXP gl, SEXP sc, SEXP thresh, SEXP weights);
 
@@ -22,7 +22,7 @@ SEXP shiftGapsAA(SEXP x, SEXP subMatrix, SEXP go, SEXP ge, SEXP gl, SEXP sc, SEX
 
 // DistanceMatrix.c
 
-SEXP distMatrix(SEXP x, SEXP t, SEXP terminalGaps, SEXP penalizeGapGaps, SEXP penalizeGapLetters, SEXP fullMatrix, SEXP output, SEXP verbose, SEXP pBar, SEXP nThreads);
+SEXP distMatrix(SEXP x, SEXP t, SEXP terminalGaps, SEXP penalizeGapGaps, SEXP penalizeGapLetters, SEXP fullMatrix, SEXP output, SEXP e, SEXP verbose, SEXP pBar, SEXP nThreads);
 
 SEXP gaps(SEXP x, SEXP t);
 
@@ -46,7 +46,9 @@ SEXP adjustHeights(SEXP x);
 
 // ClusterML.c
 
-SEXP clusterML(SEXP x, SEXP y, SEXP model, SEXP branches, SEXP lengths, SEXP states, SEXP type, SEXP nThreads);
+SEXP clusterML(SEXP x, SEXP y, SEXP model, SEXP branches, SEXP lengths, SEXP states, SEXP type, SEXP weights, SEXP nThreads);
+
+SEXP expM(SEXP x, SEXP model, SEXP type);
 
 // DesignProbes.c
 
@@ -116,9 +118,9 @@ SEXP calculateFISH(SEXP probes, SEXP targets);
 
 // AlignProfiles.c
 
-SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SEXP pm, SEXP mm, SEXP go, SEXP ge, SEXP exp, SEXP power, SEXP endGapPenaltyLeft, SEXP endGapPenaltyRight, SEXP boundary, SEXP nThreads);
+SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SEXP pm, SEXP mm, SEXP go, SEXP ge, SEXP exp, SEXP power, SEXP endGapPenaltyLeft, SEXP endGapPenaltyRight, SEXP boundary, SEXP norm, SEXP nThreads);
 
-SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SEXP ge, SEXP exp, SEXP power, SEXP endGapPenaltyLeft, SEXP endGapPenaltyRight, SEXP boundary, SEXP nThreads);
+SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SEXP ge, SEXP exp, SEXP power, SEXP endGapPenaltyLeft, SEXP endGapPenaltyRight, SEXP boundary, SEXP norm, SEXP nThreads);
 
 // EnumerateSequence.c
 
@@ -164,9 +166,9 @@ SEXP expandAmbiguities(SEXP x, SEXP c);
 
 // RemoveGaps.c
 
-SEXP removeCommonGaps(SEXP x, SEXP type, SEXP nThreads);
+SEXP removeCommonGaps(SEXP x, SEXP type, SEXP mask, SEXP nThreads);
 
-SEXP removeGaps(SEXP x, SEXP type, SEXP nThreads);
+SEXP removeGaps(SEXP x, SEXP type, SEXP mask, SEXP nThreads);
 
 // PredictHEC.c
 
@@ -198,7 +200,7 @@ SEXP fillOverlaps(SEXP m, SEXP n);
 
 SEXP indexByContig(SEXP starts, SEXP ends, SEXP order, SEXP index, SEXP widths);
 
-SEXP chainSegments(SEXP x_s, SEXP x_e, SEXP x_i, SEXP x_f, SEXP y_s, SEXP y_e, SEXP y_i, SEXP y_f, SEXP weights, SEXP sepCost, SEXP gapCost, SEXP shiftCost, SEXP codingCost, SEXP maxSep, SEXP maxGap, SEXP ordering, SEXP minScore, SEXP minW);
+SEXP chainSegments(SEXP x_s, SEXP x_e, SEXP x_i, SEXP x_f, SEXP y_s, SEXP y_e, SEXP y_i, SEXP y_f, SEXP weights, SEXP sepCost, SEXP gapCost, SEXP shiftCost, SEXP codingCost, SEXP maxSep, SEXP maxGap, SEXP ordering, SEXP minScore, SEXP minW, SEXP allowOverlap);
 
 SEXP extendSegments(SEXP X, SEXP W1, SEXP W2, SEXP S1, SEXP S2, SEXP O1P, SEXP O1N, SEXP O2P, SEXP O2N, SEXP S, SEXP maxDrop, SEXP INDEX1, SEXP INDEX2);
 
@@ -325,3 +327,7 @@ SEXP scorePWM(SEXP pwm, SEXP x, SEXP minScore, SEXP nThreads);
 SEXP scoreTopPWM(SEXP pwm, SEXP x, SEXP begin, SEXP positions, SEXP nThreads);
 
 SEXP dist(SEXP x, SEXP nThreads);
+
+// ClusterMP.c
+
+SEXP clusterMP(SEXP x, SEXP z, SEXP s, SEXP sizes, SEXP scoreOnly, SEXP add, SEXP weights, SEXP nThreads);

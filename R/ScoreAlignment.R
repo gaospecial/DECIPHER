@@ -1,14 +1,14 @@
-AdjustAlignment <- function(myXStringSet,
-	perfectMatch=5,
+ScoreAlignment <- function(myXStringSet,
+	method="pairs",
+	perfectMatch=1,
 	misMatch=0,
-	gapLetter=-3,
-	gapOpening=-0.1,
-	gapExtension=0,
+	gapOpening=-7.5,
+	gapExtension=-0.6,
 	substitutionMatrix=NULL,
-	shiftPenalty=-0.2,
-	threshold=0.1,
-	weight=1,
-	processors=1) {
+	structures=NULL,
+	structureMatrix=NULL,
+	includeTerminalGaps=FALSE,
+	weight=1) {
 	
 	# error checking
 	if (is(myXStringSet, "DNAStringSet")) {
@@ -20,13 +20,18 @@ AdjustAlignment <- function(myXStringSet,
 	} else {
 		stop("myXStringSet must be an AAStringSet, DNAStringSet, or RNAStringSet.")
 	}
-	if (length(myXStringSet) < 2)
-		return(myXStringSet)
+	l <- length(myXStringSet)
+	if (l < 2)
+		return(0)
 	u <- unique(width(myXStringSet))
 	if (length(u) != 1)
 		stop("Sequences in myXStringSet must be the same width (aligned).")
-	if (u < 4) # no changes can be made
-		return(myXStringSet)
+	METHODS <- c("pairs", "adjacent")
+	method <- pmatch(method[1], METHODS)
+	if (is.na(method))
+		stop("Invalid method.")
+	if (method==-1)
+		stop("Ambiguous method.")
 	if (!is.numeric(perfectMatch))
 		stop("perfectMatch must be a numeric.")
 	if (perfectMatch < 0)
@@ -35,10 +40,6 @@ AdjustAlignment <- function(myXStringSet,
 		stop("misMatch must be a numeric.")
 	if (misMatch > 0)
 		stop("misMatch must be less than or equal to zero.")
-	if (!is.numeric(gapLetter))
-		stop("gapLetter must be a numeric.")
-	if (gapLetter > 0)
-		stop("gapLetter must be less than or equal to zero.")
 	if (!is.numeric(gapOpening))
 		stop("gapOpening must be a numeric.")
 	if (gapOpening > 0)
@@ -47,14 +48,8 @@ AdjustAlignment <- function(myXStringSet,
 		stop("gapExtension must be a numeric.")
 	if (gapExtension > 0)
 		stop("gapExtension must be less than or equal to zero.")
-	if (!is.numeric(threshold))
-		stop("threshold must be a numeric.")
-	if (threshold < 0)
-		stop("threshold must be at least zero.")
-	if (!is.numeric(shiftPenalty))
-		stop("shiftPenalty must be a numeric.")
-	if (shiftPenalty > 0)
-		stop("shiftPenalty must be less than or equal to zero.")
+	if (!is.logical(includeTerminalGaps))
+		stop("includeTerminalGaps must be a logical.")
 	if (!is.numeric(weight))
 		stop("weight must be a numeric.")
 	if (length(weight)!=1 && length(weight)!=length(myXStringSet))
@@ -64,17 +59,6 @@ AdjustAlignment <- function(myXStringSet,
 	} else {
 		if (!isTRUE(all.equal(1, mean(weight))))
 			stop("The mean of weight must be 1.")
-	}
-	if (!is.null(processors) && !is.numeric(processors))
-		stop("processors must be a numeric.")
-	if (!is.null(processors) && floor(processors)!=processors)
-		stop("processors must be a whole number.")
-	if (!is.null(processors) && processors < 1)
-		stop("processors must be at least 1.")
-	if (is.null(processors)) {
-		processors <- detectCores()
-	} else {
-		processors <- as.integer(processors)
 	}
 	
 	if (type==3L) { # AAStringSet
@@ -99,59 +83,114 @@ AdjustAlignment <- function(myXStringSet,
 			subMatrix <- eval(parse(text=data(list=substitutionMatrix, envir=environment(), package=ifelse(substitutionMatrix=="MIQS", "DECIPHER", "Biostrings"))))
 		}
 		subMatrix <- subMatrix[AAs, AAs]
-		subMatrix <- as.numeric(subMatrix)
+		mode(subMatrix) <- "numeric"
 		
-		functionCall <- "shiftGapsAA"
+		functionCall <- "colScoresAA"
 	} else { # DNAStringSet or RNAStringSet
+		bases <- c("A", "C", "G",
+			ifelse(type == 2L, "U", "T"))
 		if (is.matrix(substitutionMatrix)) {
-			bases <- c("A", "C", "G",
-				ifelse(type==2L, "U", "T"))
 			if (any(!(bases %in% dimnames(substitutionMatrix)[[1]])) ||
 				any(!(bases %in% dimnames(substitutionMatrix)[[2]])))
 				stop("substitutionMatrix is incomplete.")
 			subMatrix <- substitutionMatrix[bases, bases]
 		} else if (is.null(substitutionMatrix)) {
 			subMatrix <- matrix(misMatch,
-				nrow=4, ncol=4)
+				nrow=4,
+				ncol=4,
+				dimnames=list(bases, bases))
 			diag(subMatrix) <- perfectMatch
 		} else {
 			stop("substitutionMatrix must be NULL or a matrix.")
 		}
 		
-		functionCall <- "shiftGaps"
+		functionCall <- "colScores"
+	}
+	if (!is.null(structures)) {
+		if (length(structures) != l)
+			stop("structures is not the same length as myXStringSet.")
+		if (typeof(structures) != "list")
+			stop("structures must be a list.")
+		# assume structures and matrix are ordered the same
+		if (!is.double(structureMatrix))
+			stop("structureMatrix must contain numerics.")
+		if (!is.matrix(structureMatrix))
+			stop("structureMatrix must be a matrix.")
+		if (dim(structureMatrix)[1] != dim(structureMatrix)[2])
+			stop("structureMatrix is not square.")
+		if (dim(structureMatrix)[1] != dim(structures[[1]])[1])
+			stop("Dimensions of structureMatrix are incompatible with the structures.")
+	} else {
+		if (!is.null(structureMatrix))
+			stop("structureMatrix specified without structures.")
+		structureMatrix <- numeric()
 	}
 	
-	# add gaps to both ends of the sequences
-	ns <- names(myXStringSet)
-	myXStringSet <- .Call("insertGaps",
-		myXStringSet,
-		c(1L, u + 1L),
-		c(1L, 1L),
-		type,
-		processors,
-		PACKAGE="DECIPHER")
+	if (method == 1L) { # pairs
+		z <- .Call(functionCall,
+			myXStringSet,
+			subMatrix,
+			gapOpening/2, # applied at both ends
+			gapExtension,
+			includeTerminalGaps,
+			weight,
+			structures,
+			structureMatrix)
+		z <- sum(z)
+	} else { # adjacent (method == 2L)
+		s <- as.matrix(myXStringSet)
+		s <- matrix(match(s, rownames(subMatrix)),
+			ncol(s),
+			byrow=TRUE)
+		g <- !is.na(s)
+		
+		z <- 0
+		for (k in seq_len(ncol(s) - 1)) { # each adjacent pair
+			# score similarity
+			g1 <- g[, k]
+			g2 <- g[, k + 1L]
+			z <- z + sum(subMatrix[s[g1 & g2, k:(k + 1L), drop=FALSE]])
+			
+			# score gaps
+			w <- which(g1 != g2)
+			if (!includeTerminalGaps) {
+				reject <- logical(length(w))
+				i <- 1L
+				while (i <= length(w) && w[i] == i) {
+					reject[i] <- TRUE
+					i <- i + 1L
+				}
+				j <- u
+				i <- length(w)
+				while (i >= 1 && w[i] == j) {
+					reject[i] <- TRUE
+					i <- i - 1L
+					j <- j - 1L
+				}
+				w <- w[!reject]
+			}
+			if (length(w) > 0) {
+				e <- w[-length(w)] + 1L == w[-1L]
+				e <- sum(e)
+				z <- z + gapOpening*(length(w) - e)
+				z <- z + gapExtension*e
+			}
+			
+			# score structures
+			if (length(structureMatrix) > 0L) {
+				c1 <- cumsum(g1)
+				c2 <- cumsum(g2)
+				w <- which(g1 & g2)
+				s1 <- structures[[k]][, c1[w], drop=FALSE]
+				s2 <- structures[[k + 1L]][, c2[w], drop=FALSE]
+				s1 <- lapply(seq_len(nrow(s1)), function(x) s1[x,])
+				s2 <- lapply(seq_len(nrow(s2)), function(x) s2[x,])
+				for (i in seq_along(s1))
+					for (j in seq_along(s2))
+						z <- z + structureMatrix[i, j]*sum(s1[[i]]*s2[[j]])
+			}
+		}
+	}
 	
-	# adjust the alignment
-	myXStringSet <- .Call(functionCall,
-		myXStringSet, # in-place change of myXStringSet (requires previous temporary copy)
-		as.numeric(subMatrix),
-		gapOpening,
-		gapExtension,
-		gapLetter,
-		shiftPenalty,
-		threshold,
-		weight,
-		PACKAGE="DECIPHER")
-	
-	# remove all 100% gap columns
-	myXStringSet <- .Call("removeCommonGaps",
-		myXStringSet,
-		type,
-		FALSE, # includeMask
-		processors,
-		PACKAGE="DECIPHER")
-	
-	names(myXStringSet) <- ns
-	
-	return(myXStringSet)
+	return(z)
 }

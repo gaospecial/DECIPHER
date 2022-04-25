@@ -296,7 +296,7 @@ Some of these intergenic regions might be similar to each other.  We can find re
 <<expr16,eval=TRUE>>=
 intergenic <- c(intergenic, reverseComplement(intergenic))
 names(intergenic) <- c(w, paste(w, "rc", sep="_"))
-clusts <- IdClusters(myXStringSet=intergenic, method="inexact", cutoff=0.2)
+clusts <- IdClusters(myXStringSet=intergenic, cutoff=0.2)
 @
 
 Since we used \code{inexact} clustering, the clusters containing the longest sequences will be first.  We can look at sequences belonging to the first cluster:

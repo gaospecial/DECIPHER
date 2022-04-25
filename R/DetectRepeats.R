@@ -1,8 +1,8 @@
 DetectRepeats <- function(myXStringSet,
 	type="tandem",
-	minScore=10,
+	minScore=15,
 	allScores=FALSE,
-	maxPeriod=10000,
+	maxPeriod=1000,
 	maxFailures=2,
 	maxShifts=5,
 	alphabet=AA_REDUCED[[125]],
@@ -21,6 +21,8 @@ DetectRepeats <- function(myXStringSet,
 		stop("Invalid type.")
 	if (type==-1)
 		stop("Ambiguous type.")
+	if (length(myXStringSet) == 0)
+		stop("myXStringSet must contain at least one sequence.")
 	if (is(myXStringSet, "DNAStringSet")) {
 		xtype <- 1L
 	} else if (is(myXStringSet, "RNAStringSet")) {
@@ -63,10 +65,15 @@ DetectRepeats <- function(myXStringSet,
 	}
 	if (!is.numeric(minScore) || length(minScore) > 1)
 		stop("minScore must be a numeric.")
+	if (minScore < 0)
+		stop("minScore must be at least zero.")
 	if (!is.logical(allScores))
 		stop("allScores must be a logical.")
 	if (!is.numeric(maxPeriod) || length(maxPeriod) > 1)
 		stop("maxPeriod must be a numeric.")
+	if (maxPeriod < 1)
+		stop("maxPeriod must be at least one.")
+	maxPeriod <- min(maxPeriod, max(2000, width(myXStringSet))/2)
 	if (!is.numeric(maxFailures))
 		stop("maxFailures must be a numeric.")
 	if (maxFailures != floor(maxFailures))
@@ -106,133 +113,64 @@ DetectRepeats <- function(myXStringSet,
 	
 	# default parameters
 	N <- 10 # find k-mers on average N times per maxPeriod
-	gapCost <- c(4, 1.5) # cost of opening and extending each gap in the alignment of repeats
-	maxExact <- 1e4 # maximum combinations to use exact scoring
+	gapCost <- c(-2.6, -0.1) # gap open and extension coefficients
 	mult <- 2L # multiplier on K for lookahead length
-	ratio <- 0.2 # ratio of repeat length to periodicity worth aligning
-	transition <- 0.3 # relative similarity for transitions
+	maxVisits <- 1L # maximum attempts to detect repeats in each position
 	
-	# multinomial test
-	.multinomial <- function(x,
-		p,
-		gapCost) {
-		
-		if (xtype == 3L) {
-			m <- .Call("consensusProfileAA",
-						x,
-						rep(1, length(x)),
-						NULL,
-						PACKAGE="DECIPHER")
-			m2 <- rowsum(m[1:20,, drop=FALSE], alphabet)
-			m2 <- t(m2)
-			gapEx <- (1 - m[24,]*m[27,])*m[27,]
-			gapOp <- (m[, 25] > 0) + (m[, 26] > 0)
-			m <- m2/(1 - m[24,])*gapEx
-		} else {
-			m <- .Call("consensusProfile",
-						x,
-						rep(1, length(x)),
-						NULL,
-						PACKAGE="DECIPHER")
-			m <- t(m)
-			gapEx <- (1 - m[, 5]*m[, 8])*m[, 8]
-			gapOp <- (m[, 6] > 0) + (m[, 7] > 0)
-			m <- m[, 1:4, drop=FALSE]/(1 - m[, 5])*gapEx
+	.score <- function(x,
+		gapCost,
+		POSL=NA_integer_,
+		POSR=NA_integer_) {
+		if (length(POSL) > 1L) { # not NA
+			period <- POSR - POSL + 1L
+			period <- range(period)
+			period <- period[1L]/period[2L]
+			if (period < 0.3)
+				return(-Inf)
 		}
 		
-		m <- m*length(x)
-		a <- apply(m,
-			1,
-			function(x) {
-				sx <- sum(x)
-				if (sx <= length(ecdfs)) { # use exact
-					y <- dmultinom(x, prob=p)
-					y <- ecdfs[[ceiling(sx)]][[1L]](y)*y
-					y <- y*ecdfs[[ceiling(sx)]][[2L]]
-					log(y)
-				} else { # approximate
-					chisq <- sum(x)*p
-					chisq <- sum((x - chisq)^2/chisq)
-					pchisq(chisq,
-						length(x) - 1,
-						lower.tail=FALSE,
-						log.p=TRUE)
-				}
-			})
-		a <- a + gapCost[2]*(1 - gapEx)*length(x)
-		a <- a + gapCost[1]*gapOp*length(x)
+		if (xtype == 3L)
+			structures <- mapply(function(a, b) struct[, a:b, drop=FALSE],
+				POSL,
+				POSR,
+				SIMPLIFY=FALSE)
 		
-		rS <- rowSums(m)
-		score <- -sum(log(rS))
-		
-		score <- score - sum(a, na.rm=TRUE)
-		
-		similarity <- .Call(functionCall,
-			x,
-			sM,
-			0, # gap opening
-			0, # gap extension
-			rep(1, length(x)), # weights
-			NULL, # structures
-			numeric(), # structure matrix
-			PACKAGE="DECIPHER")
-		rS <- rS*(rS - 1)/2 # normalization constant
-		similarity <- similarity/rS
-		score*mean(similarity, na.rm=TRUE)
+		ScoreAlignment(x,
+			method="adjacent",
+			gapOpening=gapCost[1L],
+			gapExtension=gapCost[2L],
+			substitutionMatrix=sM,
+			structures=structures,
+			structureMatrix=structureMatrix)
 	}
 	
 	if (xtype == 3L) {
-		bg <- alphabetFrequency(myXStringSet,
-			as.prob=TRUE,
-			collapse=TRUE)[1:20]
-		bg <- bg/sum(bg)
-		bg <- tapply(bg, alphabet, sum)
+		# convert substitution matrix to units of log-odds
+		SM <- matrix(c(0.951, -0.266, -0.305, -0.327, 0.099, -0.126, -0.151, 0.041, -0.383, -0.26, -0.274, -0.236, -0.131, -0.451, -0.14, 0.191, 0.008, -0.586, -0.501, 0.015, -2.542, -0.266, 1.465, 0.013, -0.153, -0.741, 0.37, 0.117, -0.453, 0.178, -0.81, -0.701, 0.679, -0.46, -0.874, -0.311, -0.097, -0.129, -0.5, -0.415, -0.679, -2.542, -0.305, 0.013, 1.494, 0.532, -0.582, 0.189, 0.129, 0.037, 0.255, -0.962, -0.947, 0.202, -0.606, -0.879, -0.252, 0.261, 0.075, -0.873, -0.433, -0.834, -2.542, -0.327, -0.153, 0.532, 1.575, -1.007, 0.155, 0.597, -0.131, -0.045, -1.265, -1.194, 0.052, -0.915, -1.235, -0.131, 0.099, -0.121, -1.102, -0.8, -1.051, -2.542, 0.099, -0.741, -0.582, -1.007, 3.127, -0.777, -0.995, -0.499, -0.438, -0.174, -0.218, -0.884, -0.137, -0.189, -0.832, -0.091, -0.185, -0.446, -0.268, 0.016, -2.542, -0.126, 0.37, 0.189, 0.155, -0.777, 1.289, 0.494, -0.368, 0.251, -0.762, -0.636, 0.433, -0.259, -0.846, -0.241, 0.046, -0.01, -0.707, -0.444, -0.624, -2.542, -0.151, 0.117, 0.129, 0.597, -0.995, 0.494, 1.287, -0.38, -0.057, -0.967, -0.931, 0.342, -0.646, -1.116, -0.162, 0.007, -0.072, -0.97, -0.681, -0.758, -2.542, 0.041, -0.453, 0.037, -0.131, -0.499, -0.368, -0.38, 1.768, -0.42, -1.087, -1.022, -0.369, -0.758, -0.924, -0.333, 0.043, -0.342, -0.886, -0.863, -0.861, -2.542, -0.383, 0.178, 0.255, -0.045, -0.438, 0.251, -0.057, -0.42, 2.254, -0.781, -0.663, 0.033, -0.433, -0.29, -0.354, -0.099, -0.206, -0.217, 0.381, -0.664, -2.542, -0.26, -0.81, -0.962, -1.265, -0.174, -0.762, -0.967, -1.087, -0.781, 1.184, 0.585, -0.819, 0.423, 0.216, -0.799, -0.716, -0.29, -0.347, -0.258, 0.785, -2.542, -0.274, -0.701, -0.947, -1.194, -0.218, -0.636, -0.931, -1.022, -0.663, 0.585, 1.087, -0.799, 0.585, 0.39, -0.777, -0.73, -0.43, -0.123, -0.159, 0.343, -2.542, -0.236, 0.679, 0.202, 0.052, -0.884, 0.433, 0.342, -0.369, 0.033, -0.819, -0.799, 1.282, -0.5, -1.005, -0.175, 0.006, -0.035, -0.829, -0.564, -0.704, -2.542, -0.131, -0.46, -0.606, -0.915, -0.137, -0.259, -0.646, -0.758, -0.433, 0.423, 0.585, -0.5, 1.637, 0.285, -0.712, -0.406, -0.171, -0.135, -0.091, 0.219, -2.542, -0.451, -0.874, -0.879, -1.235, -0.189, -0.846, -1.116, -0.924, -0.29, 0.216, 0.39, -1.005, 0.285, 1.717, -0.837, -0.7, -0.528, 0.608, 0.885, 0.045, -2.542, -0.14, -0.311, -0.252, -0.131, -0.832, -0.241, -0.162, -0.333, -0.354, -0.799, -0.777, -0.175, -0.712, -0.837, 2.121, -0.015, -0.198, -0.777, -0.763, -0.588, -2.542, 0.191, -0.097, 0.261, 0.099, -0.091, 0.046, 0.007, 0.043, -0.099, -0.716, -0.73, 0.006, -0.406, -0.7, -0.015, 0.979, 0.427, -0.727, -0.505, -0.505, -2.542, 0.008, -0.129, 0.075, -0.121, -0.185, -0.01, -0.072, -0.342, -0.206, -0.29, -0.43, -0.035, -0.171, -0.528, -0.198, 0.427, 1.128, -0.659, -0.439, -0.062, -2.542, -0.586, -0.5, -0.873, -1.102, -0.446, -0.707, -0.97, -0.886, -0.217, -0.347, -0.123, -0.829, -0.135, 0.608, -0.777, -0.727, -0.659, 3.153, 0.763, -0.428, -2.542, -0.501, -0.415, -0.433, -0.8, -0.268, -0.444, -0.681, -0.863, 0.381, -0.258, -0.159, -0.564, -0.091, 0.885, -0.763, -0.505, -0.439, 0.763, 2.023, -0.287, -2.542, 0.015, -0.679, -0.834, -1.051, 0.016, -0.624, -0.758, -0.861, -0.664, 0.785, 0.343, -0.704, 0.219, 0.045, -0.588, -0.505, -0.062, -0.428, -0.287, 1.084, -2.542, -2.542, -2.542, -2.542, -2.542, -2.542, -2.542, -2.542, -2.542, -2.542, -2.542, -2.542, -2.542, -2.542, -2.542, -2.542, -2.542, -2.542, -2.542, -2.542, -2.542, 3.235),
+			nrow=21,
+			ncol=21,
+			dimnames=list(c(AA_STANDARD, "*"), c(AA_STANDARD, "*")))
+		freqs <- setNames(c(0.0774, 0.0552, 0.0397, 0.0533, 0.0179, 0.0421, 0.0652, 0.0683, 0.0242, 0.0513, 0.0971, 0.0535, 0.0231, 0.0382, 0.0547, 0.0753, 0.0545, 0.0124, 0.029, 0.0655, 0.0019),
+			c(AA_STANDARD, "*"))
 		
-		sM <- matrix(c(0.83, 0.23, 0.22, 0.21, 0.31, 0.26, 0.25, 0.3, 0.2, 0.23, 0.22, 0.23, 0.26, 0.18, 0.25, 0.33, 0.29, 0.15, 0.17, 0.29, 0, 0.23, 0.95, 0.29, 0.25, 0.12, 0.37, 0.31, 0.18, 0.33, 0.1, 0.13, 0.44, 0.18, 0.09, 0.22, 0.26, 0.26, 0.17, 0.19, 0.13, 0, 0.22, 0.29, 0.95, 0.41, 0.15, 0.33, 0.32, 0.29, 0.34, 0.07, 0.07, 0.33, 0.15, 0.09, 0.23, 0.35, 0.3, 0.09, 0.19, 0.1, 0, 0.21, 0.25, 0.41, 0.97, 0.06, 0.32, 0.42, 0.26, 0.28, 0, 0.02, 0.3, 0.08, 0.01, 0.26, 0.31, 0.26, 0.04, 0.11, 0.05, 0, 0.31, 0.12, 0.15, 0.06, 1.32, 0.11, 0.06, 0.17, 0.19, 0.25, 0.24, 0.09, 0.26, 0.24, 0.1, 0.27, 0.24, 0.19, 0.23, 0.29, 0, 0.26, 0.37, 0.33, 0.32, 0.11, 0.91, 0.4, 0.2, 0.34, 0.11, 0.14, 0.38, 0.23, 0.09, 0.23, 0.3, 0.28, 0.13, 0.19, 0.15, 0, 0.25, 0.31, 0.32, 0.42, 0.06, 0.4, 0.91, 0.2, 0.27, 0.07, 0.08, 0.36, 0.14, 0.03, 0.25, 0.29, 0.27, 0.07, 0.13, 0.11, 0, 0.3, 0.18, 0.29, 0.26, 0.17, 0.2, 0.2, 1.01, 0.19, 0.04, 0.06, 0.2, 0.11, 0.08, 0.21, 0.3, 0.21, 0.09, 0.09, 0.09, 0, 0.2, 0.33, 0.34, 0.28, 0.19, 0.34, 0.27, 0.19, 1.12, 0.11, 0.14, 0.29, 0.19, 0.22, 0.21, 0.26, 0.24, 0.24, 0.37, 0.14, 0, 0.23, 0.1, 0.07, 0, 0.25, 0.11, 0.07, 0.04, 0.11, 0.88, 0.42, 0.1, 0.38, 0.34, 0.11, 0.12, 0.22, 0.21, 0.23, 0.46, 0, 0.22, 0.13, 0.07, 0.02, 0.24, 0.14, 0.08, 0.06, 0.14, 0.42, 0.86, 0.11, 0.42, 0.37, 0.11, 0.12, 0.19, 0.26, 0.25, 0.36, 0, 0.23, 0.44, 0.33, 0.3, 0.09, 0.38, 0.36, 0.2, 0.29, 0.1, 0.11, 0.9, 0.17, 0.06, 0.25, 0.29, 0.28, 0.1, 0.16, 0.13, 0, 0.26, 0.18, 0.15, 0.08, 0.26, 0.23, 0.14, 0.11, 0.19, 0.38, 0.42, 0.17, 0.99, 0.35, 0.13, 0.19, 0.25, 0.26, 0.27, 0.34, 0, 0.18, 0.09, 0.09, 0.01, 0.24, 0.09, 0.03, 0.08, 0.22, 0.34, 0.37, 0.06, 0.35, 1, 0.1, 0.13, 0.17, 0.42, 0.49, 0.3, 0, 0.25, 0.22, 0.23, 0.26, 0.1, 0.23, 0.25, 0.21, 0.21, 0.11, 0.11, 0.25, 0.13, 0.1, 1.09, 0.28, 0.24, 0.11, 0.11, 0.15, 0, 0.33, 0.26, 0.35, 0.31, 0.27, 0.3, 0.29, 0.3, 0.26, 0.12, 0.12, 0.29, 0.19, 0.13, 0.28, 0.84, 0.38, 0.12, 0.17, 0.17, 0, 0.29, 0.26, 0.3, 0.26, 0.24, 0.28, 0.27, 0.21, 0.24, 0.22, 0.19, 0.28, 0.25, 0.17, 0.24, 0.38, 0.87, 0.14, 0.19, 0.27, 0, 0.15, 0.17, 0.09, 0.04, 0.19, 0.13, 0.07, 0.09, 0.24, 0.21, 0.26, 0.1, 0.26, 0.42, 0.11, 0.12, 0.14, 1.33, 0.46, 0.19, 0, 0.17, 0.19, 0.19, 0.11, 0.23, 0.19, 0.13, 0.09, 0.37, 0.23, 0.25, 0.16, 0.27, 0.49, 0.11, 0.17, 0.19, 0.46, 1.07, 0.22, 0, 0.29, 0.13, 0.1, 0.05, 0.29, 0.15, 0.11, 0.09, 0.14, 0.46, 0.36, 0.13, 0.34, 0.3, 0.15, 0.17, 0.27, 0.19, 0.22, 0.86, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.33),
-				nrow=21,
-				ncol=21,
-				dimnames=list(c(AA_STANDARD, "*"), c(AA_STANDARD, "*")))
-		
-		functionCall <- "colScoresAA"
+		# optimized structure matrix
+		structures <- PredictHEC(myXStringSet,
+			type="probabilities")
+		structureMatrix <- matrix(c(0.102, -0.119, -0.136, -0.119, 0.188, -0.16, -0.136, -0.16, 0.109),
+			nrow=3) # order is H, E, C
 	} else {
-		bg <- oligonucleotideFrequency(myXStringSet,
-			width=1,
-			as.prob=TRUE,
-			simplify.as="collapse")
+		# optimized substitution matrix
+		SM <- matrix(c(0.763, -0.713, -0.513, -0.818, -0.713, 0.887, -0.618, -0.485, -0.513, -0.618, 0.83, -1.113, -0.818, -0.485, -1.113, 0.896),
+			nrow=4,
+			ncol=4,
+			dimnames=list(DNA_BASES, DNA_BASES))
+		freqs <- setNames(c(0.274, 0.229, 0.255, 0.241),
+			DNA_BASES)
 		
-		sM <- diag(length(DNA_BASES))
-		diag(sM) <- 1 - log(bg*length(DNA_BASES))
-		dimnames(sM) <- list(DNA_BASES, DNA_BASES)
-		sM["A", "G"] <- sM["G", "A"] <- transition
-		sM["C", "T"] <- sM["T", "C"] <- transition
-		
-		functionCall <- "colScores"
+		structures <- NULL
+		structureMatrix <- NULL
 	}
-	
-	.combos <- function(n, k) {
-		if (n == 1L) {
-			k
-		} else {
-			res <- matrix(rep(0L, n - 1L), 1L)
-			for (i in seq_len(k))
-				res <- rbind(res,
-					.combos(n - 1L, i))
-			cbind(res,
-				k - rowSums(res))
-		}
-	}
-	sizes <- choose(length(bg) + 0:49, # n + k - 1
-		length(bg) - 1) # k - 1
-	exact <- which.max(sizes > maxExact) - 1L
-	exact <- min(20, exact) # convergence to approximate
-	ecdfs <- vector("list", exact)
-	for (i in seq_len(exact)) {
-		a <- apply(.combos(length(bg), i),
-			1L,
-			dmultinom,
-			prob=bg)
-		ecdfs[[i]] <- list(ecdf(a), length(a))
-	}
+	BG <- outer(freqs, freqs)
 	
 	if (type == 1L || type == 3L) { # tandem repeats
 		if (verbose) {
@@ -383,7 +321,7 @@ DetectRepeats <- function(myXStringSet,
 					POSL,
 					xtype,
 					PACKAGE="DECIPHER")
-				temp <- .multinomial(y, bg, gapCost)
+				temp <- .score(y, gapCost, POSL, POSR)
 				if (temp > LnL) {
 					x <- y
 					LnL <- temp
@@ -400,7 +338,7 @@ DetectRepeats <- function(myXStringSet,
 			POSL <- tempL + 1L
 			POSR <- tempR + 1L
 			attempts <- 0L
-			while (POSR[length(POSR)] <= length(myXString) &&
+			while (POSR[length(POSR)] <= l &&
 				attempts <= maxShifts) {
 				y <- .Call("replaceGaps",
 					x,
@@ -408,7 +346,7 @@ DetectRepeats <- function(myXStringSet,
 					POSL,
 					xtype,
 					PACKAGE="DECIPHER")
-				temp <- .multinomial(y, bg, gapCost)
+				temp <- .score(y, gapCost, POSL, POSR)
 				if (temp > LnL) {
 					x <- y
 					LnL <- temp
@@ -428,10 +366,42 @@ DetectRepeats <- function(myXStringSet,
 		result <- list()
 		for (k in seq_along(r)) {
 			myXString <- myXStringSet[[k]]
+			l <- length(myXString)
+			struct <- structures[[k]]
 			values <- r[[k]]$values
 			lengths <- r[[k]]$lengths
-			w <- which(lengths/values > ratio &
-				values <= maxPeriod)
+			
+			if (xtype == 3L) {
+				bg <- alphabetFrequency(myXString,
+					as.prob=TRUE)[c(1:20, 27)]
+				bg <- bg/sum(bg)
+			} else {
+				bg <- oligonucleotideFrequency(myXString,
+					width=1,
+					as.prob=TRUE)
+			}
+			sM <- SM + log(BG/outer(bg, bg))
+			
+			# only repeats occurring more frequently than expected
+			w <- which(values/lengths <= maxPeriod/N &
+				lengths <= maxPeriod)
+			
+			# reduce to the set of top ranked k-mer repeats
+			visited <- integer(l)
+			keep <- logical(length(w))
+			o <- order(-lengths[w], values[w])
+			for (i in seq_along(o)) {
+				posL <- w[o[i]]
+				posR <- posL + values[w[o[i]]] - 1L
+				if (posR > l)
+					posR <- l
+				if (all(visited[posL:posR] > maxVisits))
+					next
+				visited[posL:posR] <- visited[posL:posR] + 1L
+				keep[o[i]] <- TRUE
+			}
+			w <- w[keep]
+			
 			res <- vector("list", length(w))
 			for (i in seq_along(w)) {
 				posL <- seq(0,
@@ -439,8 +409,8 @@ DetectRepeats <- function(myXStringSet,
 					values[w[i]])
 				posL <- posL + w[i]
 				posR <- posL + values[w[i]] - 1L
-				keep <- posL <= length(myXString) &
-					posR <= length(myXString)
+				keep <- posL <= l &
+					posR <= l
 				if (sum(keep) < length(keep)) {
 					posL <- posL[keep]
 					posR <- posR[keep]
@@ -449,12 +419,15 @@ DetectRepeats <- function(myXStringSet,
 				delta <- as.integer(values[w[i]]/2)
 				if (length(posR) > 1) { # extend unknown right bound
 					posR[length(posR)] <- posR[length(posR)] + delta
-					if (posR[length(posR)] > length(myXString))
-						posR[length(posR)] <- length(myXString)
+					if (posR[length(posR)] > l)
+						posR[length(posR)] <- l
 				}
 				
 				if (length(posR) < 2L) {
 					res[[i]] <- list(posL, posR, -Inf, k)
+					if (verbose)
+						setTxtProgressBar(pBar,
+							(totW[k] + w[i])/totW[length(totW)])
 					next
 				}
 				
@@ -463,14 +436,20 @@ DetectRepeats <- function(myXStringSet,
 				ux <- unique(x)
 				if (length(ux) > 1) {
 					index <- match(x, ux)
-					ux <- AlignSeqs(ux,
-						terminalGap=c(-1000, -5),
-						iterations=0,
-						refinements=0,
-						anchor=NA,
-						processors=processors,
-						verbose=FALSE)
-					x <- ux[index]
+					if (length(ux) == 2) {
+						ux <- AlignProfiles(.subset(ux, 1),
+							.subset(ux, 2),
+							anchor=NA,
+							processors=processors)
+					} else {
+						ux <- AlignSeqs(ux,
+							iterations=0,
+							refinements=0,
+							anchor=NA,
+							processors=processors,
+							verbose=FALSE)
+					}
+					x <- .subset(ux, index)
 					
 					t <- TerminalChar(x)
 					off <- min(t[-nrow(t), "trailingChar"])
@@ -479,14 +458,17 @@ DetectRepeats <- function(myXStringSet,
 				}
 				
 				# calculate the likelihood
-				LnL <- .multinomial(x, bg, gapCost)
-				out <- shift(x, LnL, posL, posR, min(values[w[i]], maxShifts))
-				x <- out[[1L]]
-				LnL <- out[[2L]]
-				posL <- out[[3L]]
-				posR <- out[[4L]]
-				if (LnL < minScore/2) {
+				LnL <- .score(x, gapCost, posL, posR)
+#				out <- shift(x, LnL, posL, posR, min(values[w[i]], maxShifts))
+#				x <- out[[1L]]
+#				LnL <- out[[2L]]
+#				posL <- out[[3L]]
+#				posR <- out[[4L]]
+				if (posR[length(posR)] < posL[length(posL)] || LnL < minScore/2) {
 					res[[i]] <- list(posL, posR, LnL, k)
+					if (verbose)
+						setTxtProgressBar(pBar,
+							(totW[k] + w[i])/totW[length(totW)])
 					next
 				}
 				
@@ -501,24 +483,29 @@ DetectRepeats <- function(myXStringSet,
 					start <- start - delta
 					if (start < 1)
 						start <- 1L
-					y <- AlignProfiles(extractAt(myXString,
-							IRanges(start, POSL[1L] - 1L)),
+					subseq <- .extract(myXStringSet,
+						k,
+						start,
+						POSL[1L] - 1L)
+					y <- AlignProfiles(subseq,
 						X,
 						anchor=NA,
 						processors=processors)
 					t <- TerminalChar(y)
 					off <- min(t[-1L, "leadingChar"])
 					y <- subseq(y, off + 1L)
-					temp <- .multinomial(y, bg, gapCost)
 					start <- start + off
+					if (start >= POSL[1L])
+						break # no overlap in alignment
 					POSR <- c(POSL[1L] - 1L, POSR)
 					POSL <- c(start, POSL)
+					temp <- .score(y, gapCost, POSL, POSR)
 					
-					out <- shift(y, temp, POSL, POSR, min(values[w[i]], maxShifts))
-					y <- out[[1L]]
-					temp <- out[[2L]]
-					POSL <- out[[3L]]
-					POSR <- out[[4L]]
+#					out <- shift(y, temp, POSL, POSR, min(values[w[i]], maxShifts))
+#					y <- out[[1L]]
+#					temp <- out[[2L]]
+#					POSL <- out[[3L]]
+#					POSR <- out[[4L]]
 					
 					X <- y
 					if (temp > LnL) {
@@ -539,29 +526,34 @@ DetectRepeats <- function(myXStringSet,
 				X <- x
 				POSL <- posL
 				POSR <- posR
-				while (end <= length(myXString) &&
+				while (end <= l &&
 					attempts <= maxFailures) {
 					end <- end + delta
-					if (end > length(myXString))
-						end <- length(myXString)
+					if (end > l)
+						end <- l
+					subseq <- .extract(myXStringSet,
+						k,
+						POSR[length(POSR)] + 1L,
+						end)
 					y <- AlignProfiles(X,
-						extractAt(myXString,
-							IRanges(POSR[length(POSR)] + 1L, end)),
+						subseq,
 						anchor=NA,
 						processors=processors)
 					t <- TerminalChar(y)
 					off <- min(t[-nrow(t), "trailingChar"])
 					y <- subseq(y, end=width(y)[1L] - off)
-					temp <- .multinomial(y, bg, gapCost)
 					end <- end - off
+					if (end <= POSR[length(POSR)])
+						break # no overlap in alignment
 					POSL <- c(POSL, POSR[length(POSR)] + 1L)
 					POSR <- c(POSR, end)
+					temp <- .score(y, gapCost, POSL, POSR)
 					
-					out <- shift(y, temp, POSL, POSR, min(values[w[i]], maxShifts))
-					y <- out[[1L]]
-					temp <- out[[2L]]
-					POSL <- out[[3L]]
-					POSR <- out[[4L]]
+#					out <- shift(y, temp, POSL, POSR, min(values[w[i]], maxShifts))
+#					y <- out[[1L]]
+#					temp <- out[[2L]]
+#					POSL <- out[[3L]]
+#					POSR <- out[[4L]]
 					
 					X <- y
 					if (temp > LnL) {
@@ -576,6 +568,12 @@ DetectRepeats <- function(myXStringSet,
 					end <- POSR[length(POSR)] + values[w[i]]
 				}
 				
+				out <- shift(x, LnL, posL, posR, min(values[w[i]], maxShifts))
+				x <- out[[1L]]
+				LnL <- out[[2L]]
+				posL <- out[[3L]]
+				posR <- out[[4L]]
+				
 				# record the result
 				res[[i]] <- list(posL, posR, LnL, k)
 				if (verbose)
@@ -587,16 +585,25 @@ DetectRepeats <- function(myXStringSet,
 		}
 		
 		result <- unique(result)
-		posL <- lapply(result, `[[`, 1L)
-		posR <- lapply(result, `[[`, 2L)
-		result <- data.frame(Index=sapply(result, `[[`, 4L),
-			Begin=sapply(posL, `[`, 1L),
-			End=sapply(posR, tail, n=1L),
-			Left=I(posL),
-			Right=I(posR),
-			Score=sapply(result, `[[`, 3L))
-		result <- result[result[, "Score"] >= minScore,]
-		result <- result[order(result[, "Index"], result[, "Begin"]),]
+		if (length(result) > 0) {
+			posL <- lapply(result, `[[`, 1L)
+			posR <- lapply(result, `[[`, 2L)
+			result <- data.frame(Index=sapply(result, `[[`, 4L),
+				Begin=sapply(posL, `[`, 1L),
+				End=sapply(posR, tail, n=1L),
+				Left=I(posL),
+				Right=I(posR),
+				Score=sapply(result, `[[`, 3L))
+			result <- result[result[, "Score"] >= minScore,]
+			result <- result[order(result[, "Index"], result[, "Begin"]),]
+		} else {
+			result <- data.frame(Index=integer(),
+				Begin=numeric(),
+				End=numeric(),
+				Left=I(numeric()),
+				Right=I(numeric()),
+				Score=numeric())
+		}
 		
 		if (!allScores) {
 			# pick highest score when overlapping
@@ -642,6 +649,7 @@ DetectRepeats <- function(myXStringSet,
 	
 	if (type > 1L) { # interspersed repeats
 		dbConn <- dbConnect(SQLite(), ":memory:")
+		on.exit(dbDisconnect(dbConn))
 		Seqs2DB(myXStringSet,
 			"XStringSet",
 			dbConn,
@@ -671,14 +679,20 @@ DetectRepeats <- function(myXStringSet,
 			
 			ali <- AlignSynteny(syn,
 				dbConn,
+				processors=processors,
 				verbose=verbose)
 			
 			ali <- ali[[1L]]
 			res2 <- data.frame(syn[[2, 1]][, 1:8])
 			if (length(ali) > 0) {
+				bg <- oligonucleotideFrequency(myXStringSet,
+					width=1,
+					as.prob=TRUE,
+					simplify.as="collapse")
+				sM <- SM + log(BG/outer(bg, bg))
+				
 				res2[, "score"] <- sapply(ali,
-					.multinomial,
-					p=bg,
+					.score,
 					gapCost=gapCost)
 				res2 <- res2[res2[, "score"] >= minScore,]
 				
@@ -724,7 +738,6 @@ DetectRepeats <- function(myXStringSet,
 		} else {
 			res2 <- data.frame(syn[[2, 1]][w, 1:8])
 		}
-		dbDisconnect(dbConn)
 		
 		if (type == 2L) { # interspersed
 			result <- res2

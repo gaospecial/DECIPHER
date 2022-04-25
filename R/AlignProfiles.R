@@ -6,13 +6,14 @@ AlignProfiles <- function(pattern,
 	s.struct=NULL,
 	perfectMatch=5,
 	misMatch=0,
-	gapOpening=-13,
-	gapExtension=-1,
-	gapPower=-0.5,
-	terminalGap=-5,
+	gapOpening=-14,
+	gapExtension=-2,
+	gapPower=-1,
+	terminalGap=0,
 	restrict=c(-1000, 2, 10),
 	anchor=0.7,
 	normPower=c(1, 0),
+	standardize=TRUE,
 	substitutionMatrix=NULL,
 	structureMatrix=NULL,
 	processors=1) {
@@ -154,6 +155,8 @@ AlignProfiles <- function(pattern,
 		stop("Length of normPower must be 1 or 2.")
 	}
 	normPower <- as.double(normPower)
+	if (!isTRUEorFALSE(standardize))
+		stop("standardize must be a logical.")
 	if (!is.null(processors) && !is.numeric(processors))
 		stop("processors must be a numeric.")
 	if (!is.null(processors) && floor(processors)!=processors)
@@ -213,7 +216,7 @@ AlignProfiles <- function(pattern,
 				stop("substitutionMatrix must be NULL or a matrix.")
 			}
 		} else if (type==2L && missing(perfectMatch) && missing(misMatch)) {
-			sM <- matrix(c(14, 4, 7, 4, 4, 15, 4, 7, 7, 4, 15, 4, 4, 7, 4, 14),
+			sM <- matrix(c(10, 3, 5, 3, 3, 12, 3, 5, 5, 3, 12, 3, 3, 5, 3, 10),
 				nrow=4,
 				ncol=4,
 				dimnames=list(bases, bases))
@@ -240,10 +243,10 @@ AlignProfiles <- function(pattern,
 		if (is.null(structureMatrix)) {
 			if (type==3L) {
 				# assume structures from PredictHEC
-				structureMatrix <- matrix(c(6, 1, -2, 1, 13, 0, -2, 0, 1),
+				structureMatrix <- matrix(c(6, 2, -1, 2, 12, 0, -1, 0, 1),
 					nrow=3) # order is H, E, C
 			} else {
-				structureMatrix <- matrix(c(6, 0, 0, 0, 30, -6, 0, -6, 30),
+				structureMatrix <- matrix(c(-1, -3, -3, -3, 7, -3, -3, -3, 7),
 					nrow=3) # order is ., (, )
 			}
 		} else {
@@ -324,6 +327,7 @@ AlignProfiles <- function(pattern,
 					tGaps[1],
 					tGaps[2],
 					restrict,
+					standardize,
 					processors,
 					PACKAGE="DECIPHER")
 			} else {
@@ -339,6 +343,7 @@ AlignProfiles <- function(pattern,
 					tGaps[1],
 					tGaps[2],
 					restrict,
+					standardize,
 					processors,
 					PACKAGE="DECIPHER")
 			}
@@ -359,6 +364,7 @@ AlignProfiles <- function(pattern,
 					tGaps[1],
 					tGaps[2],
 					restrict,
+					standardize,
 					processors,
 					PACKAGE="DECIPHER")
 			} else {
@@ -377,6 +383,7 @@ AlignProfiles <- function(pattern,
 					tGaps[1],
 					tGaps[2],
 					restrict,
+					standardize,
 					processors,
 					PACKAGE="DECIPHER")
 			}

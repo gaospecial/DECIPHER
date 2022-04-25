@@ -11,18 +11,18 @@ import(parallel)
 
 importFrom("grDevices", "colorRampPalette", "colors", "dev.flush", "dev.hold", "dev.size", "rainbow", "rgb", "as.graphicsAnnot", "col2rgb")
 importFrom("graphics", "abline", "axis", "box", "legend", "mtext", "par", "plot", "points", "rect", "segments", "strheight", "strwidth", "text", "axTicks", "hist", "layout", "lines", "polygon", "locator")
-importFrom("stats", "dendrapply", "dist", "is.leaf", "nlminb", "optimize", "order.dendrogram", "pbinom", "reorder", "setNames", "step", "uniroot", "weighted.mean", "binomial", "glm", "glm.control", "optim", "predict", "smooth.spline", "dlnorm", "plnorm", "qlnorm", "chisq.test", "dmultinom", "ecdf", "pchisq", "qbinom")
+importFrom("stats", "dendrapply", "dist", "is.leaf", "nlminb", "optimize", "order.dendrogram", "pbinom", "reorder", "setNames", "step", "uniroot", "weighted.mean", "binomial", "glm", "glm.control", "optim", "predict", "smooth.spline", "dlnorm", "plnorm", "qlnorm", "chisq.test", "dmultinom", "ecdf", "pchisq", "qbinom", "as.dist", "pgamma", "prcomp", "qgamma", "qnorm", "rnorm", "runif")
 importFrom("utils", "browseURL", "data", "flush.console", "object.size", "setTxtProgressBar", "txtProgressBar", "packageVersion", "write.table")
 
 export(
 # interacting with a database:
 Add2DB, Codec, Seqs2DB, SearchDB, DB2Seqs,
-# assigning an identifier:
-FormGroups, IdentifyByRank,
+# assigning group labels:
+FormGroups, IdClusters, IdentifyByRank,
 # lengths:
 IdLengths, TerminalChar,
 # phylogenetics:
-Cophenetic, DistanceMatrix, IdClusters, MapCharacters, MODELS, ReadDendrogram, WriteDendrogram,
+Cophenetic, DistanceMatrix, MapCharacters, MODELS, ReadDendrogram, TreeLine, WriteDendrogram,
 # forming consensus:
 ConsensusSequence, Disambiguate, IdConsensus, TileSeqs,
 # chimeras:
@@ -38,7 +38,7 @@ BrowseSeqs, BrowseDB,
 # sequence analysis/manipulation:
 CorrectFrameshifts, DetectRepeats, OrientNucleotides, PredictDBN, PredictHEC, RemoveGaps, TrimDNA,
 # multiple alignment:
-AdjustAlignment, AlignDB, AlignProfiles, AlignSeqs, AlignTranslation, MaskAlignment, StaggerAlignment,
+AdjustAlignment, AlignDB, AlignProfiles, AlignSeqs, AlignTranslation, MaskAlignment, ScoreAlignment, StaggerAlignment,
 # synteny:
 AA_REDUCED, AlignSynteny, FindSynteny,
 # taxonomic classification:

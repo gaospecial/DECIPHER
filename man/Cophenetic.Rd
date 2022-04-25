@@ -24,13 +24,13 @@ An object of class 'dist'.
 Erik Wright \email{eswright@pitt.edu}
 }
 \seealso{
-\code{\link{IdClusters}}
+\code{\link{TreeLine}}
 }
 \examples{
 fas <- system.file("extdata", "Bacteria_175seqs.fas", package="DECIPHER")
 dna <- readDNAStringSet(fas)
 d1 <- DistanceMatrix(dna, type="dist")
-dend <- IdClusters(d1, method="NJ", type="dendrogram")
+dend <- TreeLine(myDistMatrix=d1, method="NJ")
 d2 <- Cophenetic(dend)
 cor(d1, d2)
 }

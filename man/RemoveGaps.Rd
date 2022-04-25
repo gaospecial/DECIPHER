@@ -9,6 +9,7 @@ Removes gaps ("-" or "." characters) in a set of sequences, either deleting all 
 \usage{
 RemoveGaps(myXStringSet,
            removeGaps = "all",
+           includeMask = FALSE,
            processors = 1)
 }
 \arguments{
@@ -17,6 +18,9 @@ An \code{AAStringSet}, \code{DNAStringSet}, or \code{RNAStringSet} object contai
 }
   \item{removeGaps}{
 Determines how gaps ("-" or "." characters) are removed in the sequences.  This should be (an unambiguous abbreviation of) one of \code{"none"}, \code{"all"} or \code{"common"}.
+}
+  \item{includeMask}{
+Logical specifying whether to consider the mask character ("+") as a gap.
 }
   \item{processors}{
 The number of processors to use, or \code{NULL} to automatically detect and use all available processors.

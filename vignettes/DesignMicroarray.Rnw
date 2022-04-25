@@ -118,7 +118,7 @@ At this point we need to define groups of related sequences in the database we j
 <<expr3,eval=TRUE>>=
 dna <- SearchDB(dbConn)
 dMatrix <- DistanceMatrix(dna, verbose=FALSE)
-clusters <- IdClusters(dMatrix, cutoff=0.03, method="complete", verbose=FALSE)
+clusters <- TreeLine(myDistMatrix=dMatrix, type="clusters", cutoff=0.03, method="complete", verbose=FALSE)
 Add2DB(clusters, dbConn, verbose=FALSE)
 @
 

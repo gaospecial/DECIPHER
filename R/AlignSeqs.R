@@ -2,8 +2,8 @@ AlignSeqs <- function(myXStringSet,
 	guideTree=NULL,
 	iterations=2,
 	refinements=1,
-	gapOpening=c(-18, -16),
-	gapExtension=c(-2, -1),
+	gapOpening=c(-18, -14),
+	gapExtension=c(-3, -2),
 	useStructures=TRUE,
 	structures=NULL,
 	FUN=AdjustAlignment,
@@ -175,7 +175,7 @@ AlignSeqs <- function(myXStringSet,
 					if (dim(structureMatrix)[1] != dim(structureMatrix)[2])
 						stop("structureMatrix is not square.")
 				} else {
-					structureMatrix <- matrix(c(6, 1, -2, 1, 13, 0, -2, 0, 1),
+					structureMatrix <- matrix(c(6, 2, -1, 2, 12, 0, -1, 0, 1),
 						nrow=3) # order is H, E, C
 				}
 				if (dim(structureMatrix)[1] != dim(structures[[1]])[1])
@@ -218,7 +218,7 @@ AlignSeqs <- function(myXStringSet,
 					if (dim(structureMatrix)[1] != 3)
 						stop("structureMatrix must be 3 x 3 when structures is NULL.")
 				} else { # use the default structureMatrix
-					structureMatrix <- matrix(c(2, -1, -1, -1, 18, 0, -1, 0, 18),
+					structureMatrix <- matrix(c(-1, -3, -3, -3, 7, -3, -3, -3, 7),
 						nrow=3) # order is ., (, )
 				}
 				replace <- FALSE
@@ -319,11 +319,11 @@ AlignSeqs <- function(myXStringSet,
 			!("misMatch" %in% m) &&
 			!("perfectMatch" %in% m)) {
 			subM <- TRUE
-			sM <- matrix(c(14, 4, 7, 4, 4, 15, 4, 7, 7, 4, 15, 4, 4, 7, 4, 14),
+			sM <- matrix(c(10, 3, 5, 3, 3, 12, 3, 5, 5, 3, 12, 3, 3, 5, 3, 10),
 				nrow=4,
 				ncol=4,
 				dimnames=list(bases, bases))
-			sM2 <- matrix(c(14, 4, 7, 4, 4, 15, 4, 7, 7, 4, 15, 4, 4, 7, 4, 14),
+			sM2 <- matrix(c(10, 3, 5, 3, 3, 12, 3, 5, 5, 3, 12, 3, 3, 5, 3, 10),
 				nrow=4,
 				ncol=4,
 				dimnames=list(DNA_BASES, DNA_BASES))
@@ -435,9 +435,8 @@ AlignSeqs <- function(myXStringSet,
 			flush.console()
 		}
 		dimnames(d) <- NULL
-		suppressWarnings(guideTree <- IdClusters(d,
+		suppressWarnings(guideTree <- TreeLine(myDistMatrix=d,
 			method="single",
-			type="dendrogram",
 			verbose=verbose,
 			processors=processors))
 	}
@@ -474,6 +473,7 @@ AlignSeqs <- function(myXStringSet,
 							.Call("removeCommonGaps",
 								.subset(seqs_prev, u),
 								type,
+								FALSE, # includeMask
 								processors,
 								PACKAGE="DECIPHER"),
 							u)
@@ -797,7 +797,7 @@ AlignSeqs <- function(myXStringSet,
 		weights <- weights/mean(weights)
 		
 		if (replace) {
-			structureMatrix <- matrix(c(2, -1, -1, -1, 18, 0, -1, 0, 18),
+			structureMatrix <- matrix(c(-1, -3, -3, -3, 7, -3, -3, -3, 7),
 				nrow=3) # order is ., (, )
 			replace <- FALSE
 		}
@@ -958,9 +958,8 @@ AlignSeqs <- function(myXStringSet,
 		
 		orgTree <- guideTree
 		dimnames(d) <- NULL
-		suppressWarnings(guideTree <- IdClusters(d,
+		suppressWarnings(guideTree <- TreeLine(myDistMatrix=d,
 			method="UPGMA",
-			type="dendrogram",
 			collapse=0,
 			verbose=verbose,
 			processors=processors))
@@ -1025,6 +1024,7 @@ AlignSeqs <- function(myXStringSet,
 				sM,
 				GO,
 				gapExtensionMax,
+				FALSE, # exclude terminal gaps
 				weights,
 				structs,
 				structureMatrix)
@@ -1077,12 +1077,14 @@ AlignSeqs <- function(myXStringSet,
 					pattern <- .Call("removeCommonGaps",
 						pattern,
 						type,
+						FALSE, # includeMask
 						processors,
 						PACKAGE="DECIPHER")
 					subject <- .subset(myXStringSet, y)
 					subject <- .Call("removeCommonGaps",
 						subject,
 						type,
+						FALSE, # includeMask
 						processors,
 						PACKAGE="DECIPHER")
 					

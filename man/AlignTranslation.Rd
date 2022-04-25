@@ -35,7 +35,7 @@ Character string indicating the type of output desired.  This should be (an abbr
 Either a character vector giving the genetic code in the same format as \code{GENETIC_CODE} (the default), or a list containing one genetic code for each sequence in \code{myXStringSet}.
 }
   \item{\dots}{
-Further arguments to be passed directly to \code{\link{AlignSeqs}}, including \code{gapOpening}, \code{gapExtension}, \code{gapPower}, \code{terminalGap}, \code{restrict}, \code{anchor}, \code{normPower}, \code{substitutionMatrix}, \code{structureMatrix}, \code{alphabet}, \code{guideTree}, \code{iterations}, \code{refinements}, \code{useStructures}, \code{structures}, \code{FUN}, and \code{levels}.
+Further arguments to be passed directly to \code{\link{AlignSeqs}}, including \code{gapOpening}, \code{gapExtension}, \code{gapPower}, \code{terminalGap}, \code{restrict}, \code{anchor}, \code{normPower}, \code{substitutionMatrix}, \code{structureMatrix}, \code{standardize}, \code{alphabet}, \code{guideTree}, \code{iterations}, \code{refinements}, \code{useStructures}, \code{structures}, \code{FUN}, and \code{levels}.
 }
 }
 \details{

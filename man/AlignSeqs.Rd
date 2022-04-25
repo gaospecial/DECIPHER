@@ -11,8 +11,8 @@ AlignSeqs(myXStringSet,
          guideTree = NULL,
          iterations = 2,
          refinements = 1,
-         gapOpening = c(-18, -16),
-         gapExtension = c(-2, -1),
+         gapOpening = c(-18, -14),
+         gapExtension = c(-3, -2),
          useStructures = TRUE,
          structures = NULL,
          FUN = AdjustAlignment,
@@ -63,7 +63,7 @@ The number of processors to use, or \code{NULL} to automatically detect and use 
 Logical indicating whether to display progress.
 }
   \item{\dots}{
-Further arguments to be passed directly to \code{\link{AlignProfiles}}, including \code{perfectMatch}, \code{misMatch}, \code{gapPower}, \code{terminalGap}, \code{restrict}, \code{anchor}, \code{normPower}, \code{substitutionMatrix}, and \code{structureMatrix}.
+Further arguments to be passed directly to \code{\link{AlignProfiles}}, including \code{perfectMatch}, \code{misMatch}, \code{gapPower}, \code{terminalGap}, \code{restrict}, \code{anchor}, \code{normPower}, \code{standardize}, \code{substitutionMatrix}, and \code{structureMatrix}.
 }
 }
 \details{
@@ -71,7 +71,7 @@ The profile-to-profile method aligns a sequence set by merging profiles along a 
 
 The purpose of \code{levels} is to speed-up the alignment process by not running time consuming processes when they are unlikely to change the outcome.  The first four \code{levels} control when \code{refinements} occur and the function \code{FUN} is run on the alignment.  The default \code{levels} specify that these events should happen when above 0.9 (AA; \code{levels[1]}) or 0.7 (DNA/RNA; \code{levels[3]}) average dissimilarity on the initial tree, when above 0.7 (AA; \code{levels[2]}) or 0.4 (DNA/RNA; \code{levels[4]}) average dissimilarity on the iterative tree(s), and after every tenth improvement made during refinement.  The sixth element of levels (\code{levels[6]}) prevents \code{FUN} from being applied at any point to less than 5 sequences.
 
-The \code{FUN} function is always applied just before returning the alignment so long as there are at least \code{levels[6]} sequences.  The default \code{FUN} is \code{AdjustAlignment}, but \code{FUN} can be any function that takes in an \code{XStringSet} as its first argument, as well as \code{weights}, \code{processors}, and \code{substitutionMatrix} as optional arguments.  For example, the default \code{FUN} could be altered to not perform any changes by setting it equal to \code{function(x, ...) return(x)}, where \code{x} is an \code{XStringSet}.
+The \code{FUN} function is always applied before returning the alignment so long as there are at least \code{levels[6]} sequences.  The default \code{FUN} is \code{AdjustAlignment}, but \code{FUN} can be any function that takes in an \code{XStringSet} as its first argument, as well as \code{weights}, \code{processors}, and \code{substitutionMatrix} as optional arguments.  For example, the default \code{FUN} could be altered to not perform any changes by setting it equal to \code{function(x, ...) return(x)}, where \code{x} is an \code{XStringSet}.
 
 Secondary structures are automatically computed for amino acid and RNA sequences unless \code{structures} are provided or \code{useStructures} is \code{FALSE}.  The default \code{structureMatrix} is used unless an alternative is provided.  For RNA sequences, secondary structures are only computed when the total length of the initial guide tree is at least 5 (\code{levels[7]}) or the length of subsequent trees is at least 2 (\code{levels[8]}).
 }
@@ -87,7 +87,7 @@ Wright, E. S. (2020). RNAconTest: comparing tools for noncoding RNA multiple seq
 Erik Wright \email{eswright@pitt.edu}
 }
 \seealso{
-\code{\link{AdjustAlignment}}, \code{\link{AlignDB}}, \code{\link{AlignProfiles}}, \code{\link{AlignSynteny}}, \code{\link{AlignTranslation}}, \code{\link{IdClusters}}, \code{\link{ReadDendrogram}}, \code{\link{StaggerAlignment}}
+\code{\link{AdjustAlignment}}, \code{\link{AlignDB}}, \code{\link{AlignProfiles}}, \code{\link{AlignSynteny}}, \code{\link{AlignTranslation}}, \code{\link{ReadDendrogram}}, \code{\link{TreeLine}}, \code{\link{StaggerAlignment}}
 }
 \examples{
 db <- system.file("extdata", "Bacteria_175seqs.sqlite", package="DECIPHER")

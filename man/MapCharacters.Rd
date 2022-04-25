@@ -44,7 +44,7 @@ If \code{type} is \code{"dendrogram"} (the default) then the original \code{dend
 Erik Wright \email{eswright@pitt.edu}
 }
 \seealso{
-\code{\link{IdClusters}}
+\code{\link{TreeLine}}
 }
 \examples{
 fas <- system.file("extdata", "Bacteria_175seqs.fas", package="DECIPHER")
@@ -56,11 +56,11 @@ rna <- AlignSeqs(rna)
 rna # input alignment
 
 d <- DistanceMatrix(rna, type="dist", correction="JC")
-tree <- IdClusters(d,
-                   method="NJ",
-                   type="dendrogram",
-                   myXStringSet=rna,
-                   reconstruct=TRUE)
+tree <- TreeLine(myDistMatrix=d,
+                 method="NJ",
+                 type="dendrogram",
+                 myXStringSet=rna,
+                 reconstruct=TRUE)
 
 out <- MapCharacters(tree, labelEdges=TRUE, type="both")
 

@@ -33,10 +33,32 @@
 // DECIPHER header file
 #include "DECIPHER.h"
 
-SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SEXP pm, SEXP mm, SEXP go, SEXP ge, SEXP exp, SEXP power, SEXP endGapPenaltyLeft, SEXP endGapPenaltyRight, SEXP boundary, SEXP nThreads)
+static double traceback(int i, int j, int *o, double *pnorm, double *snorm, int ls)
 {
-	int i, j, k, start, end, *rans, count, z;
-	double *pprofile, *sprofile, gp, gs, lGp, lGs, S, M, GP, GS;
+	int z;
+	double d = 0;
+	
+	while (i > -1 && j > -1) {
+		z = *(o + i*ls + j);
+		if (z==0) {
+			if (pnorm[i] > 0 && snorm[j] > 0)
+				d += sqrt(pnorm[i]*snorm[j]);
+			i--;
+			j--;
+		} else if (z < 0) {
+			i += z;
+		} else { // z > 0
+			j -= z;
+		}
+	}
+	
+	return d;
+}
+
+SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SEXP pm, SEXP mm, SEXP go, SEXP ge, SEXP exp, SEXP power, SEXP endGapPenaltyLeft, SEXP endGapPenaltyRight, SEXP boundary, SEXP norm, SEXP nThreads)
+{
+	int i, j, k, start, end, *rans, count, z, totM = 0;
+	double *pprofile, *sprofile, gp, gs, lGp, lGs, S, M, GP, GS, temp, avgM = 0;
 	double max, tot;
 	SEXP ans1, ans2, ans3, ans4, dims;
 	
@@ -64,6 +86,7 @@ SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SE
 		do_subM = 1;
 		subM = REAL(subMatrix);
 	}
+	int normalize = asInteger(norm);
 	int nthreads = asInteger(nThreads);
 	
 	double *dbnM = REAL(dbnMatrix);
@@ -253,9 +276,9 @@ SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SE
 	
 	if (egpL != 0) {
 		for (i = 1; i <= ls; i++)
-			*(m + i) = egpL*sstarts[i - 1]*snorm[i - 1];
+			*(m + i) = zip[i]*egpL*sstarts[i - 1]*snorm[i - 1] + *(m + i - 1);
 		for (i = 1; i <= lp; i++)
-			*(m + (ls + 1)*i) = egpL*pstarts[i - 1]*pnorm[i - 1];
+			*(m + (ls + 1)*i) = zip[i]*egpL*pstarts[i - 1]*pnorm[i - 1] + *(m + (ls + 1)*(i - 1));
 	}
 	
 	int left = 0, top = 0; // boundaries of DP matrix
@@ -352,7 +375,7 @@ SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SE
 		}
 		//Rprintf("\nk %d START %d END %d start %d end %d top %d left %d", k, START, END, start, end, top, left);
 		max = -1e53;
-		#pragma omp parallel for private(i,j,gp,gs,S,M,GP,GS,tot,lGp,lGs) num_threads(nthreads)
+		#pragma omp parallel for private(i,j,gp,gs,S,M,GP,GS,tot,lGp,lGs,temp) reduction(+:totM,avgM) num_threads(nthreads)
 		for (i = START; i <= END; i++) {
 			// determine column index
 			if (k >= lp) {
@@ -462,6 +485,8 @@ SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SE
 				}
 			}
 			
+			temp = M;
+			
 			M *= tot;
 			GP *= tot;
 			GS *= tot;
@@ -522,6 +547,9 @@ SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SE
 					scoreLastGs[j] = GS;
 				}
 			} else { // no gap
+				avgM += temp;
+				totM++;
+				
 				*(m + (i + 1)*(ls + 1) + j + 1) = M;
 				*(o + i*ls + j) = 0;
 				
@@ -574,22 +602,39 @@ SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SE
 	}
 */	
 	if (egpR != 0) {
+		GP = 0;
 		for (i = ls - 1; i > -1; i--) {
-			GP = egpR*sstops[i]*snorm[i];
+			GP += zip[ls - i]*egpR*sstops[i]*snorm[i];
 			*(m + lp*(ls + 1) + i) = *(m + lp*(ls + 1) + i) + GP;
 		}
+		GP = 0;
 		for (i = lp - 1; i > -1; i--) {
-			GP = egpR*pstops[i]*pnorm[i];
+			GP += zip[lp - i]*egpR*pstops[i]*pnorm[i];
 			*(m + i*(ls + 1) + ls) = *(m + i*(ls + 1) + ls) + GP;
+		}
+	}
+	
+	Free(posLastGp);
+	Free(posLastGs);
+	Free(scoreLastGp);
+	Free(scoreLastGs);
+	
+	// subtract background score expected without alignment
+	if (normalize) {
+		avgM /= totM;
+		double dist;
+		for (i = 1; i <= ls; i++) {
+			dist = traceback(lp - 1, i - 1, o, pnorm, snorm, ls);
+			*(m + lp*(ls + 1) + i) -= avgM*dist;
+		}
+		for (i = top + 1; i < lp; i++) {
+			dist = traceback(i - 1, ls - 1, o, pnorm, snorm, ls);
+			*(m + i*(ls + 1) + ls) -= avgM*dist;
 		}
 	}
 	
 	Free(pnorm);
 	Free(snorm);
-	Free(posLastGp);
-	Free(posLastGs);
-	Free(scoreLastGp);
-	Free(scoreLastGs);
 	
 	// find the max scoring alignment
 	int maxp = 0;
@@ -597,7 +642,7 @@ SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SE
 	for (i = 1; i <= ls; i++)
 		if (*(m + lp*(ls + 1) + i) >= *(m + lp*(ls + 1) + maxs))
 			maxs = i;
-	for (i = top + 1; i <= lp; i++)
+	for (i = top + 1; i < lp; i++)
 		if (*(m + i*(ls + 1) + ls) >= *(m + maxp*(ls + 1) + ls))
 			maxp = i;
 	
@@ -636,7 +681,7 @@ SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SE
 	i = maxp - 1;
 	j = maxs - 1;
 	count = l - 1;
-	while ((i > -1) && (j > -1)) {
+	while (i > -1 && j > -1) {
 		*(t + count) = *(o + i*ls + j);
 		z = *(o + i*ls + j);
 		//*(o + i*ls + j) = 0;
@@ -757,10 +802,10 @@ SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SE
 	return ret_list;
 }
 
-SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SEXP ge, SEXP exp, SEXP power, SEXP endGapPenaltyLeft, SEXP endGapPenaltyRight, SEXP boundary, SEXP nThreads)
+SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SEXP ge, SEXP exp, SEXP power, SEXP endGapPenaltyLeft, SEXP endGapPenaltyRight, SEXP boundary, SEXP norm, SEXP nThreads)
 {
-	int i, j, k, pos, start, end, *rans, count, z;
-	double *pprofile, *sprofile, gp, gs, lGp, lGs, M, GP, GS, R;
+	int i, j, k, pos, start, end, *rans, count, z, totM = 0;
+	double *pprofile, *sprofile, gp, gs, lGp, lGs, M, GP, GS, R, temp, avgM = 0;
 	double max, tot, freq;
 	SEXP ans1, ans2, ans3, ans4, dims;
 	
@@ -777,6 +822,7 @@ SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SE
 	double egpL = asReal(endGapPenaltyLeft);
 	double egpR = asReal(endGapPenaltyRight);
 	double *subM = REAL(subMatrix);
+	int normalize = asInteger(norm);
 	int nthreads = asInteger(nThreads);
 	
 	double *hecM = REAL(hecMatrix);
@@ -1068,9 +1114,9 @@ SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SE
 	
 	if (egpL != 0) {
 		for (i = 1; i <= ls; i++)
-			*(m + i) = egpL*sstarts[i - 1]*snorm[i - 1];
+			*(m + i) = zip[i]*egpL*sstarts[i - 1]*snorm[i - 1] + *(m + i - 1);
 		for (i = 1; i <= lp; i++)
-			*(m + (ls + 1)*i) = egpL*pstarts[i - 1]*pnorm[i - 1];
+			*(m + (ls + 1)*i) = zip[i]*egpL*pstarts[i - 1]*pnorm[i - 1] + *(m + (ls + 1)*(i - 1));
 	}
 	
 	int left = 0, top = 0; // boundaries of DP matrix
@@ -1164,7 +1210,7 @@ SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SE
 		}
 		
 		max = -1e53;
-		#pragma omp parallel for private(i,j,gp,gs,M,GP,GS,tot,lGp,lGs) num_threads(nthreads)
+		#pragma omp parallel for private(i,j,gp,gs,M,GP,GS,tot,lGp,lGs,temp) reduction(+:totM,avgM) num_threads(nthreads)
 		for (i = START; i <= END; i++) {
 			// determine column index
 			if (k >= lp) {
@@ -1273,6 +1319,8 @@ SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SE
 				}
 			}
 			
+			temp = M;
+			
 			M *= tot;
 			GP *= tot;
 			GS *= tot;
@@ -1333,6 +1381,9 @@ SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SE
 					scoreLastGs[j] = GS;
 				}
 			} else { // no gap
+				avgM += temp;
+				totM++;
+				
 				*(m + (i + 1)*(ls + 1) + j + 1) = M;
 				*(o + i*ls + j) = 0;
 				
@@ -1378,22 +1429,39 @@ SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SE
 	}
 	
 	if (egpR != 0) {
+		GP = 0;
 		for (i = ls - 1; i > -1; i--) {
-			GP = egpR*sstops[i]*snorm[i];
+			GP += zip[ls - i]*egpR*sstops[i]*snorm[i];
 			*(m + lp*(ls + 1) + i) = *(m + lp*(ls + 1) + i) + GP;
 		}
+		GP = 0;
 		for (i = lp - 1; i > -1; i--) {
-			GP = egpR*pstops[i]*pnorm[i];
+			GP += zip[lp - i]*egpR*pstops[i]*pnorm[i];
 			*(m + i*(ls + 1) + ls) = *(m + i*(ls + 1) + ls) + GP;
+		}
+	}
+	
+	Free(posLastGp);
+	Free(posLastGs);
+	Free(scoreLastGp);
+	Free(scoreLastGs);
+	
+	// subtract background score expected without alignment
+	if (normalize) {
+		avgM /= totM;
+		double dist;
+		for (i = 1; i <= ls; i++) {
+			dist = traceback(lp - 1, i - 1, o, pnorm, snorm, ls);
+			*(m + lp*(ls + 1) + i) -= avgM*dist;
+		}
+		for (i = top + 1; i < lp; i++) {
+			dist = traceback(i - 1, ls - 1, o, pnorm, snorm, ls);
+			*(m + i*(ls + 1) + ls) -= avgM*dist;
 		}
 	}
 	
 	Free(pnorm);
 	Free(snorm);
-	Free(posLastGp);
-	Free(posLastGs);
-	Free(scoreLastGp);
-	Free(scoreLastGs);
 	
 	// find the max scoring alignment
 	int maxp = 0;
@@ -1401,7 +1469,7 @@ SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SE
 	for (i = 1; i <= ls; i++)
 		if (*(m + lp*(ls + 1) + i) >= *(m + lp*(ls + 1) + maxs))
 			maxs = i;
-	for (i = top + 1; i <= lp; i++)
+	for (i = top + 1; i < lp; i++)
 		if (*(m + i*(ls + 1) + ls) >= *(m + maxp*(ls + 1) + ls))
 			maxp = i;
 	
@@ -1448,7 +1516,7 @@ SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SE
 	i = maxp - 1;
 	j = maxs - 1;
 	count = l - 1;
-	while ((i > -1) && (j > -1)) {
+	while (i > -1 && j > -1) {
 		*(t + count) = *(o + i*ls + j);
 		z = *(o + i*ls + j);
 		//*(o + i*ls + j) = 0;

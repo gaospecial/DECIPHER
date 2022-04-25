@@ -73,6 +73,8 @@ If \code{type} is \code{"collapsed"} then a character vector is returned with th
 }
 \references{
 Murali, A., et al. (2018). IDTAXA: a novel approach for accurate taxonomic classification of microbiome sequences. Microbiome, 6, 140. https://doi.org/10.1186/s40168-018-0521-5
+
+Cooley, N. and Wright, E. (2021). Accurate annotation of protein coding sequences with IDTAXA. NAR Genomics and Bioinformatics, \bold{3(3)}. https://doi.org/10.1093/nargab/lqab080
 }
 \author{
 Erik Wright \email{eswright@pitt.edu}

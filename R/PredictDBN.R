@@ -23,9 +23,8 @@
 				cat("Determining sequence weights:\n")
 				flush.console()
 			}
-			suppressWarnings(guideTree <- IdClusters(d,
+			suppressWarnings(guideTree <- TreeLine(myDistMatrix=d,
 				method="UPGMA",
-				type="dendrogram",
 				verbose=verbose,
 				processors=processors))
 			

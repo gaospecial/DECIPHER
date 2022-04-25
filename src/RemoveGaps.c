@@ -37,11 +37,12 @@
 #include "DECIPHER.h"
 
 //ans_start <- .Call("removeCommonGaps", sequences, type, processors, PACKAGE="DECIPHER")
-SEXP removeCommonGaps(SEXP x, SEXP type, SEXP nThreads)
+SEXP removeCommonGaps(SEXP x, SEXP type, SEXP mask, SEXP nThreads)
 {
 	int i, j, k, l, w, x_length, *width, sum, start, delta;
 	SEXP ans_width, ans;
 	int t = asInteger(type);
+	int m = asInteger(mask);
 	int nthreads = asInteger(nThreads);
 	
 	// determine the element type of the XStringSet
@@ -62,7 +63,7 @@ SEXP removeCommonGaps(SEXP x, SEXP type, SEXP nThreads)
 	sum = 0; // number of columns to remove
 	if (t==3) { // AAStringSet
 		for (i = 0; i < l; i++) {
-			if (!(x_i.ptr[i] ^ 0x2D) || !(x_i.ptr[i] ^ 0x2E)) { // position is a gap
+			if (!(x_i.ptr[i] ^ 0x2D) || !(x_i.ptr[i] ^ 0x2E) || (m && !(x_i.ptr[i] ^ 0x2B))) { // position is a gap
 				remove[sum] = i;
 				sum++;
 			}
@@ -75,7 +76,7 @@ SEXP removeCommonGaps(SEXP x, SEXP type, SEXP nThreads)
 				error("Sequences are not equal length.");
 			
 			for (j = 0; j < sum; j++) {
-				if (x_i.ptr[remove[j]] ^ 0x2D && x_i.ptr[remove[j]] ^ 0x2E) { // letter in this position
+				if (x_i.ptr[remove[j]] ^ 0x2D && x_i.ptr[remove[j]] ^ 0x2E && (!m || x_i.ptr[remove[j]] ^ 0x2B)) { // non-gap in this position
 					// stop the position from being removed
 					sum--;
 					// shift all positions over by one
@@ -87,7 +88,7 @@ SEXP removeCommonGaps(SEXP x, SEXP type, SEXP nThreads)
 		}
 	} else { // DNAStringSet or RNAStringSet
 		for (i = 0; i < l; i++) {
-			if (x_i.ptr[i] & 0x10 || x_i.ptr[i] & 0x40) { // position is a gap
+			if (x_i.ptr[i] & 0x10 || x_i.ptr[i] & 0x40 || (m && x_i.ptr[i] & 0x20)) { // position is a gap
 				remove[sum] = i;
 				sum++;
 			}
@@ -100,7 +101,7 @@ SEXP removeCommonGaps(SEXP x, SEXP type, SEXP nThreads)
 				error("Sequences are not equal length.");
 			
 			for (j = 0; j < sum; j++) {
-				if (!(x_i.ptr[remove[j]] & 0x10 || x_i.ptr[remove[j]] & 0x40)) { // non-gap in this position
+				if (!(x_i.ptr[remove[j]] & 0x10 || x_i.ptr[remove[j]] & 0x40 || (m && x_i.ptr[remove[j]] & 0x20))) { // non-gap in this position
 					// stop the position from being removed
 					sum--;
 					// shift all positions over by one
@@ -159,11 +160,12 @@ SEXP removeCommonGaps(SEXP x, SEXP type, SEXP nThreads)
 }
 
 //ans_start <- .Call("removeGaps", sequences, type, processors, PACKAGE="DECIPHER")
-SEXP removeGaps(SEXP x, SEXP type, SEXP nThreads)
+SEXP removeGaps(SEXP x, SEXP type, SEXP mask, SEXP nThreads)
 {
 	int i, j, x_length, p, sum;
 	SEXP ans_width, ans;
 	int t = asInteger(type);
+	int m = asInteger(mask);
 	int nthreads = asInteger(nThreads);
 	
 	// determine the element type of the XStringSet
@@ -185,13 +187,13 @@ SEXP removeGaps(SEXP x, SEXP type, SEXP nThreads)
 		width[i] = x_i.length;
 		if (t==3) { // AAStringSet
 			for (j = 0; j < x_i.length; j++) {
-				if (!(x_i.ptr[j] ^ 0x2D) || !(x_i.ptr[j] ^ 0x2E)) { // position is a gap
+				if (!(x_i.ptr[j] ^ 0x2D) || !(x_i.ptr[j] ^ 0x2E) || (m && !(x_i.ptr[j] ^ 0x2B))) { // position is a gap
 					width[i]--;
 				}
 			}
 		} else { // DNAStringSet or RNAStringSet
 			for (j = 0; j < x_i.length; j++) {
-				if (x_i.ptr[j] & 0x10 || x_i.ptr[j] & 0x40) { // position is a gap
+				if (x_i.ptr[j] & 0x10 || x_i.ptr[j] & 0x40 || (m && x_i.ptr[j] & 0x20)) { // position is a gap
 					width[i]--;
 				}
 			}
@@ -220,7 +222,7 @@ SEXP removeGaps(SEXP x, SEXP type, SEXP nThreads)
 		p = 0; // position in ans_elt_holder
 		if (t==3) { // AAStringSet
 			for (j = 0; j < x_i.length; j++) {
-				if (!(x_i.ptr[j] ^ 0x2D) || !(x_i.ptr[j] ^ 0x2E)) { // position is a gap
+				if (!(x_i.ptr[j] ^ 0x2D) || !(x_i.ptr[j] ^ 0x2E) || (m && !(x_i.ptr[j] ^ 0x2B))) { // position is a gap
 					if (sum > 0) {
 						memcpy((char *) ans_elt_holder.ptr + p, x_i.ptr + j - sum, sum * sizeof(char));
 						p += sum;
@@ -234,7 +236,7 @@ SEXP removeGaps(SEXP x, SEXP type, SEXP nThreads)
 				memcpy((char *) ans_elt_holder.ptr + p, x_i.ptr + j - sum, sum * sizeof(char));
 		} else { // DNAStringSet or RNAStringSet
 			for (j = 0; j < x_i.length; j++) {
-				if (x_i.ptr[j] & 0x10 || x_i.ptr[j] & 0x40) { // position is a gap
+				if (x_i.ptr[j] & 0x10 || x_i.ptr[j] & 0x40 || (m && x_i.ptr[j] & 0x20)) { // position is a gap
 					if (sum > 0) {
 						memcpy((char *) ans_elt_holder.ptr + p, x_i.ptr + j - sum, sum * sizeof(char));
 						p += sum;

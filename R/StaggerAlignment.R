@@ -87,7 +87,7 @@ StaggerAlignment <- function(myXStringSet,
 		}
 		
 		d <- DistanceMatrix(myXStringSet,
-			correction="JC",
+			correction="F81",
 			processors=processors,
 			verbose=verbose)
 		
@@ -96,10 +96,8 @@ StaggerAlignment <- function(myXStringSet,
 			flush.console()
 		}
 		
-		suppressWarnings(tree <- IdClusters(d,
+		suppressWarnings(tree <- TreeLine(myDistMatrix=d,
 			method="NJ",
-			type="dendrogram",
-			collapse=-1, # bifurcating
 			processors=processors,
 			verbose=verbose))
 	} else {

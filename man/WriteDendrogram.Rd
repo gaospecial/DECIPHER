@@ -48,12 +48,12 @@ Logical indicating whether to append to an existing \code{file}.  Only applicabl
 Erik Wright \email{eswright@pitt.edu}
 }
 \seealso{
-\code{\link{IdClusters}}, \code{\link{ReadDendrogram}}
+\code{\link{TreeLine}}, \code{\link{ReadDendrogram}}
 }
 \examples{
 dists <- matrix(c(0, 10, 20, 10, 0, 5, 20, 5, 0),
     nrow=3,
     dimnames=list(c("dog", "elephant", "horse")))
-dend <- IdClusters(dists, method="NJ", type="dendrogram")
+dend <- TreeLine(myDistMatrix=dists, method="NJ")
 WriteDendrogram(dend)
 }

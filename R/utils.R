@@ -9,6 +9,17 @@
 	ans
 }
 
+.extract <- function(x, i, s, e) {
+	ans <- new(class(x))
+	g <- x@ranges@group[i]
+	u <- unique(g)
+	ans@pool <- x@pool[u]
+	ans@ranges@group <- match(g, u)
+	ans@ranges@start <- as.integer(x@ranges@start[i] + s - 1L)
+	ans@ranges@width <- as.integer(e - s + 1L)
+	ans
+}
+
 .replace <- function(x, y, index) {
 	ans <- new(class(x))
 	ans@pool <- c(x@pool,

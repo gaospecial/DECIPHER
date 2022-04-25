@@ -14,13 +14,13 @@ DistanceMatrix <- function(myXStringSet,
 		stop("Invalid type.")
 	if (type==-1)
 		stop("Ambiguous type.")
-	CORRECTIONS <- c("none", "Jukes-Cantor", "JC")
+	CORRECTIONS <- c("none", "Jukes-Cantor", "JC", "JC69", "F81")
 	correction <- pmatch(correction, CORRECTIONS)
 	if (is.na(correction))
 		stop("Invalid distance correction method.")
 	if (correction==-1)
 		stop("Ambiguous distance correction method.")
-	if (correction==3)
+	if (correction==3 || correction==4)
 		correction <- 2
 	if (!is.logical(includeTerminalGaps))
 		stop("includeTerminalGaps must be a logical.")
@@ -66,6 +66,44 @@ DistanceMatrix <- function(myXStringSet,
 		pBar <- NULL
 	}
 	
+	# calculate distance correction
+	if (correction != 1L) {
+		if (is(myXStringSet, "DNAStringSet")) {
+			if (penalizeGapLetterMatches ||
+				penalizeGapGapMatches) {
+				alphabet <- c(DNA_BASES, "-")
+			} else {
+				alphabet <- DNA_BASES
+			}
+		} else if (is(myXStringSet, "RNAStringSet")) {
+			if (penalizeGapLetterMatches ||
+				penalizeGapGapMatches) {
+				alphabet <- c(RNA_BASES, "-")
+			} else {
+				alphabet <- RNA_BASES
+			}
+		} else if (is(myXStringSet, "AAStringSet")) {
+			if (penalizeGapLetterMatches ||
+				penalizeGapGapMatches) {
+				alphabet <- c(AA_STANDARD, "-")
+			} else {
+				alphabet <- AA_STANDARD
+			}
+		}
+		if (correction == 5L) {
+			E <- letterFrequency(myXStringSet,
+				alphabet)
+			E <- colSums(E)
+			E <- E/sum(E)
+			E <- 1 - sum(E^2)
+		} else { # JC69
+			E <- 1/length(alphabet) # assumes even frequencies
+			E <- 1 - length(alphabet)*sum(E^2)
+		}
+	} else {
+		E <- 0
+	}
+	
 	# calculate the distance matrix
 	distMatrix <- .Call("distMatrix",
 		myXStringSet,
@@ -75,6 +113,7 @@ DistanceMatrix <- function(myXStringSet,
 		penalizeGapLetterMatches,
 		TRUE, # full matrix
 		type,
+		E,
 		verbose,
 		pBar,
 		processors,
@@ -90,36 +129,7 @@ DistanceMatrix <- function(myXStringSet,
 		attr(distMatrix, "Upper") <- TRUE
 		class(distMatrix) <- "dist"
 	}
-	
-	# apply distance correction
-	if (correction==2) { # Jukes-Cantor
-		if (is(myXStringSet, "DNAStringSet") || is(myXStringSet, "RNAStringSet")) {
-			# JC func is undefined above p = 0.75
-			w <- which(distMatrix > 0.75)
-			if (length(w) > 0) {
-				# rather than produce NaNs
-				# make the distance infinite
-				distMatrix[w] <- 0.75
-			}
-			distMatrix <- -3/4*log(1 - 4/3*distMatrix)
-			attr(distMatrix, "correction") <- "Jukes-Cantor"
-		} else if (is(myXStringSet, "AAStringSet")) {
-			# JC func is undefined above p = 0.95
-			w <- which(distMatrix > 0.95)
-			if (length(w) > 0) {
-				# rather than produce NaNs
-				# make the distance infinite
-				distMatrix[w] <- 0.95
-			}
-			distMatrix <- -19/20*log(1 - 20/19*distMatrix)
-			attr(distMatrix, "correction") <- "Jukes-Cantor"
-		} else {
-			warning("Jukes-Cantor correction is not available for a BStringSet input.")
-			attr(distMatrix, "correction") <- "none"
-		}
-	} else {
-		attr(distMatrix, "correction") <- "none"
-	}
+	attr(distMatrix, "correction") <- CORRECTIONS[correction]
 	
 	if (verbose) {
 		close(pBar)

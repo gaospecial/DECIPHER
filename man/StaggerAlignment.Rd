@@ -19,10 +19,10 @@ StaggerAlignment(myXStringSet,
 An \code{AAStringSet}, \code{DNAStringSet}, or \code{RNAStringSet} object of aligned sequences.
 }
   \item{tree}{
-A bifurcating \code{dendrogram} representing the evolutionary relationships between sequences, such as that created by \code{\link{IdClusters}}.  The root should be the topmost node of the \code{tree}.
+A bifurcating \code{dendrogram} representing the evolutionary relationships between sequences, such as that created by \code{\link{TreeLine}}.  The root should be the topmost node of the \code{tree}.  The default (\code{NULL}) will automatically infer a \code{tree} from \code{myXStringSet}.
 }
   \item{threshold}{
-Numeric giving the ratio of insertions to deletions that must be met to stagger a region of the alignment.  Specifically, the number of insertions divided by deletions must be less than threshold to stagger.
+Numeric giving the ratio of insertions to deletions that must be met to stagger a region of the alignment.  Specifically, the number of insertions divided by deletions must be less than \code{threshold} to stagger.
 }
   \item{fullLength}{
 Logical specifying whether the sequences are full-length (\code{TRUE}), or terminal gaps should be treated as missing data (\code{FALSE}, the default).  Either a single logical, a vector with one logical per sequence, or a list with \code{right} and \code{left} components containing logicals for the right and left sides of the alignment.
@@ -49,7 +49,7 @@ Coming soon!
 Erik Wright \email{eswright@pitt.edu}
 }
 \seealso{
-\code{\link{AdjustAlignment}}, \code{\link{AlignSeqs}}, \code{\link{IdClusters}}
+\code{\link{AdjustAlignment}}, \code{\link{AlignSeqs}}, \code{\link{TreeLine}}
 }
 \examples{
 db <- system.file("extdata", "Bacteria_175seqs.sqlite", package="DECIPHER")

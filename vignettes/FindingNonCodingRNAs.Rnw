@@ -136,7 +136,7 @@ p <- PredictDBN(RNA, type="structures")
 BrowseSeqs(RNA, patterns=p)
 @
 
-In this color scheme, blue regions pair to green regions and red regions are unpaired.  There is clear evidence for a hairpin loop near the 3'-end if IhtA, and weaker evidence for conserved secondary structure elsewhere in the sequences.
+In this color scheme, blue regions pair to green regions and red regions are unpaired.  There is clear evidence for a hairpin loop near the 3'-end if IhtA, and weaker evidence for conserved secondary structure elsewhere in the sequences (Fig. \ref{f1}).
 
 \begin{figure}
 \begin{center}
@@ -147,9 +147,32 @@ In this color scheme, blue regions pair to green regions and red regions are unp
 
 \clearpage
 
+We can also visualize the secondary structure through a dot plot (Fig. \ref{f2}).  One half of the dot plot shows the probabilities of pairing, and the other half shows the predicted structure.  This view reveals the level of ambiguity in the secondary structure based on the (low) amount of available information.
+
+\begin{centerfig}
+<<expr4,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6>>=
+evidence <- PredictDBN(RNA, type="evidence", threshold=0, verbose=FALSE)
+pairs <- PredictDBN(RNA, type="pairs", verbose=FALSE)
+dots <- matrix(0, width(RNA)[1], width(RNA)[1])
+dots[evidence[, 1:2]] <- evidence[, 3]
+dots[pairs[, 2:1]] <- 1
+
+image(dots, xaxt="n", yaxt="n", col=gray(seq(1, 0, -0.01)))
+abline(a=0, b=1)
+cons <- toString(ConsensusSequence(RNA, threshold=0.2))
+cons <- strsplit(cons, "")[[1]]
+at <- seq(0, 1, length.out=length(cons))
+axis(1, at, cons, tick=FALSE, cex.axis=0.3, gap.axis=0, line=-1)
+axis(2, at, cons, tick=FALSE, cex.axis=0.3, gap.axis=0, line=-1)
+@
+\caption{\label{f2} Secondary Structure Dot Plot.}
+\end{centerfig}
+
+\clearpage
+
 Two considerations are important at this stage: (\emph{i}) that we have a clearly defined boundary representing the true beginning and end of every sequence, and (\emph{ii}) that the sequences are a diverse sample of what we hope to find.  Here we don't have any partial sequences, but if we did they could be identified by counting gaps (``-'') at their ends with \Rfunction{TerminalChar}.  Any partial sequences should be removed before proceeding, for example by using:
 
-<<expr4,eval=TRUE>>=
+<<expr5,eval=TRUE>>=
 RNA <- unique(RNA)
 t <- TerminalChar(RNA)
 w <- which(t[, "leadingChar"] <= median(t[, "leadingChar"]) &
@@ -163,26 +186,26 @@ Rather than remove partial sequences, it would have been possible to shorten the
 
 Now we need to build a model capturing the essential characteristics of the non-coding RNA.  The function \Rfunction{LearnNonCoding} takes an alignment as input and outputs an object of class \Rclass{NonCoding} that describes the sequences.
 
-<<expr5,eval=TRUE>>=
+<<expr6,eval=TRUE>>=
 y <- LearnNonCoding(RNA)
 y
 @
 
 The output object is a list containing patterns of three types:  ``motifs'', ``hairpins'', and ``kmers''.  Motifs are short regions of the sequence that can be used to identify the sequences:
 
-<<expr6,eval=TRUE>>=
+<<expr7,eval=TRUE>>=
 y[["motifs"]]
 @
 
 Note that some of the motifs contain ambiguity codes (see \code{IUPAC_CODE_MAP}) that represent multiple nucleotides.  Motifs are defined by their distance from each end of the non-coding RNA, and their prevalence across sequence representatives when allowing for a certain degree of distance.
 
-<<expr7,eval=TRUE>>=
+<<expr8,eval=TRUE>>=
 y[["hairpins"]]
 @
 
 Hairpins are defined similarly, but allow for ambiguity in the form of varying free energy (dG).  As we saw in the predicted structures, the IhtA sequences end in a prominent hairpin that is both long and has a low free energy.
 
-<<expr8,eval=TRUE>>=
+<<expr9,eval=TRUE>>=
 head(y[["kmers"]])
 tail(y[["kmers"]])
 @
@@ -195,7 +218,7 @@ Finally, the sequences are identifiable by their k-mer frequencies.  In general,
 
 Now that we have captured the life force of the sequences, our next goal is to find homologous non-coding RNAs in a genome.  You can either use your own genome or follow along with the example \emph{C. trachomatis} genome.
 
-<<expr9,eval=TRUE>>=
+<<expr10,eval=TRUE>>=
 # specify the path to your genome:
 genome_path <- "<<path to genome FASTA file>>"
 # OR use the example genome:
@@ -210,7 +233,7 @@ genome
 
 The function \Rfunction{FindNonCoding} finds matches to \Rclass{NonCoding} models in a genome.  Let's search for the IhtA model in the \emph{Chlamydia} genome:
 
-<<expr10,eval=TRUE>>=
+<<expr11,eval=TRUE>>=
 FindNonCoding(y, genome)
 @
 
@@ -218,7 +241,7 @@ And there it is!  The output tells us that the IhtA gene is found on the forward
 
 Life's too short to build models for every non-coding RNA, so we can load a set of pre-built models for our bacterial genome.  Replace ``Bacteria'' with ``Archaea'' or ``Eukarya'' for genomes from organisms belonging to other domains of life.
 
-<<expr11,eval=TRUE>>=
+<<expr12,eval=TRUE>>=
 data(NonCodingRNA_Bacteria)
 x <- NonCodingRNA_Bacteria
 names(x)
@@ -226,14 +249,14 @@ names(x)
 
 What a life saver!  Our new dataset (\code{x}) is a list of models, including tRNAs (by amino acid), transfer-messenger RNA, RNase P, SsrS (6S RNA), group I and II introns, the signal recognition particle, and three rRNAs (5S, 16S, and 23S).  Let's add the model we built of IhtA into the list:
 
-<<expr12,eval=TRUE>>=
+<<expr13,eval=TRUE>>=
 x[[length(x) + 1]] <- y
 names(x)[length(x)] <- "IhtA"
 @
 
 Now we can search for them all at once with \Rfunction{FindNonCoding}:
 
-<<expr13,eval=TRUE>>=
+<<expr14,eval=TRUE>>=
 rnas <- FindNonCoding(x, genome)
 rnas
 class(rnas)
@@ -241,7 +264,7 @@ class(rnas)
 
 Wow!  That has to be one of life's simplest pleasures.  \Rfunction{FindNonCoding} returned an object of class \Rclass{Genes}.  By convention, the starting position of non-coding RNAs on the forward (\code{0}) \code{Strand} is at \code{Begin}, while those on the reverse (\code{1}) \code{Strand} start at \code{End}.  We can take a look at which RNAs were found:
 
-<<expr14,eval=TRUE>>=
+<<expr15,eval=TRUE>>=
 annotations <- attr(rnas, "annotations")
 m <- match(rnas[, "Gene"], annotations)
 sort(table(names(annotations)[m]))
@@ -249,7 +272,7 @@ sort(table(names(annotations)[m]))
 
 We see that the \emph{C. trachomatis} genome has multiple tRNA genes, two copies of each ribosomal RNA gene, and the RNaseP and tmRNA genes.  Finally, it is possible to extract the non-coding RNAs from the genome:
 
-<<expr15,eval=TRUE>>=
+<<expr16,eval=TRUE>>=
 ExtractGenes(rnas, genome, type="RNAStringSet")
 @
 

@@ -6,11 +6,12 @@ AlignDB <- function(dbFile,
 	batchSize=10000,
 	perfectMatch=5,
 	misMatch=0,
-	gapOpening=-13,
-	gapExtension=-1,
-	gapPower=-0.5,
-	terminalGap=-5,
+	gapOpening=-14,
+	gapExtension=-2,
+	gapPower=-1,
+	terminalGap=0,
 	normPower=c(1, 0),
+	standardize=TRUE,
 	substitutionMatrix=NULL,
 	processors=1,
 	verbose=TRUE,
@@ -85,6 +86,8 @@ AlignDB <- function(dbFile,
 		stop("terminalGap must be finite.")
 	if (length(terminalGap)==1)
 		terminalGap[2] <- terminalGap[1]
+	if (!isTRUEorFALSE(standardize))
+		stop("standardize must be a logical.")
 	if (!is.null(processors) && !is.numeric(processors))
 		stop("processors must be a numeric.")
 	if (!is.null(processors) && floor(processors)!=processors)
@@ -134,7 +137,7 @@ AlignDB <- function(dbFile,
 				stop("substitutionMatrix must be NULL or a matrix.")
 			}
 		} else if (type==2L && missing(perfectMatch) && missing(misMatch)) {
-			substitutionMatrix <- matrix(c(14, 4, 7, 4, 4, 15, 4, 7, 7, 4, 15, 4, 4, 7, 4, 14),
+			substitutionMatrix <- matrix(c(10, 3, 5, 3, 3, 12, 3, 5, 5, 3, 12, 3, 3, 5, 3, 10),
 				nrow=4,
 				ncol=4,
 				dimnames=list(bases, bases))
@@ -280,6 +283,7 @@ AlignDB <- function(dbFile,
 			terminalGap[1],
 			terminalGap[2],
 			restrict,
+			standardize,
 			processors,
 			PACKAGE="DECIPHER")
 	} else { # DNAStringSet or RNAStringSet
@@ -298,6 +302,7 @@ AlignDB <- function(dbFile,
 			terminalGap[1],
 			terminalGap[2],
 			restrict,
+			standardize,
 			processors,
 			PACKAGE="DECIPHER")
 	}

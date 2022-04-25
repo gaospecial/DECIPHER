@@ -695,6 +695,7 @@ FindSynteny <- function(dbFile,
 				order(x.i, x.e) - 1L,
 				minScore,
 				maxW,
+				allowOverlap,
 				PACKAGE="DECIPHER")
 			
 			scores <- chains[[2]]
@@ -1061,6 +1062,7 @@ FindSynteny <- function(dbFile,
 				order(x.i, x.e) - 1L,
 				minScore,
 				maxW,
+				allowOverlap,
 				PACKAGE="DECIPHER")
 			
 			scores <- chains[[2]]

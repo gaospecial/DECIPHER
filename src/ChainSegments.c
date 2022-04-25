@@ -119,7 +119,7 @@ SEXP indexByContig(SEXP starts, SEXP ends, SEXP order, SEXP index, SEXP widths)
 	return ret_list;
 }
 
-SEXP chainSegments(SEXP x_s, SEXP x_e, SEXP x_i, SEXP x_f, SEXP y_s, SEXP y_e, SEXP y_i, SEXP y_f, SEXP weights, SEXP sepCost, SEXP gapCost, SEXP shiftCost, SEXP codingCost, SEXP maxSep, SEXP maxGap, SEXP ordering, SEXP minScore, SEXP maxW)
+SEXP chainSegments(SEXP x_s, SEXP x_e, SEXP x_i, SEXP x_f, SEXP y_s, SEXP y_e, SEXP y_i, SEXP y_f, SEXP weights, SEXP sepCost, SEXP gapCost, SEXP shiftCost, SEXP codingCost, SEXP maxSep, SEXP maxGap, SEXP ordering, SEXP minScore, SEXP maxW, SEXP allowOverlap)
 {
 	int *xs = INTEGER(x_s);
 	int *xe = INTEGER(x_e);
@@ -139,6 +139,7 @@ SEXP chainSegments(SEXP x_s, SEXP x_e, SEXP x_i, SEXP x_f, SEXP y_s, SEXP y_e, S
 	double totW = asReal(maxW);
 	int *xo = INTEGER(ordering);
 	double minS = asReal(minScore);
+	int aO = asInteger(allowOverlap);
 	
 	int l = length(x_s);
 	int i = 0;
@@ -360,23 +361,44 @@ SEXP chainSegments(SEXP x_s, SEXP x_e, SEXP x_i, SEXP x_f, SEXP y_s, SEXP y_e, S
 		}
 		
 		// pull back overlapping end
-		while (max != -1 &&
-			max >= O[max]) {
-			overlap = 0;
-			for (i = 0; i < count; i++) {
-				if (xi[max]==rectXI[i] &&
-					yi[max]==rectYI[i] &&
-					((xe[max] >= rectXS[i] &&
-					xe[max] <= rectXE[i]) ||
-					(ye[max] >= rectYS[i] &&
-					ye[max] <= rectYE[i]))) {
-					overlap = 1;
-					break;
+		if (aO) { // allow overlaps in x or y
+			while (max != -1 &&
+				max >= O[max]) {
+				overlap = 0;
+				for (i = 0; i < count; i++) {
+					if (xi[max]==rectXI[i] &&
+						yi[max]==rectYI[i] &&
+						xe[max] >= rectXS[i] &&
+						xe[max] <= rectXE[i] &&
+						ye[max] >= rectYS[i] &&
+						ye[max] <= rectYE[i]) {
+						overlap = 1;
+						break;
+					}
 				}
+				if (overlap==0)
+					break;
+				max = R[max];
 			}
-			if (overlap==0)
-				break;
-			max = R[max];
+		} else {
+			while (max != -1 &&
+				max >= O[max]) {
+				overlap = 0;
+				for (i = 0; i < count; i++) {
+					if (xi[max]==rectXI[i] &&
+						yi[max]==rectYI[i] &&
+						((xe[max] >= rectXS[i] &&
+						xe[max] <= rectXE[i]) ||
+						(ye[max] >= rectYS[i] &&
+						ye[max] <= rectYE[i]))) {
+						overlap = 1;
+						break;
+					}
+				}
+				if (overlap==0)
+					break;
+				max = R[max];
+			}
 		}
 		
 		if (max==-1) // no chain
@@ -386,24 +408,46 @@ SEXP chainSegments(SEXP x_s, SEXP x_e, SEXP x_i, SEXP x_f, SEXP y_s, SEXP y_e, S
 		min = max;
 		n = min;
 		j = 0;
-		while (n >= O[max]) {
-			overlap = 0;
-			for (i = 0; i < count; i++) {
-				if (xi[n]==rectXI[i] &&
-					yi[n]==rectYI[i] &&
-					((xs[n] >= rectXS[i] &&
-					xs[n] <= rectXE[i]) ||
-					(ys[n] >= rectYS[i] &&
-					ys[n] <= rectYE[i]))) {
-					overlap = 1;
-					break;
+		if (aO) { // allow overlaps in x or y
+			while (n >= O[max]) {
+				overlap = 0;
+				for (i = 0; i < count; i++) {
+					if (xi[n]==rectXI[i] &&
+						yi[n]==rectYI[i] &&
+						xs[n] >= rectXS[i] &&
+						xs[n] <= rectXE[i] &&
+						ys[n] >= rectYS[i] &&
+						ys[n] <= rectYE[i]) {
+						overlap = 1;
+						break;
+					}
 				}
+				if (overlap==1)
+					break;
+				j++;
+				min = n; // prior value of min
+				n = R[min];
 			}
-			if (overlap==1)
-				break;
-			j++;
-			min = n; // prior value of min
-			n = R[min];
+		} else {
+			while (n >= O[max]) {
+				overlap = 0;
+				for (i = 0; i < count; i++) {
+					if (xi[n]==rectXI[i] &&
+						yi[n]==rectYI[i] &&
+						((xs[n] >= rectXS[i] &&
+						xs[n] <= rectXE[i]) ||
+						(ys[n] >= rectYS[i] &&
+						ys[n] <= rectYE[i]))) {
+						overlap = 1;
+						break;
+					}
+				}
+				if (overlap==1)
+					break;
+				j++;
+				min = n; // prior value of min
+				n = R[min];
+			}
 		}
 		
 		if (j==0)
@@ -443,8 +487,13 @@ SEXP chainSegments(SEXP x_s, SEXP x_e, SEXP x_i, SEXP x_f, SEXP y_s, SEXP y_e, S
 					}
 				}
 			}
-			if (minDx < 0 || minDy < 0) // fully overlapping
-				continue;
+			if (aO) { // allow overlaps in x or y
+				if (minDx < 0 && minDy < 0) // completely within rectangle
+					continue;
+			} else {
+				if (minDx < 0 || minDy < 0) // completely overlapping in x or y
+					continue;
+			}
 			
 			sep = 1e9;
 			gap = 1e9;

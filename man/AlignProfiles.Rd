@@ -15,13 +15,14 @@ AlignProfiles(pattern,
               s.struct = NULL,
               perfectMatch = 5,
               misMatch = 0,
-              gapOpening = -13,
-              gapExtension = -1,
-              gapPower = -0.5,
-              terminalGap = -5,
+              gapOpening = -14,
+              gapExtension = -2,
+              gapPower = -1,
+              terminalGap = 0,
               restrict = c(-1000, 2, 10),
               anchor = 0.7,
               normPower = c(1, 0),
+              standardize = TRUE,
               substitutionMatrix = NULL,
               structureMatrix = NULL,
               processors = 1)
@@ -71,6 +72,9 @@ Numeric giving the fraction of sequences with identical k-mers required to becom
 }
   \item{normPower}{
 Numeric giving the exponent that controls the degree of normalization applied to scores by column occupancy.  If two numerics are provided, the first controls the normalization power of terminal gaps, while the second controls that of internal gaps.  A \code{normPower} of \code{0} does not normalize the scores, which results in all columns of the profiles being weighted equally, and is the optimal value for aligning fragmentary sequences.  A \code{normPower} of \code{1} normalizes the score for aligning two positions by their column occupancy (1 - fraction of gaps).  A \code{normPower} greater than \code{1} more strongly discourages aligning with ``gappy'' regions of the alignment.  (See details section below.)
+}
+  \item{standardize}{
+Logical determining whether scores are standardized to be in units of per matching site. Standardization effectively divides the score of each possible alignment by its length so that scores are relative rather than absolute.
 }
   \item{substitutionMatrix}{
 Either a substitution matrix representing the substitution scores for an alignment or the name of the amino acid substitution matrix to use in alignment.  The latter may be one of the following:  ``BLOSUM45'', ``BLOSUM50'', ``BLOSUM62'', ``BLOSUM80'', ``BLOSUM100'', ``PAM30'', ``PAM40'', ``PAM70'', ``PAM120'', ``PAM250'', or ``MIQS''.  The default (NULL) will use the \code{perfectMatch} and \code{misMatch} penalties for DNA/RNA or \code{PFASUM50} for AA.  (See examples section below.)

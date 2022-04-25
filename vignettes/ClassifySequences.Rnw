@@ -99,7 +99,7 @@ Once \Rpackage{DECIPHER} is installed, the code in this tutorial can be obtained
 
 The training process only needs to occur once per training set, and results in an object that can be reused for testing as many sequences as desired.  If you already have the output of training the classifier (an object of \term{class} \code{Taxa} and subclass \code{Train}), then you can skip to subsection \ref{viewing} (\nameref{viewing}) below.  Otherwise follow along with this section to learn how to train the classifier.
 
-The training process begins with a set of sequence representatives assigned to a taxonomic hierarchy, called a ``training set''.  Typically taxonomic assignments are obtained from an authoritative source, but they can also be automatically created (e.g., with \Rfunction{IdClusters}).  Here we describe the general training process, where the classifier iteratively learns about the reference taxonomy.
+The training process begins with a set of sequence representatives assigned to a taxonomic hierarchy, called a ``training set''.  Typically taxonomic assignments are obtained from an authoritative source, but they can also be automatically created (e.g., with \Rfunction{TreeLine}).  Here we describe the general training process, where the classifier iteratively learns about the reference taxonomy.
 
 \subsection{Importing the training set}
 

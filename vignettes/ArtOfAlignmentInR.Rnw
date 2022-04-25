@@ -366,7 +366,7 @@ DNA_adjusted <- AdjustAlignment(DNA)
 
 It is common to use alignment as a preliminary step before the creation of a phylogenetic tree.  \Rpackage{DECIPHER}, like the majority of alignment programs, attempts to maximize homologous positions between the sequences being aligned.  Such an alignment is particularly useful when investigating which residues are in the same structural position of a protein.  However, disparate sequence regions tend to be concentrated into the same ``gappy'' areas of the alignment.  When viewed from a phylogenetic perspective these homologies have highly implausible insertion/deletion scenarios.
 
-To mitigate the problem of false homologies, \Rfunction{StaggerAlignment} will automatically generate a staggered version of an existing alignment.  Staggered alignments separate potentially non-homologous regions into separate columns of the alignment.  The result is an alignment that is less visually appealing, but likely more accurate from a phylogenetic perspective.  As such, this is an important post-processing step whenever the alignment will be used to construct a phylogenetic tree (e.g., with \Rfunction{DistanceMatrix} and \Rfunction{IdClusters}).
+To mitigate the problem of false homologies, \Rfunction{StaggerAlignment} will automatically generate a staggered version of an existing alignment.  Staggered alignments separate potentially non-homologous regions into separate columns of the alignment.  The result is an alignment that is less visually appealing, but likely more accurate from a phylogenetic perspective.
 
 <<expr10,eval=FALSE,echo=TRUE>>=
 DNA_staggered <- StaggerAlignment(DNA)

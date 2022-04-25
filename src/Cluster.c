@@ -19,6 +19,9 @@
 /* for R_CheckUserInterrupt */
 #include <R_ext/Utils.h>
 
+/* for Calloc/Free */
+#include <R_ext/RS.h>
+
 // for math functions
 #include <math.h>
 
@@ -31,7 +34,6 @@
 
 // DECIPHER header file
 #include "DECIPHER.h"
-
 
 void binUPGMA(double *rans, int i, int clusterNumber, double maxHeight, int length) {
 	// NOTE:  cluster number is going to be the index i + 1
@@ -386,6 +388,8 @@ SEXP cluster(SEXP x, SEXP cutoff, SEXP method, SEXP l, SEXP verbose, SEXP pBar, 
 			}
 		} else { // nthreads > 1
 			if (met==1) { // NJ method
+				double *minHs = Calloc(size - 1, double); // initialized to zero
+				int *minCs = Calloc(size - 1, int); // initialized to zero
 				#pragma omp parallel for private(i,j,minC,minH) schedule(guided) num_threads(nthreads)
 				for (i = (size - 2); i >= 0; i--) {
 					minH = 1e50;
@@ -395,16 +399,21 @@ SEXP cluster(SEXP x, SEXP cutoff, SEXP method, SEXP l, SEXP verbose, SEXP pBar, 
 							minC = j;
 						}
 					}
-					if (minH < minHeight) { // not thread-safe check
-						#pragma omp critical
-						if (minH < minHeight) { // thread-safe check
-							minHeight = minH;
-							minRow = i;
-							minCol = minC;
-						}
+					minHs[i] = minH;
+					minCs[i] = minC;
+				}
+				for (i = (size - 2); i >= 0; i--) {
+					if (minHs[i] < minHeight) {
+						minHeight = minHs[i];
+						minRow = i;
+						minCol = minCs[i];
 					}
 				}
+				Free(minHs);
+				Free(minCs);
 			} else {
+				double *minHs = Calloc(size - 1, double); // initialized to zero
+				int *minCs = Calloc(size - 1, int); // initialized to zero
 				#pragma omp parallel for private(i,j,minC,minH) schedule(guided) num_threads(nthreads)
 				for (i = (size - 2); i >= 0; i--) {
 					if (minCols[rowIndices[i]] < 0) { // need to find minimum column
@@ -420,15 +429,18 @@ SEXP cluster(SEXP x, SEXP cutoff, SEXP method, SEXP l, SEXP verbose, SEXP pBar, 
 						minC = minCols[rowIndices[i]];
 						minH = dMatrix2[length*colIndices[minC] - colIndices[minC]*(colIndices[minC] + 1)/2 + rowIndices[i] - colIndices[minC]];
 					}
-					if (minH < minHeight) { // not thread-safe check
-						#pragma omp critical
-						if (minH < minHeight) { // thread-safe check
-							minHeight = minH;
-							minRow = i;
-							minCol = minC;
-						}
+					minHs[i] = minH;
+					minCs[i] = minC;
+				}
+				for (i = (size - 2); i >= 0; i--) {
+					if (minHs[i] < minHeight) {
+						minHeight = minHs[i];
+						minRow = i;
+						minCol = minCs[i];
 					}
 				}
+				Free(minHs);
+				Free(minCs);
 			}
 		}
 		
@@ -452,10 +464,10 @@ SEXP cluster(SEXP x, SEXP cutoff, SEXP method, SEXP l, SEXP verbose, SEXP pBar, 
 					rans[3*(length - 1) + k] = dMatrix2[length*colIndices[minCol] - colIndices[minCol]*(colIndices[minCol] + 1)/2 + rowIndices[minRow] - colIndices[minCol]] - rans[4*(length - 1) + k]; // row
 				}
 				
-				// zero negative branch lengths
+				// transfer negative branch lengths to positive branch lengths
 				if (rans[3*(length - 1) + k] < 0 && rans[4*(length - 1) + k] < 0) {
-					rans[3*(length - 1) + k] = 0;
-					rans[4*(length - 1) + k] = 0;
+					rans[3*(length - 1) + k] = -1*rans[3*(length - 1) + k];
+					rans[4*(length - 1) + k] = -1*rans[4*(length - 1) + k];
 				} else if (rans[4*(length - 1) + k] < 0) {
 					rans[3*(length - 1) + k] += -1*rans[4*(length - 1) + k]; // add difference to other branch
 					rans[4*(length - 1) + k] = 0;

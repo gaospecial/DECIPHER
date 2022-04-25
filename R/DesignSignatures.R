@@ -1536,7 +1536,8 @@ DesignSignatures <- function(dbFile,
 		d <- dist(signatures,
 			method="maximum")
 		if (length(d) > 0) {
-			c <- IdClusters(as.matrix(d),
+			c <- TreeLine(myDistMatrix=d,
+				type="clusters",
 				method="single",
 				cutoff=levels/5,
 				processors=processors,
@@ -2000,7 +2001,8 @@ DesignSignatures <- function(dbFile,
 				d <- dist(signatures,
 					method="maximum")
 				if (length(d) > 0) {
-					c <- IdClusters(as.matrix(d),
+					c <- TreeLine(myDistMatrix=d,
+						type="clusters",
 						method="single",
 						cutoff=levels/5,
 						processors=processors,

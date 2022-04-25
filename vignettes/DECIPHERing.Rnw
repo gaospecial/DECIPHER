@@ -109,7 +109,7 @@ The functions of DECIPHER can be grouped into several categories based on intend
 \item Functions related to forming consensus:
 \begin{enumerate} \item \Rfunction{ConsensusSequence} \item \Rfunction{Disambiguate} \item \Rfunction{IdConsensus} \end{enumerate}
 \item Phylogenetics and sequence comparison:
-\begin{enumerate} \item \Rfunction{DistanceMatrix} \item \Rfunction{IdClusters} \item \Rfunction{MaskAlignment} \item \Rfunction{ReadDendrogram} \item \Rfunction{StaggerAlignment} \item \Rfunction{WriteDendrogram} \end{enumerate}
+\begin{enumerate} \item \Rfunction{DistanceMatrix} \item \Rfunction{IdClusters} \item \Rfunction{MaskAlignment} \item \Rfunction{ReadDendrogram} \item \Rfunction{StaggerAlignment} \item \Rfunction{TreeLine} \item \Rfunction{WriteDendrogram} \end{enumerate}
 \item Visualization with a web browser:
 \begin{enumerate} \item \Rfunction{BrowseDB} \item \Rfunction{BrowseSeqs} \end{enumerate}
 \item Manipulating sequences:
@@ -117,7 +117,7 @@ The functions of DECIPHER can be grouped into several categories based on intend
 \item Analyzing sequences:
 \begin{enumerate} \item \Rfunction{DetectRepeats} \item \Rfunction{DigestDNA} \item \Rfunction{PredictDBN} \item \Rfunction{PredictHEC} \end{enumerate}
 \item Multiple sequence alignment:
-\begin{enumerate} \item \Rfunction{AdjustAlignment} \item \Rfunction{AlignDB} \item \Rfunction{AlignProfiles} \item \Rfunction{AlignSeqs} \item \Rfunction{AlignTranslation} \end{enumerate}
+\begin{enumerate} \item \Rfunction{AdjustAlignment} \item \Rfunction{AlignDB} \item \Rfunction{AlignProfiles} \item \Rfunction{AlignSeqs} \item \Rfunction{AlignTranslation} \item \Rfunction{ScoreAlignment} \end{enumerate}
 \item Comparison of sequences that are not collinear (i.e., genomes):
 \begin{enumerate} \item \Rfunction{AlignSynteny} \item \Rfunction{FindSynteny} \item \Rclass{Synteny-class} \end{enumerate}
 \item Functions related to chimeras (PCR artifacts):
@@ -191,7 +191,12 @@ The functions of DECIPHER can be grouped into several categories based on intend
 \end{Schunk}
 \end{enumerate}
 
-For parallelization on Mac OS X, extra steps are required to \underline{\url{http://mac.r-project.org/openmp/}{enable OpenMP}} before install.
+For parallelization on Mac OS X, extra steps are required to \underline{\url{http://mac.r-project.org/openmp/}{enable OpenMP}} before install.  In summary, run "clang -v" and then download the corresponding LLVM tar.gz file.  Run the sudo tar command as shown, and then add these two lines to your ~/.R/Makevars file:
+
+CPPFLAGS += -Xclang -fopenmp
+LDFLAGS += -lomp
+
+Then \Rpackage{DECIPHER} can be built and installed the usual way via the command line.
 
 \subsubsection{Linux}
 In a shell enter:
@@ -305,9 +310,9 @@ Let's construct a phylogenetic tree from the \term{Bacteroidetes} sequences (Fig
 \begin{centerfig}
 <<expr6,fig=TRUE,height=3.5,width=6>>=
 d <- DistanceMatrix(dna, correction="Jukes-Cantor", verbose=FALSE)
-c <- IdClusters(d, method="ML", cutoff=.05, showPlot=TRUE, myXStringSet=dna, verbose=FALSE)
+c <- TreeLine(myDistMatrix=d, method="NJ", cutoff=0.05, showPlot=TRUE, verbose=FALSE)
 @
-\caption{Maximum likelihood tree showing the relationships between sequences.}
+\caption{Neighbor-joining tree showing the relationships between sequences.}
 \end{centerfig}
 
 \clearpage

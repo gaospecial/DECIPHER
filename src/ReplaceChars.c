@@ -103,7 +103,7 @@ SEXP replaceChars(SEXP x, SEXP r, SEXP t)
 							break;
 						default:
 							if (fail) {
-								error("Incompatible character ('%c') found when replaceChar = NA.", seq[j]);
+								error("Incompatible character ('%c') found in DNAStringSet when replaceChar = NA.", seq[j]);
 							} else if (repChar[0] != '\0') {
 								s[count] = repChar[0];
 								count++;
@@ -164,7 +164,7 @@ SEXP replaceChars(SEXP x, SEXP r, SEXP t)
 							break;
 						default:
 							if (fail) {
-								error("Incompatible character ('%c') found when replaceChar = NA.", seq[j]);
+								error("Incompatible character ('%c') in RNAStringSet found when replaceChar = NA.", seq[j]);
 							} else if (repChar[0] != '\0') {
 								s[count] = repChar[0];
 								count++;
@@ -324,7 +324,7 @@ SEXP replaceChars(SEXP x, SEXP r, SEXP t)
 						break;
 					default:
 						if (fail) {
-							error("Incompatible character ('%c') found when replaceChar = NA.", seq[j]);
+							error("Incompatible character ('%c') in AAStringSet found when replaceChar = NA.", seq[j]);
 						} else if (repChar[0] != '\0') {
 							s[count] = repChar[0];
 							count++;

@@ -72,8 +72,8 @@ IdTaxa <- function(test,
 		if (is.name(sexpr)) { # function name
 			sexpr <- call(as.character(sexpr),
 				as.name("L")) # pass in 'L'
-	    } else if (!(is.call(sexpr) && # call
-	   	 	"L" %in% all.vars(sexpr))) { # containing 'L'
+		} else if (!(is.call(sexpr) && # call
+			"L" %in% all.vars(sexpr))) { # containing 'L'
 			stop("samples must be a call containing 'L'.")
 		}
 	}

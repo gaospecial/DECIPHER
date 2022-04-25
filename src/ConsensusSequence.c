@@ -1915,7 +1915,7 @@ SEXP consensusProfileAA(SEXP x, SEXP weight, SEXP structs)
 
 // returns the sum of substitution scores
 // for each alignment column [start-end]
-SEXP colScores(SEXP x, SEXP subMatrix, SEXP go, SEXP ge, SEXP weights, SEXP structs, SEXP dbnMatrix)
+SEXP colScores(SEXP x, SEXP subMatrix, SEXP go, SEXP ge, SEXP terminalGaps, SEXP weights, SEXP structs, SEXP dbnMatrix)
 {
 	XStringSet_holder x_set;
 	Chars_holder x_i;
@@ -1924,7 +1924,8 @@ SEXP colScores(SEXP x, SEXP subMatrix, SEXP go, SEXP ge, SEXP weights, SEXP stru
 	double *w = REAL(weights);
 	double GO = asReal(go); // gap opening
 	double GE = asReal(ge); // gap extension
-	double weight, total, prev, curr, prev_total;
+	int tGaps = asLogical(terminalGaps);
+	double weight, total, prev, curr;
 	
 	// initialize the XStringSet
 	x_set = hold_XStringSet(x);
@@ -1962,7 +1963,11 @@ SEXP colScores(SEXP x, SEXP subMatrix, SEXP go, SEXP ge, SEXP weights, SEXP stru
 		if (gapLengths[i*2]==x_i.length) // all gaps
 			continue;
 		gapLengths[i*2 + 1] = endTerminalGaps(&x_i);
-		alphabetFrequency(&x_i, bases, seqLength, 1, 0, gapLengths[i*2], gapLengths[i*2 + 1], w[i]);
+		if (tGaps) {
+			alphabetFrequency(&x_i, bases, seqLength, 1, 0, 0, 0, w[i]);
+		} else {
+			alphabetFrequency(&x_i, bases, seqLength, 1, 0, gapLengths[i*2], gapLengths[i*2 + 1], w[i]);
+		}
 		
 		if (do_DBN) {
 			elmt = VECTOR_ELT(structs, i);
@@ -1986,7 +1991,6 @@ SEXP colScores(SEXP x, SEXP subMatrix, SEXP go, SEXP ge, SEXP weights, SEXP stru
 	rans = REAL(ans);
 	
 	prev = 0; // gaps in previous position
-	prev_total = 0; // number of letters in previous position
 	for (k = 0; k < seqLength; k++) {
 		*(rans + k) = 0;
 		total = 0;
@@ -1994,38 +1998,46 @@ SEXP colScores(SEXP x, SEXP subMatrix, SEXP go, SEXP ge, SEXP weights, SEXP stru
 			total += bases[i*seqLength + k];
 			for (j = i; j < 4; j++) {
 				weight = (i==j) ? 0.5 : 1;
-				weight *= (bases[j*seqLength + k] - ((i==j) ? 1 : 0));
+				weight *= bases[j*seqLength + k] - ((i==j) ? 1 : 0);
 				weight *= bases[i*seqLength + k];
 				if (weight > 0)
 					*(rans + k) += *(subM + i*4 + j)*weight;
 			}
 		}
 		
-		if (do_DBN) {
-			for (i = 0; i < d; i++) {
-				for (j = i; j < d; j++) {
-					weight = (i==j) ? 0.5 : 1;
-					weight *= (DBN[j*seqLength + k] - ((i==j) ? 1 : 0));
-					weight *= DBN[i*seqLength + k];
-					if (weight > 0)
-						*(rans + k) += *(dbnM + i*d + j)*weight;
+		if (total >= 1.9999999) {
+			if (do_DBN) {
+				for (i = 0; i < d; i++) {
+					for (j = i; j < d; j++) {
+						weight = (i==j) ? 0.5 : 1;
+						weight *= DBN[j*seqLength + k];// - ((i==j) ? 1 : 0);
+						weight *= DBN[i*seqLength + k];
+						if (weight > 0)
+							*(rans + k) += *(dbnM + i*d + j)*weight;
+					}
 				}
 			}
+			
+			*(rans + k) *= 2/total; // normalize to total non-gaps
 		}
-		
 		curr = bases[4*seqLength + k]; // number gapped
 		if (curr > prev) {
-			*(rans + k) += GO*((curr - prev)*total); // gap opening
-			*(rans + k) += GE*(prev*total); // gap extension
+			*(rans + k) += GO*(curr - prev); // gap opening
+			*(rans + k) += GE*prev; // gap extension
 		} else if (curr < prev) {
-			*(rans + k) += GO*((prev - curr)*prev_total); // gap closing
-			*(rans + k) += GE*(curr*total); // gap extension
+			*(rans + k) += GO*(prev - curr); // gap closing
+			*(rans + k) += GE*curr; // gap extension
 		} else {
-			*(rans + k) += GE*(curr*total); // gap extension
+			*(rans + k) += GE*curr; // gap extension
 		}
 		
 		prev = curr;
-		prev_total = total;
+	}
+	
+	if (tGaps && curr > 0) {
+		k = seqLength - 1;
+		if (k >= 0)
+			*(rans + k) += GO*(curr*total);
 	}
 	
 	Free(bases);
@@ -2040,7 +2052,7 @@ SEXP colScores(SEXP x, SEXP subMatrix, SEXP go, SEXP ge, SEXP weights, SEXP stru
 
 // returns the sum of substitution scores
 // for each alignment column [start-end]
-SEXP colScoresAA(SEXP x, SEXP subMatrix, SEXP go, SEXP ge, SEXP weights, SEXP structs, SEXP hecMatrix)
+SEXP colScoresAA(SEXP x, SEXP subMatrix, SEXP go, SEXP ge, SEXP terminalGaps, SEXP weights, SEXP structs, SEXP hecMatrix)
 {
 	XStringSet_holder x_set;
 	Chars_holder x_i;
@@ -2049,7 +2061,8 @@ SEXP colScoresAA(SEXP x, SEXP subMatrix, SEXP go, SEXP ge, SEXP weights, SEXP st
 	double *w = REAL(weights);
 	double GO = asReal(go); // gap opening
 	double GE = asReal(ge); // gap extension
-	double weight, total, prev, curr, prev_total;
+	int tGaps = asLogical(terminalGaps);
+	double weight, total, prev, curr;
 	
 	// initialize the XStringSet
 	x_set = hold_XStringSet(x);
@@ -2087,7 +2100,11 @@ SEXP colScoresAA(SEXP x, SEXP subMatrix, SEXP go, SEXP ge, SEXP weights, SEXP st
 		if (gapLengths[i*2]==x_i.length) // all gaps
 			continue;
 		gapLengths[i*2 + 1] = endTerminalGapsAA(&x_i);
-		alphabetFrequencyAA(&x_i, bases, seqLength, 1, 0, gapLengths[i*2], gapLengths[i*2 + 1], w[i]);
+		if (tGaps) {
+			alphabetFrequencyAA(&x_i, bases, seqLength, 1, 0, 0, 0, w[i]);
+		} else {
+			alphabetFrequencyAA(&x_i, bases, seqLength, 1, 0, gapLengths[i*2], gapLengths[i*2 + 1], w[i]);
+		}
 		
 		if (do_HEC) {
 			elmt = VECTOR_ELT(structs, i);
@@ -2111,7 +2128,6 @@ SEXP colScoresAA(SEXP x, SEXP subMatrix, SEXP go, SEXP ge, SEXP weights, SEXP st
 	rans = REAL(ans);
 	
 	prev = 0; // gaps in previous position
-	prev_total = 0; // number of letters in previous position
 	for (k = 0; k < seqLength; k++) {
 		*(rans + k) = 0;
 		total = 0;
@@ -2119,38 +2135,46 @@ SEXP colScoresAA(SEXP x, SEXP subMatrix, SEXP go, SEXP ge, SEXP weights, SEXP st
 			total += bases[i*seqLength + k];
 			for (j = i; j < 20; j++) {
 				weight = (i==j) ? 0.5 : 1;
-				weight *= (bases[j*seqLength + k] - ((i==j) ? 1 : 0));
+				weight *= bases[j*seqLength + k] - ((i==j) ? 1 : 0);
 				weight *= bases[i*seqLength + k];
 				if (weight > 0)
 					*(rans + k) += *(subM + i*21 + j)*weight;
 			}
 		}
 		
-		if (do_HEC) {
-			for (i = 0; i < d; i++) {
-				for (j = i; j < d; j++) {
-					weight = (i==j) ? 0.5 : 1;
-					weight *= (HEC[j*seqLength + k] - ((i==j) ? 1 : 0));
-					weight *= HEC[i*seqLength + k];
-					if (weight > 0)
-						*(rans + k) += *(hecM + i*d + j)*weight;
+		if (total >= 1.9999999) {
+			if (do_HEC) {
+				for (i = 0; i < d; i++) {
+					for (j = i; j < d; j++) {
+						weight = (i==j) ? 0.5 : 1;
+						weight *= HEC[j*seqLength + k];// - ((i==j) ? 1 : 0);
+						weight *= HEC[i*seqLength + k];
+						if (weight > 0)
+							*(rans + k) += *(hecM + i*d + j)*weight;
+					}
 				}
 			}
+			
+			*(rans + k) *= 2/total; // normalize to total non-gaps
 		}
 		
 		curr = bases[23*seqLength + k]; // number gapped
 		if (curr > prev) {
-			*(rans + k) += GO*((curr - prev)*total); // gap opening
-			*(rans + k) += GE*(prev*total); // gap extension
+			*(rans + k) += GO*(curr - prev); // gap opening
+			*(rans + k) += GE*prev; // gap extension
 		} else if (curr < prev) {
-			*(rans + k) += GO*((prev - curr)*prev_total); // gap closing
-			*(rans + k) += GE*(curr*total); // gap extension
+			*(rans + k) += GO*(prev - curr); // gap closing
+			*(rans + k) += GE*curr; // gap extension
 		} else {
-			*(rans + k) += GE*(curr*total); // gap extension
+			*(rans + k) += GE*curr; // gap extension
 		}
 		
 		prev = curr;
-		prev_total = total;
+	}
+	if (tGaps && curr > 0) {
+		k = seqLength - 1;
+		if (k >= 0)
+			*(rans + k) += GO*(curr*total);
 	}
 	
 	Free(bases);

@@ -79,7 +79,7 @@ FormGroups               Forms Groups By Rank
 Genes-class              Genes objects and accessors
 HEC_MI                   Mutual Information for Protein Secondary Structure
                          Prediction
-IdClusters               Cluster Sequences By Distance or Sequence
+IdClusters               Cluster Sequences By Similarity
 IdConsensus              Create Consensus Sequences by Groups
 IdentifyByRank           Identify By Taxonomic Rank
 IdLengths                Determine the Number of Bases, Nonbases, and Width
@@ -91,7 +91,7 @@ MapCharacters            Map Changes in Ancestral Character States
 MaskAlignment            Mask Highly Variable Regions of An Alignment
 MeltDNA                  Simulate Melting of DNA
 MIQS                     MIQS Amino Acid Substitution Matrix
-MODELS                   Available Models of DNA Evolution
+MODELS                   Available Models of Sequence Evolution
 NNLS                     Sequential Coordinate-wise Algorithm for the
                          Non-negative Least Squares Problem
 NonCoding                NonCoding Models for Common Non-Coding RNA Families
@@ -105,6 +105,7 @@ PredictHEC               Predict Protein Secondary Structure as Helix,
 Read Dendrogram          Read a Dendrogram from a Newick Formatted File
 RemoveGaps               Remove Gap Characters in Sequences
 RESTRICTION_ENZYMES      Common Restriction Enzyme's Cut Sites
+ScoreAlignment           Score a Multiple Sequence Alignment
 SearchDB                 Obtain Specific Sequences from a Database
 Seqs2DB                  Add Sequences from Text File to Database
 StaggerAlignment         Produce a Staggered Alignment
@@ -114,6 +115,7 @@ TerminalChar             Determine the Number of Terminal Characters
 TileSeqs                 Form a Set of Tiles for Each Group of Sequences
 TrainingSet_16S          Training Set for Classification of 16S rRNA Gene
                          Sequences
+TreeLine                 Construct a Phylogenetic Tree
 TrimDNA                  Trims DNA Sequences to the High Quality Region
                          Between Patterns
 WriteDendrogram          Write a Dendrogram to Newick Format

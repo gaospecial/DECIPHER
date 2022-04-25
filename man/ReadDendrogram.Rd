@@ -36,14 +36,14 @@ An object of class \code{dendrogram}.
 Erik Wright \email{eswright@pitt.edu}
 }
 \seealso{
-\code{\link{IdClusters}}, \code{\link{WriteDendrogram}}
+\code{\link{TreeLine}}, \code{\link{WriteDendrogram}}
 }
 \examples{
 tf <- tempfile()
 dists <- matrix(c(0, 10, 20, 10, 0, 5, 20, 5, 0),
     nrow=3,
     dimnames=list(c("dog", "elephant", "horse")))
-dend1 <- IdClusters(dists, method="NJ", type="dendrogram")
+dend1 <- TreeLine(myDistMatrix=dists, method="NJ", type="dendrogram")
 WriteDendrogram(dend1, file=tf)
 
 dend2 <- ReadDendrogram(tf)

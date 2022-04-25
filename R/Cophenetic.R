@@ -10,11 +10,20 @@ Cophenetic <- function(x) {
 	attr(d, "Size") <- n
 	attr(d, "Diag") <- TRUE
 	attr(d, "Upper") <- TRUE
-	o <- order(unlist(x))
+	u <- unlist(x)
+	o <- order(u)
+	u <- u[o]
 	labs <- rapply(x,
 		function(x)
 			attr(x, "label"))
-	attr(d, "Labels") <- labs[o]
+	labs <- labs[o]
+	attr(d, "Labels") <- labs
+	x <- rapply(x,
+		function(y) {
+			y[] <- match(y[1L], u)
+			y
+		},
+		how="replace")
 	
 	.dist <- function(dend) {
 		# initialize a stack of maximum length (n)

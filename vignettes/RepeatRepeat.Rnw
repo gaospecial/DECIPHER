@@ -1,0 +1,249 @@
+%\VignetteIndexEntry{Detecting obscure tandem repeats in sequences}
+%\VignettePackage{DECIPHER}
+
+\documentclass[10pt]{article}
+
+\usepackage{times}
+\usepackage{hyperref}
+\usepackage{underscore}
+\usepackage{enumerate}
+\usepackage{graphics}
+\usepackage{wrapfig}
+\usepackage{cite}
+
+\textwidth=6.5in
+\textheight=8.5in
+%\parskip=.3cm
+\oddsidemargin=-.1in
+\evensidemargin=-.1in
+\headheight=-.3in
+\setlength{\parindent}{1cm}
+
+\newcommand{\scscst}{\scriptscriptstyle}
+\newcommand{\scst}{\scriptstyle}
+
+\newcommand{\R}{{\textsf{R}}}
+\newcommand{\code}[1]{{\texttt{#1}}}
+\newcommand{\term}[1]{{\emph{#1}}}
+\newcommand{\Rpackage}[1]{\textsf{#1}}
+\newcommand{\Rfunction}[1]{\texttt{#1}}
+\newcommand{\Robject}[1]{\texttt{#1}}
+\newcommand{\Rclass}[1]{{\textit{#1}}}
+\newcommand{\Rmethod}[1]{{\textit{#1}}}
+\newcommand{\Rfunarg}[1]{{\textit{#1}}}
+
+\bibliographystyle{plainnat}
+
+\begin{document}
+%\setkeys{Gin}{width=0.55\textwidth}
+
+\title{Classify Sequences}
+\author{Erik S. Wright}
+\date{\today}
+\maketitle
+
+\newenvironment{centerfig}
+{\begin{figure}[htp]\centering}
+{\end{figure}}
+\renewcommand{\indent}{\hspace*{\tindent}}
+\DefineVerbatimEnvironment{Sinput}{Verbatim} {xleftmargin=2em} \DefineVerbatimEnvironment{Soutput}{Verbatim}{xleftmargin=2em} \DefineVerbatimEnvironment{Scode}{Verbatim}{xleftmargin=2em} \fvset{listparameters={\setlength{\topsep}{0pt}}} \renewenvironment{Schunk}{\vspace{\topsep}}{\vspace{\topsep}}
+\SweaveOpts{keep.source=TRUE}
+<<echo=false>>=
+options(continue=" ")
+options(width=80)
+options(SweaveHooks=list(fig=function()	par(mar=c(4.1, 4.1, 0.3, 0.1))))
+set.seed(123)
+@
+
+\tableofcontents
+
+%------------------------------------------------------------
+\section{Introduction}
+%------------------------------------------------------------
+
+\begin{wrapfigure}{r}{0.31\textwidth}
+\includegraphics[width=0.31\textwidth]{ObscurinStructure}
+\caption{\label{f1} Partial predicted structure of the human protein Obscurin showing the repeated Ig domains.}
+\end{wrapfigure}
+
+Jacques Monod famously penned an essay in 1977 likening the evolutionary process to tinkering and boldly claiming that ``evolution does not produce novelties from scratch.'' He cites molecular evidence:
+
+\begin{quotation}
+This is exemplified by the finding that large segments of genetic information, that is, of DNA, turn out to be homologous, not only in the same organism, but also among different organisms, even among those that are phylogenetically distant. Similarly, as more is known about amino acid sequences in proteins, it appears not only that proteins fulfilling similar functions in different organisms have frequently similar sequences, but also that proteins with different functions also exhibit rather large segments in common.
+\end{quotation}
+
+We now know that proteins can, and regularly do, evolve \textit{de novo}. Yet, repetition of existing sequence, followed by divergence (i.e., tinkering), is still a major source of evolutionary innovation. DNA slippage during replication is one mechanism that can result in repeated sequences, in particular adjacent repeats in the DNA. These tandem repeats, especially in the form of short microsatellites, underly several human diseases including fragile X syndrome and Huntington's disease.
+
+Microsatellites are easy to spot by eye, as they contain repetitive stretches of a few nucleotides repeated many times in a row (e.g., CAG CAG CAG CAG CAG [...] in the protein Huntintin). Harder to detect are tandem repeats that have evolved considerably since their origin, such that the repeated copies no longer look anything like their shared ancestral sequence. It is estimated that over half of the human proteome contains tandem repeats, many of which share an ancient origin and are undetectable by eye.
+
+Obscurin is one human protein containing several repeats that are difficult to spot by eye. It contains 68 Ig (Immunoglobin) domains, which each contain multiple antiparallel $\beta$-sheets (Fig. \ref{f1}). Many of these Ig domains are found adjacent to each other and likely arose from a common ancestor. This vignette describes how to detect these obscure repeats using the \Rfunction{DetectRepeats} function in the \R{} package \Rpackage{DECIPHER}.
+
+\clearpage
+
+%------------------------------------------------------------
+\section{Getting Started}
+%------------------------------------------------------------
+
+\newlength\tindent
+\setlength{\tindent}{\parindent}
+\setlength{\parindent}{0pt}
+
+\subsection{Startup}
+
+To get started we need to load the \Rpackage{DECIPHER} package, which automatically loads a few other required packages.
+
+<<startup,results=hide>>=
+library(DECIPHER)
+@
+
+Detecting repeats is performed with the \Rfunction{DetectRepeats} function. Its help page can be accessed through:
+
+\begin{Schunk}
+\begin{Sinput}
+> ? DetectRepeats
+\end{Sinput}
+\end{Schunk}
+
+Once \Rpackage{DECIPHER} is installed, the code in this tutorial can be obtained via:
+
+\begin{Schunk}
+\begin{Sinput}
+> browseVignettes("DECIPHER")
+\end{Sinput}
+\end{Schunk}
+
+%------------------------------------------------------------
+\section{Taking a first look at Obscurin}
+%------------------------------------------------------------
+
+\setlength{\parindent}{1cm}
+
+Here, we will take a deep dive into the human protein Obscurin, which is expressed in muscle tissue. Obscurin is a large protein primarily composed of Ig domains, an example of which looks like:
+
+<<expr1,eval=TRUE>>=
+Ig <- AAStringSet("VRALPARFTEGLRNEEAMEGATATLQCELSKAAPVEWRKGLEALRDGDKYSLRQDGAVCELQIHGLAMADNGVYSCVCGQERTSATLT")
+Ig
+@
+
+Since we know the form of the repeat, we can find others like it in the sequence by aligning the repeat to a sliding window along the entire protein sequence. First, we load our sequences with:
+
+<<expr2,eval=TRUE>>=
+# specify the path to your file of sequences:
+fas <- "<<path to training FASTA file>>"
+# OR use the example DNA sequences:
+fas <- system.file("extdata",
+	"LongHumanProteins.fas.gz",
+	package="DECIPHER")
+# read the sequences into memory
+DNA <- readDNAStringSet(fas)
+DNA
+@
+
+Although \Rfunction{DetectRepeats} works on nucleotide and protein sequences, it is generally easier to find tandem repeats in amino acid sequences than it is to find them in DNA sequences. We can easily translate our proteins:
+
+<<expr3,eval=TRUE>>=
+AA <- translate(DNA)
+AA
+names(AA)
+index <- 2
+AA <- AA[index]
+@
+
+We see that Obscurin is the second protein in the \Rclass{AAStringSet}. The others are related human proteins containing Ig domains. It is possible to analyze many proteins at the same time, but this vignette focuses on only a single protein so the examples run quickly. To detect repeats in a different protein, or multiple proteins, simply change the value of \code{index} above.
+
+We can find the repeated sequence using pairwise alignment by aligning each of the windows along the sequence to the Ig domain and plot their scores. The alignment score quantifies how well each window along the protein matches the Ig domain. Windows matching Ig domains will show up as peaks in the score.
+
+\begin{centerfig}
+<<expr4,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6>>=
+windows <- extractAt(AA[[1]],
+	IRanges(seq_len(width(AA[1]) - width(Ig)),
+		width=width(Ig)))
+p <- pairwiseAlignment(windows, Ig)
+plot(score(p), ylab="Score", xlab="Amino acid position", type="l")
+@
+\caption{\label{f2} Peaks marking the start of Ig domains in the human protein Obscurin.}
+\end{centerfig}
+
+We can make a couple of observations from the plot. First, many of the Ig domains are located adjacent to each other, likely as a result of tandem repeats, although some are isolated to other parts of the protein. Second, the tandem repeats around the main peak have higher scores, suggesting these orthologous repeats share a more recent evolutionary ancestor. Many of the other repeats have negative scores even though they are also Ig domains.
+
+\clearpage
+
+%------------------------------------------------------------
+\section{Detecting repeats automatically with DetectRepeats}
+%------------------------------------------------------------
+
+With Obscurin we have the advantage that we already know to look for repeated Ig domains. But how can we find tandem repeats when we don't know what to expect? This is when it comes in handy to use the \Rfunction{DetectRepeats} function to find tandem repeats. It takes sequences as input and then outputs the predicted tandem repeats and their associated scores. Let's take a look at how it does with Obscurin:
+
+<<expr5,eval=TRUE>>=
+reps <- DetectRepeats(AA, allScores=TRUE)
+reps[which.max(reps[, "Score"]),]
+@
+
+The result is a \Rclass{data.frame} giving the beginning and ending positions of the tandem repeat, as well as every repeat within it. The top scoring repeat spans the Ig domains we found earlier. Since we asked for \Rfunarg{allScores}, the output contains all repeats with scores above \Rfunarg{minScore}, even if they are overlapping. This allows us to easily plot the different repeats that were identified in Obscurin:
+
+\begin{centerfig}
+<<expr6,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6>>=
+plot(NA,
+	xlim=c(0, max(width(AA))),
+	ylim=range(0, reps[, "Score"]),
+	xlab="Position in protein",
+	ylab="Tandem repeat score")
+for (i in seq_len(nrow(reps)))
+	segments(reps[[i, "Left"]],
+		reps[i, "Score"],
+		reps[[i, "Right"]],
+		reps[i, "Score"],
+		col=seq_along(reps[[i, "Left"]]))
+@
+\caption{\label{f3} The different repeats detected in the human protein Obscurin.}
+\end{centerfig}
+
+All of the adjacent Ig domains were identified multiple times with different beginning and ending positions. If we set \Rfunarg{allScores} to \code{FALSE} (the default) then we would only obtain the top scoring repeat in each region.
+
+\clearpage
+
+%------------------------------------------------------------
+\section{Inferring the History of Repeats in Obscurin}
+%------------------------------------------------------------
+
+It is feasible to infer the order of repeats from a phylogeny built from the repeat sequences. Repeats that duplicated more recently will presumably be more closely related on a phylogenetic tree. To construct a tree, first we must extract the repeats.
+
+<<expr7,eval=TRUE>>=
+i <- which.max(reps[, "Score"])
+seqs <- extractAt(AA[[reps[i, "Index"]]],
+	IRanges(reps[[i, "Left"]], reps[[i, "Right"]]))
+seqs <- AlignSeqs(seqs, verbose=FALSE) # align the repeats
+names(seqs) <- seq_along(seqs) # number from left to right
+seqs
+@
+
+Note that the repeats are numbered from leftmost to rightmost in the tandem repeat. Then we can infer a phylogenetic tree using the \Rfunction{TreeLine} function in \Rpackage{DECIPHER}:
+
+\begin{centerfig}
+<<expr8,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6>>=
+d <- DistanceMatrix(seqs)
+dend <- TreeLine(myDistMatrix=d, method="NJ", verbose=FALSE)
+dend <- reorder(dend, seq_along(seqs))
+layout(matrix(1:2))
+plot(dend)
+plot(unlist(dend), xlab="Position on tree", ylab="Repeat number")
+abline(a=0, b=1)
+@
+\caption{\label{f4} Inferred phylogeny of Ig domain repeats detected in Obscurin.}
+\end{centerfig}
+
+There is a signal of adjacent repeats branching later from each other in the phylogeny. From this it is possible to hypothesize the set of duplication events that resulted in the observed set and locations of repeats in Obscurin.
+
+\clearpage
+
+%------------------------------------------------------------
+\section{Session Information}
+%------------------------------------------------------------
+
+All of the output in this vignette was produced under the following conditions:
+
+<<sessinfo,echo=FALSE,results=tex>>=
+toLatex(sessionInfo(), locale=FALSE)
+@
+
+\end{document}
