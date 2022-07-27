@@ -42,7 +42,7 @@ Numeric determining the maximum number of failing attempts to extend a repeat th
 Numeric determining the maximum number of failing attempts to shift a repeat left or right that are permitted.  Numbers greater than zero may increase accuracy at the expense of speed, with decreasing marginal returns as \code{maxShifts} gets higher and higher.
 }
   \item{alphabet}{
-Character vector of amino acid groupings used to reduce the 20 standard amino acids into smaller groups.  Alphabet reduction helps to find more distant homologies between sequences.  A non-reduced amino acid alphabet can be used by setting \code{alphabet} equal to \code{AA_STANDARD}.
+Character vector of amino acid groupings used to reduce the 20 standard amino acids into smaller groups.  Alphabet reduction helps to find more distant homologies between sequences.  A non-reduced amino acid alphabet can be used by setting \code{alphabet} equal to \code{AA_STANDARD}.  Only applicable if \code{myXStringSet} is an \code{AAStringSet}.
 }
   \item{processors}{
 The number of processors to use, or \code{NULL} to automatically detect and use all available processors.
@@ -111,6 +111,28 @@ aa <- translate(dna)
 y <- DetectRepeats(aa)
 y
 
+# highlight tandem repeats in the sequence
+colors <- c("deeppink", "deepskyblue")
+colors <- lapply(colors, function(x) col2rgb(x)/255)
+cols <- vector("list", length(aa))
+for (i in seq_along(cols)) {
+	cols[[i]] <- matrix(0, nrow=3, ncol=width(aa)[i])
+	for (j in which(y[, "Index"] == i)) {
+		left <- y[[j, "Left"]]
+		right <- y[[j, "Right"]]
+		n <- 0
+		for (k in seq_along(left)) {
+			r <- left[k]:right[k]
+			n <- n + 1
+			if (n > length(colors))
+				n <- 1
+			cols[[i]][, r] <- colors[[n]]
+		}
+	}
+}
+BrowseSeqs(aa, patterns=cols)
+
+# find interspersed (rather than tandem) repeats
 data(yeastSEQCHR1)
 chr1 <- DNAStringSet(yeastSEQCHR1)
 

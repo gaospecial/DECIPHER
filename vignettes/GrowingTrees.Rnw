@@ -65,6 +65,8 @@ Why is the function called \Rfunction{TreeLine}?  The goal of \Rfunction{TreeLin
 
 Why use \Rfunction{TreeLine} versus other programs?  The \Rfunction{TreeLine} function is designed to return an excellent phylogenetic tree with minimal user intervention.  Many tree building programs have a large set of complex options for niche applications.  In contrast, \Rfunction{TreeLine} simply builds a great tree when relying on its defaults.  This vignette is intended to get you started and introduce additional options/functions that might be useful.
 
+TreeLine uses multi-start optimization followed by hill-climbing to find the highest trees on the likelihood or parsimony landscapes.  Since TreeLine is a stochastic optimizer, it optimizes many trees to prevent luck from influencing the final result.  The main difference from most other approaches to tree optimization is that TreeLine heavily uses past trees to generate new trees as it optimizes.  With any luck it'll find the treeline!
+
 %------------------------------------------------------------
 \section{Performance Considerations}
 %------------------------------------------------------------
@@ -75,7 +77,7 @@ Finding a tree with very high likelihood/parsimony is no easy feat.  \Rfunction{
 \item Only use the sequences you need:  \Rfunction{TreeLine} scales a bit worse than quadratically with the number of sequences.  Hence, limiting the number of sequences is a worthwhile consideration.  In particular, always eliminate redundant sequences, as shown below, and remove any sequences that are not necessary.  This concern is shared for all tree building programs, and \Rfunction{TreeLine} is no exception.
 \item Set a timeout:  The \code{maxTime} argument specifies the (approximate) maximum number of hours you are willing to let \Rfunction{TreeLine} run.  If you are concerned about the code running too long then simply specify this argument.
 \item Compile with OpenMP support:  Significant speed-ups can be achieved with multi-threading using OpenMP.  See the ``Getting Started DECIPHERing'' vignette for how to do this on your computer platform.  Then you only need to set the argument \code{processors=NULL} and \Rfunction{TreeLine} will use all available processors.
-\item Compile for SIMD support:  \Rfunction{TreeLine} is configured to make use of SIMD operations, which are available on some processors.  The easiest way to enable SIMD is to add `` -O3 -march=native'' to the end of \code{PKG_CFLAGS} in the ``DECIPHER/src/MAKEVARS'' text file.  This enables level-3 compiler optimization for your native computer architecture.  Then, after recompiling, there can be an automatic speed-up on systems with SIMD support.
+%\item Compile for SIMD support:  \Rfunction{TreeLine} is configured to make use of SIMD operations, which are available on some processors.  The easiest way to enable SIMD is to add `` -O3 -march=native'' to the end of \code{PKG_CFLAGS} in the ``DECIPHER/src/MAKEVARS'' text file.  This enables level-3 compiler optimization for your native computer architecture.  Then, after recompiling, there can be an automatic speed-up on systems with SIMD support.
 \end{itemize}
 
 %------------------------------------------------------------
@@ -107,11 +109,11 @@ seqs <- seqs[!duplicated(ns)] # remove redundant sequences from the same species
 seqs
 @
 
-Now, it's time to find the most likely tree.  Here, we will set a strict time limit to make this example faster, although longer time limits (e.g., 24 hours) are advised.
+Now, it's time to try our luck at finding the most likely tree.  Here, we will set a stringent time limit (0.05 hours) to make this example faster, although longer time limits (e.g., 24 hours) are advised because setting very short time limits leaves the result up to luck.
 
-Note that \Rfunction{TreeLine} automatically selects a substitution model based on Akaike information criterion (by default).  It is possible to specify specific model(s) (e.g., \code{model="GTR+G4"}) to limit the possible selections.
+Note that \Rfunction{TreeLine} automatically selects a substitution model based on Akaike information criterion (by default).  It is possible to specify specific model(s) (e.g., \code{model="GTR+G4"}) to limit the possible selections and test your luck with fewer models.
 
-Also, since \Rfunction{TreeLine} is a stochastic optimizer, it is critical to always set the random number seed for reproducibility.
+Also, since \Rfunction{TreeLine} is a stochastic optimizer, it is critical to always set the random number seed for reproducibility.  You can pick any lucky number, and if you every wonder how much you pushed your luck, you can try running again from a different random number seed to see how much the result came down to luck of the draw.
 
 \begin{centerfig}
 <<expr3,eval=TRUE,echo=TRUE,fig=TRUE,height=3.5,width=6>>=
@@ -132,7 +134,7 @@ plot(tree)
 \section{Plotting Branch Support Values}
 %------------------------------------------------------------
 
-\Rfunction{TreeLine} automatically returns a variety of information about the tree that can be accessed with the \Rfunction{attributes} and \Rfunction{attr} functions:
+Maybe it was just beginner's luck, but we already have a reasonable looking starting tree!  \Rfunction{TreeLine} automatically returns a variety of information about the tree that can be accessed with the \Rfunction{attributes} and \Rfunction{attr} functions:
 
 <<expr4,eval=TRUE,echo=TRUE>>=
 attributes(tree) # view all attributes
@@ -166,7 +168,7 @@ text(0.2, 0, "0.4 subs./site", pos=3, xpd=TRUE)
 
 \clearpage
 
-Maximum likelihood and maximum parsimony trees both provide branch supports in the form of the fraction of optimized trees that contained a given partition (branch).  These are accessible from the ``support'' attribute.  As expected, support values and (aBayes) probabilities are correlated, but support tends to be more conservative.
+We lucked out because maximum likelihood and maximum parsimony trees both provide branch supports in the form of the fraction of optimized trees that contained a given partition (branch).  These are accessible from the ``support'' attribute.  As luck would have it, support values and (aBayes) probabilities are correlated, but support tends to be more conservative.
 
 \begin{centerfig}
 <<expr6,eval=TRUE,echo=TRUE,fig=TRUE,height=3.5,width=3.5>>=
@@ -191,7 +193,7 @@ abline(a=0, b=1, lty=2) # line of identity (y=x)
 \section{Ancestral State Reconstruction}
 %------------------------------------------------------------
 
-One of the advantages of maximum likelihood and maximum parsimony tree building methods is that they automatically predict states at each internal node on the tree \cite{Joy:2016}.  This feature is enabled when \Rfunarg{reconstruct} is set to \code{TRUE}.  These character states can be used by the function \Rfunction{MapCharacters} to determine state transitions along each edge of the tree.
+We're in luck \textemdash one of the advantages of maximum likelihood and maximum parsimony tree building methods is that they automatically predict states at each internal node on the tree \cite{Joy:2016}.  This feature is enabled when \Rfunarg{reconstruct} is set to \code{TRUE}.  These character states can be used by the function \Rfunction{MapCharacters} to determine state transitions along each edge of the tree.
 
 \begin{centerfig}
 <<expr7,eval=TRUE,echo=TRUE,fig=TRUE,height=6,width=6>>=
@@ -203,6 +205,23 @@ attr(new_tree[[1]], "change") # state changes on first branch left of (virtual) 
 \end{centerfig}
 
 \clearpage
+
+%------------------------------------------------------------
+\section{Exporting the Tree}
+%------------------------------------------------------------
+
+We've had a run of good luck with this tree, so we'd better save it before our luck runs out!  The functions \Rfunction{ReadDendrogram} and \Rfunction{WriteDendrogram} will import and export trees in Newick file format.  If we leave the \Rfunarg{file} argument blank then it will print the output to the console for our viewing:
+
+<<expr8,eval=TRUE,echo=TRUE>>=
+WriteDendrogram(tree, file="")
+@
+
+To keep up our lucky streak, we should probably include any model parameters in the output along with the tree.  Luckily, Newick format supports square brackets (i.e., ``[]'') for comments, which we can append to the end of the file for good luck:
+
+<<expr9,eval=TRUE,echo=TRUE>>=
+params <- attr(tree, "parameters")
+cat("[", paste(names(params), params, sep="=", collapse=","), "]", sep="", append=TRUE, file="")
+@
 
 %------------------------------------------------------------
 \section{Session Information}

@@ -21,7 +21,7 @@ TreeLine(myXStringSet = NULL,
          maxGenerations = 20,
          maxTime = Inf,
          quadrature = FALSE,
-         costMatrix = 1 - diag(length(x)),
+         costMatrix = NULL,
          processors = 1,
          verbose = TRUE)
 }
@@ -30,7 +30,7 @@ TreeLine(myXStringSet = NULL,
 A \code{AAStringSet}, \code{DNAStringSet}, or \code{RNAStringSet} if \code{method} is \code{"ML"}, \code{method} is \code{"MP"}, or \code{reconstruct} is not \code{FALSE}.
 }
   \item{myDistMatrix}{
-A symmetric \eqn{N} x \eqn{N} distance matrix with the values of dissimilarity between \eqn{N} sequences or an object of class \code{'dist'}.  If the \code{method} is \code{"ML"} or \code{"MP"} then \code{myDistMatrix} is optional.
+A symmetric \eqn{N} x \eqn{N} distance matrix with the values of dissimilarity between \eqn{N} sequences or an object of class \code{'dist'}.  If the \code{method} is \code{"ML"} or \code{"MP"} then \code{myDistMatrix} is optional.  Missing values (i.e., \code{NA}) in \code{myDistMatrix} are imputed using the ultrametric method described by Makarenkov and Lapointe (2004).
 }
   \item{method}{
 The phylogenetic method to be used.  This should be (an abbreviation of) one of \code{"ML"} (the default), \code{"MP"}, \code{"NJ"}, \code{"complete"}, \code{"single"}, \code{"UPGMA"}, or \code{"WPGMA"}.  (See details section below.)
@@ -39,7 +39,7 @@ The phylogenetic method to be used.  This should be (an abbreviation of) one of 
 Character string indicating the type of output desired.  This should be (an abbreviation of) one of \code{"dendrogram"} (the default), \code{"clusters"}, or \code{"both"}.  (See value section below.)
 }
   \item{model}{
-One or more of the available \code{MODELS} of evolution.  Only applicable if \code{method} is \code{"ML"} or \code{reconstruct} is not \code{FALSE}.  Automatic model selection will be performed if more than one \code{model} is provided.
+One or more of the available \code{MODELS} of evolution provided as a character vector or list with components `Protein' and/or `Nucleotide'.  Only applicable if \code{method} is \code{"ML"} or \code{reconstruct} is not \code{FALSE}.  Automatic model selection will be performed if more than one \code{model} is provided.
 }
   \item{cutoff}{
 A vector with the maximum edge length separating the sequences in the same cluster.  A negative value (the default) will prevent clustering.  Multiple cutoffs may be provided in ascending or descending order.  (See details section below.)
@@ -69,7 +69,7 @@ Numeric giving the maximum number of hours the algorithm is allowed to run befor
 Logical determining whether to use the Laguerre quadrature or equal-sized bins when discretizing the rate distribution across sites.  The default is to use equal-sized bins for direct comparison among likelihoods computed by other programs, although the Laguerre quadrature theoretically offers an improvement in accuracy for the same number of rates (Felsenstein, 2001).
 }
   \item{costMatrix}{
-A function or call written as a function of `x', which will evaluate to a square numeric matrix with one row for each state.  The cost matrix sets the penalties used in Sankoff parsimony.  The default is to apply a cost of \code{1} for state changes and \code{0} otherwise (i.e., equivalent to Fitch parsimony).  Only applicable if \code{method} is \code{"MP"}.
+Either \code{NULL} (the default) or a symmetric matrix setting the penalties used in Sankoff parsimony.  The default (\code{NULL}) will apply a cost of \code{1} for state changes and \code{0} otherwise (i.e., equivalent to Fitch parsimony).  If a \code{matrix} then the states are taken from its row or column names.  Only applicable if \code{method} is \code{"MP"}.
 }
   \item{processors}{
 The number of processors to use, or \code{NULL} to automatically detect and use all available processors.  Note, the number of processors in some steps is automatically selected between one and \code{processors} to optimize performance.
@@ -104,13 +104,15 @@ If \code{type} is \code{"both"} then a list is returned containing both the \cod
 Note that the cophenetic distance between leaves of the \code{dendrogram} is equal to the sum of branch lengths separating the leaves.  This is the typical phylogenetic interpretation but different than trees produced by \code{hclust} where leaves are merged at a height equal to their cophenetic distance.  Hence, always use \code{Cophenetic} (rather than \code{cophenetic}) to compute correct cophenetic distances.
 }
 \references{
-Anisimova M., Gil, M., Dufayard, J., Dessimoz, C., Gascuel, O. (2011) Survey of branch support methods demonstrates accuracy, power, and robustness of fast likelihood-based approximation schemes. \emph{Syst Biol.}, \bold{60(5)},685-99.
+Anisimova M., Gil, M., Dufayard, J., Dessimoz, C., and Gascuel, O. (2011) Survey of branch support methods demonstrates accuracy, power, and robustness of fast likelihood-based approximation schemes. \emph{Syst Biol.}, \bold{60(5)}, 685-99.
 
 Felsenstein, J. (1981) Evolutionary trees from DNA sequences: a maximum likelihood approach. \emph{Journal of Molecular Evolution}, \bold{17(6)}, 368-376.
 
-Felsenstein J. (2001) Taking variation of evolutionary rates between sites into account in inferring phylogenies. \emph{Journal of molecular evolution}, \bold{53}:447-455.
+Felsenstein J. (2001) Taking variation of evolutionary rates between sites into account in inferring phylogenies. \emph{Journal of molecular evolution}, \bold{53}, 447-455.
 
 Fitch, W. M. (1971) Toward defining the course of evolution: minimum change for a specified tree topology. \emph{Systematic Zoology}, \bold{20}:406-416.
+
+Makarenkov V., and Lapointe, F. (2004) A weighted least-squares approach for inferring phylogenies from incomplete distance matrices. \emph{Bioinformatics}, \bold{20(13)}, 2113-2121.
 
 Saitou, N. and Nei, M. (1987) The neighbor-joining method: a new method for reconstructing phylogenetic trees. \emph{Molecular Biology and Evolution}, \bold{4(4)}, 406-425.
 
@@ -174,7 +176,7 @@ plot(tree,
 costs <- matrix(c(0, 2, 1, 2, 2, 0, 2, 1, 1, 2, 0, 2, 2, 1, 2, 0), 4)
 dimnames(costs) <- list(DNA_BASES, DNA_BASES)
 costs
-tree <- TreeLine(myXStringSet=head(dna, 10), method="MP", costMatrix=costs[x, x])
+tree <- TreeLine(myXStringSet=head(dna, 10), method="MP", costMatrix=costs)
 
 # example of accessing and using the attributes
 attributes(tree)

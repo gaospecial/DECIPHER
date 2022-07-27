@@ -24,7 +24,7 @@ IdTaxa(test,
 An \code{AAStringSet}, \code{DNAStringSet}, or \code{RNAStringSet} of unaligned sequences.
 }
   \item{trainingSet}{
-An object of class \code{Taxa} and subclass {Train}.
+An object of class \code{Taxa} and subclass {Train} compatible with the class of \code{test}.
 }
   \item{type}{
 Character string indicating the type of output desired.  This should be (an abbreviation of) one of \code{"extended"} or \code{"collapsed"}.  (See value section below.)

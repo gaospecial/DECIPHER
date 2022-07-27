@@ -138,10 +138,9 @@ ScoreAlignment <- function(myXStringSet,
 			structureMatrix)
 		z <- sum(z)
 	} else { # adjacent (method == 2L)
-		s <- as.matrix(myXStringSet)
+		s <- unlist(strsplit(as.character(myXStringSet), "", fixed=TRUE))
 		s <- matrix(match(s, rownames(subMatrix)),
-			ncol(s),
-			byrow=TRUE)
+			ncol=l)
 		g <- !is.na(s)
 		
 		z <- 0

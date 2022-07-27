@@ -714,7 +714,8 @@ SEXP alphabetSize(SEXP x)
 {
 	XStringSet_holder x_set;
 	Chars_holder x_i;
-	int x_length, i, j, letter, sum = 0;
+	int x_length, i, j, letter;
+	double sum = 0;
 	
 	// initialize the XStringSet
 	x_set = hold_XStringSet(x);
@@ -725,7 +726,7 @@ SEXP alphabetSize(SEXP x)
 	double *rans = REAL(ans);
 	rans[0] = 0;
 	
-	int dist[4] = {0}; // distribution of nucleotides
+	double dist[4] = {0}; // distribution of nucleotides
 	for (i = 0; i < x_length; i++) {
 		x_i = get_elt_from_XStringSet_holder(&x_set, i);
 		
@@ -741,7 +742,7 @@ SEXP alphabetSize(SEXP x)
 	
 	double p; // proportion of each letter
 	for (i = 0; i < 4; i++) {
-		p = (double)dist[i]/sum;
+		p = dist[i]/sum;
 		if (p > 0)
 			rans[0] -= p*log(p); // negative entropy
 	}

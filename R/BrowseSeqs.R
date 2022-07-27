@@ -341,7 +341,7 @@ BrowseSeqs <- function(myXStringSet,
 			myLengths[(i*(l + 5L) - 2L)] <- lengths[i*l]
 		}
 	} else {
-		lengths <- width(myXStringSet) - rowSums(letterFrequency(myXStringSet, "-"))
+		lengths <- width(myXStringSet) - rowSums(letterFrequency(myXStringSet, c("-", ".", "+")))
 		myLengths <- c("", "", lengths[-seq(l, length(lengths), l)], "", lengths[seq(l, length(lengths), l)], "", "")
 	}
 	

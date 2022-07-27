@@ -47,7 +47,7 @@ AB (Mirsky, 2015), BLOSUM62 (Henikoff, 1992), cpREV (Adachi, 2000), cpREV64 (Zho
 Specifying any model+G4 adds a single parameter to any of the above models to relax the assumption of equal rates among sites in the sequence.  The single parameter specifies the shape of the Gamma Distribution.  The continuous distribution is represented with 2-10 discrete rates and their respective probabilities as determined by equal bins or the Laguerre Quadrature method (Felsenstein, 2001).  For example, specifying a model+G8 would represent the continuous Gamma Distribution with eight rates and their associated probabilities.
 
 \bold{+F}
-Specifying any model+F uses empirical frequencies rather than optimized frequencies.
+Specifying any model+F uses empirical frequencies rather than optimized state frequencies.  This is only applicable for models having state frequencies with free parameters.
 }
 \references{
 Abascal, F., Posada, D., and Zardoya, R. (2007) Molecular Biology and Evolution, \bold{24}, 1-5.

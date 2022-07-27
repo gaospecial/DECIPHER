@@ -296,14 +296,15 @@ Some of these intergenic regions might be similar to each other.  We can find re
 <<expr16,eval=TRUE>>=
 intergenic <- c(intergenic, reverseComplement(intergenic))
 names(intergenic) <- c(w, paste(w, "rc", sep="_"))
-clusts <- IdClusters(myXStringSet=intergenic, cutoff=0.2)
+clusts <- IdClusters(myXStringSet=intergenic, cutoff=0.3)
 @
 
 Since we used \code{inexact} clustering, the clusters containing the longest sequences will be first.  We can look at sequences belonging to the first cluster:
 
 <<expr17,eval=TRUE>>=
-tail(sort(table(clusts$cluster))) # the biggest clusters
-AlignSeqs(intergenic[clusts$cluster==1], verbose=FALSE)
+t <- sort(table(clusts$cluster), decreasing=TRUE)
+head(t) # the biggest clusters
+AlignSeqs(intergenic[clusts$cluster == names(t)[1]], verbose=FALSE)
 @
 
 These two long intergenic regions probably contain copies of the ribosomal RNA operon.  A signature of non-coding RNAs is that they tend to have higher GC content than expected.  We can create a plot of GC content in intergenic regions versus size.  Since our genome averages 41\% GC content, we can use statistics to add a line for the 95\% confidence interval.  Only a few intergenic regions have unexpectedly high GC content.

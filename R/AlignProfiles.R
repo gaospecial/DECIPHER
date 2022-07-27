@@ -125,18 +125,19 @@ AlignProfiles <- function(pattern,
 			stop("The matrix anchor must not contain NA values.")
 		if (dim(anchor)[1] != 4)
 			stop("The matrix anchor must have four rows.")
-		if (is.unsorted(anchor[1:2,], strictly=TRUE))
-			stop("Anchors must be ascending order.")
-		if (is.unsorted(anchor[3:4,], strictly=TRUE))
+		if (any(anchor[2,] < anchor[1,] |
+			anchor[4,] < anchor[3,]) ||
+			any(anchor[2, -ncol(anchor)] >= anchor[1, -1] |
+			anchor[4, -ncol(anchor)] >= anchor[3, -1]))
 			stop("Anchors must be ascending order.")
 		if (dim(anchor)[2] > 0) {
 			if (anchor[1, 1] < 1)
 				stop("The first anchor is outside the range of the pattern.")
 			if (anchor[3, 1] < 1)
 				stop("The first anchor is outside the range of the subject.")
-			if (anchor[2, dim(anchor)[2]] > w.p)
+			if (anchor[2, ncol(anchor)] > w.p)
 				stop("The last anchor is outside the range of the pattern.")
-			if (anchor[4, dim(anchor)[2]] > w.s)
+			if (anchor[4, ncol(anchor)] > w.s)
 				stop("The last anchor is outside the range of the subject.")
 		}
 	} else {
@@ -548,13 +549,10 @@ AlignProfiles <- function(pattern,
 	
 	ns.p <- names(pattern)
 	ns.s <- names(subject)
-	if (!is.null(ns.p) && !is.null(ns.s)) {
-		ns <- c(ns.p, ns.s)
-	} else if (!is.null(ns.p)) {
-		ns.s <- rep(NA, length(subject))
-	} else if (!is.null(ns.s)) {
-		ns.p <- rep(NA, length(pattern))
-	}
+	if (is.null(ns.p))
+		ns.p <- rep(NA_character_, length(pattern))
+	if (is.null(ns.s))
+		ns.s <- rep(NA_character_, length(subject))
 	ns <- c(ns.p, ns.s)
 	
 	if (length(inserts[[1]]) > 0) {

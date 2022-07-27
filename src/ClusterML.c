@@ -47,17 +47,17 @@
 #include "DECIPHER.h"
 
 // for SIMD
-#if defined(__AVX2__) && __AVX2__
-#define _L_unknown_5 L_unknown_5_SIMD
-#define _L_unknown L_unknown_SIMD
-#define _L_unknown_AA_5 L_unknown_AA_5
-#define _L_unknown_AA L_unknown_AA
-#else
+//#if defined(__AVX2__) && __AVX2__
+//#define _L_unknown_5 L_unknown_5_SIMD
+//#define _L_unknown L_unknown_SIMD
+//#define _L_unknown_AA_5 L_unknown_AA_5
+//#define _L_unknown_AA L_unknown_AA
+//#else
 #define _L_unknown_5 L_unknown_5
 #define _L_unknown L_unknown
 #define _L_unknown_AA_5 L_unknown_AA_5
 #define _L_unknown_AA L_unknown_AA
-#endif
+//#endif
 
 static void L_known(const char *p, double *Ls, int gaps)
 {

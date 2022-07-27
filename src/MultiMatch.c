@@ -638,7 +638,7 @@ SEXP matchOrderDual(SEXP x, SEXP y, SEXP nThreads)
 	return ans;
 }
 
-// returns shared ranges between pairs in two unordered lists
+// returns shared ranges between pairs in two unordered (gapped) lists
 SEXP matchRanges(SEXP x, SEXP y, SEXP wordSize, SEXP maxLength, SEXP threshold)
 {
 	int i, j, size_x = length(x), size_y = length(y), size;
@@ -701,7 +701,7 @@ SEXP matchRanges(SEXP x, SEXP y, SEXP wordSize, SEXP maxLength, SEXP threshold)
 	size /= 2;
 	// calculate ranges of anchors
 	int *temp = Calloc(l, int); // initialized to zero
-	int match = 0, count = -1, last_end_x = -1, last_end_y = -1;
+	int match = 0, count = -1, last_end_x = -10000, last_end_y = -10000;
 	for (i = 0; i < l; i++) {
 		//Rprintf("\n%d start_x=%d start_y=%d end_x=%d end_y=%d last_end_x=%d last_end_y=%d", i, i - wS + 2, *(bits + i + l) - wS + 1, i+1, *(bits + i + l), last_end_x, last_end_y);
 		if ((double)*(bits + i)/(double)size >= thresh) {
@@ -710,6 +710,8 @@ SEXP matchRanges(SEXP x, SEXP y, SEXP wordSize, SEXP maxLength, SEXP threshold)
 					*(bits + i + l) - wS + 1 > last_end_y + 100) {
 					match = 1;
 					count++;
+					last_end_x = i - 100 - wS;
+					last_end_y = *(bits + i + l - 1) - 100 - wS;
 					*(temp + count*4) = i + 1;//i - wS + 2;
 					*(temp + count*4 + 2) = *(bits + i + l);//*(bits + i + l) - wS + 1;
 					*(temp + count*4 + 1) = i + 1;

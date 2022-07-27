@@ -39,6 +39,8 @@ IdTaxa <- function(test,
 		stop("trainingSet must be an object of class 'Taxa' (subclass 'Train').")
 	if (is(test, "AAStringSet") && is.null(trainingSet$alphabet))
 		stop("trainingSet was built from nucleotide sequences but test contains amino acid sequences.")
+	if (!is(test, "AAStringSet") && !is.null(trainingSet$alphabet))
+		stop("trainingSet was built from amino acid sequences but test contains nucleotide sequences.")
 	TYPES <- c("collapsed", "extended")
 	type <- pmatch(type[1], TYPES)
 	if (is.na(type))
