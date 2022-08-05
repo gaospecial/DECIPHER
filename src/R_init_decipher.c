@@ -154,6 +154,7 @@ static const R_CallMethodDef callMethods[] = { // method call, pointer, num args
 	{"dist", (DL_FUNC) &dist, 2},
 	{"clusterMP", (DL_FUNC) &clusterMP, 8},
 	{"expM", (DL_FUNC) &expM, 3},
+	{"matchOverlap", (DL_FUNC) &matchOverlap, 5},
 	{NULL, NULL, 0}
 };
 

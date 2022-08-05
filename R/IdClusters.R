@@ -1,7 +1,9 @@
 IdClusters <- function(myXStringSet,
 	cutoff=0,
-	maxReps=1000,
-	maxAttempts=100,
+	maxReps=10000,
+	maxComparisons=1000,
+	maxAlignments=100,
+	invertCenters=FALSE,
 	alphabet=AA_REDUCED[[30]],
 	processors=1,
 	verbose=TRUE) {
@@ -15,6 +17,8 @@ IdClusters <- function(myXStringSet,
 		stop("cutoff must be at least zero.")
 	if (any(cutoff >= 1))
 		stop("cutoff must be less than one.")
+	if (any(duplicated(cutoff)))
+		stop("cutoff cannot contain duplicated values.")
 	ASC <- TRUE
 	if (is.unsorted(cutoff)) {
 		if (is.unsorted(rev(cutoff))) {
@@ -31,14 +35,24 @@ IdClusters <- function(myXStringSet,
 		stop("maxReps must be at least 1.")
 	if (floor(maxReps) != maxReps)
 		stop("maxReps must be a whole number.")
-	if (!is.numeric(maxAttempts))
-		stop("maxAttempts must be a numeric.")
-	if (length(maxAttempts) != 1)
-		stop("maxAttempts must only be a single number.")
-	if (maxAttempts < 1)
-		stop("maxAttempts must be at least 1.")
-	if (floor(maxAttempts) != maxAttempts)
-		stop("maxAttempts must be a whole number.")
+	if (!is.numeric(maxComparisons))
+		stop("maxComparisons must be a numeric.")
+	if (length(maxComparisons) != 1)
+		stop("maxComparisons must only be a single number.")
+	if (maxComparisons < 2)
+		stop("maxComparisons must be at least 2.")
+	if (floor(maxComparisons) != maxComparisons)
+		stop("maxComparisons must be a whole number.")
+	if (!is.numeric(maxAlignments))
+		stop("maxAlignments must be a numeric.")
+	if (length(maxAlignments) != 1)
+		stop("maxAlignments must only be a single number.")
+	if (maxAlignments > maxComparisons)
+		stop("maxAlignments must be less than or equal to maxComparisons.")
+	if (floor(maxAlignments) != maxAlignments)
+		stop("maxAlignments must be a whole number.")
+	if (!is.logical(invertCenters))
+		stop("invertCenters must be a logical.")
 	if (!is.logical(verbose))
 		stop("verbose must be a logical.")
 	if (!is.null(processors) && !is.numeric(processors))
@@ -106,7 +120,8 @@ IdClusters <- function(myXStringSet,
 	# initialize parameters
 	alpha <- 0.1 # weight of exponential moving average
 	attempts <- 10L # comparison attempts before possibly skipping
-	denom <- 3 # relative factor of k-mer length differences to allow
+	minAttempts <- min(10L, maxComparisons) # minimum number of comparison attempts
+	buffer <- 0.01 # minimum (approximate) distance buffer
 	
 	if (typeX==3L) { # AAStringSet
 		wordSize <- ceiling(log(100*quantile(widths, 0.99),
@@ -155,7 +170,7 @@ IdClusters <- function(myXStringSet,
 	}
 	if (lc > 1) {
 		cNames <- paste("cluster",
-			gsub("^.+\\.", "", cutoff),
+			gsub(".", "_", prettyNum(cutoff), fixed=TRUE),
 			sep="_")
 	} else {
 		cNames <- "cluster"
@@ -171,154 +186,36 @@ IdClusters <- function(myXStringSet,
 	u <- unique(x)
 	l <- length(u)
 	t <- tabulate(x, length(x))[u]
-	wu <- widths[u]
 	
-	f <- function(x, y) {
-		X <- v[[x]]
-		OX <- z[[x]]
-		size_x <- length(X)
-		ly <- length(y)
-
-		res <- vector("list", ly)
-		for (i in seq_len(ly)) {
-			Y <- v[[y[i]]]
-			OY <- z[[y[i]]]
-			size_y <- length(Y)
-			
-			m <- integer(size_x)
-			j <- k <- 1L
-			while (j <= size_x && k <= size_y) {
-				if (is.na(X[OX[j]]) || is.na(Y[OY[k]])) {
-					break
-				} else if (X[OX[j]] == Y[OY[k]]) {
-					m[OX[j]] <- OY[k]
-					j <- j + 1L
-					k <- k + 1L
-				} else if (X[OX[j]] < Y[OY[k]]) {
-					j <- j + 1L
-				} else {
-					k <- k + 1L
-				}
+	overlap <- function(x, y) {
+		.Call("matchOverlap",
+			x,
+			y,
+			v,
+			z,
+			wordSize,
+			PACKAGE="DECIPHER")
+	}
+	
+	similarity <- function(x, w1, w2) {
+		n <- ncol(x)
+		if (n > 0) {
+			s <- sum(x[2L,] - x[1L,] + 1)
+			p1 <- x[1L, 1L]
+			p2 <- x[3L, 1L]
+			if (p1 <= p2 && w1 <= w2) { # 1 within 2
+				ov <- w1
+			} else if (p2 <= p1 && w2 <= w1) { # 2 within 1
+				ov <- w2
+			} else if (p1 > p2) { # end of 1 overlaps start of 2
+				ov <- w1 - p1 + p2
+			} else { # start of 2 overlaps end of 1
+				ov <- w2 - p2 + p1
 			}
-			
-			# count the number of anchors
-			n <- 0L
-			new <- TRUE
-			for (j in seq_len(size_x)) {
-				if (m[j] > 0) {
-					if (new) {
-						new <- FALSE
-						n <- n + 1L
-					} else if (m[j] != m[j - 1L] + 1L) {
-						n <- n + 1L
-					}
-				} else {
-					new <- TRUE
-				}
-			}
-			
-			# record anchor ranges
-			t <- matrix(0, nrow=3, ncol=n)
-			k <- 0L
-			new <- TRUE
-			for (j in seq_len(size_x)) {
-				if (m[j] > 0) {
-					if (new ||
-						m[j] != m[j - 1L] + 1L) {
-						new <- FALSE
-						k <- k + 1L
-						t[1L, k] <- j
-						t[2L, k] <- m[j]
-						t[3L, k] <- wordSize
-					} else {
-						t[3L, k] <- t[3L, k] + 1L
-					}
-				} else {
-					if (k == n)
-						break
-					new <- TRUE
-				}
-			}
-			
-			# chain anchors
-			b <- numeric(n) # traceback
-			s <- t[3L,] # cumulative score
-			j <- 2L
-			p <- 1L
-			while (j <= n) {
-				for (k in seq_len(j - 1)) {
-					if (t[2L, k] < t[2L, j] && # starts within bounds
-						((t[2L, k] + t[3L, k] <= t[2L, j] &&
-						t[1L, k] + t[3L, k] <= t[1L, j]) ||
-						t[1L, j] - t[1L, k] >= t[2L, j] - t[2L, k])) { # ends are compatible (no overlap is ==)
-						if (s[k] + t[3L, j] > s[j]) { # extend chain
-							s[j] <- s[k] + t[3L, j]
-							b[j] <- k
-						}
-					}
-				}
-				if (s[j] > s[p]) # higher score
-					p <- j
-				j <- j + 1L
-			}
-			
-			# rectify anchors
-			keep <- logical(n)
-			if (n > 0) {
-				while (p > 0) { # traceback
-					keep[p] <- TRUE
-					p <- b[p]
-				}
-			}
-			k <- 0L
-			j <- 1L
-			while (j <= n) {
-				if (keep[j]) {
-					if (k > 0L &&
-						t[1L, k] + t[3L, k] >= t[1L, j] &&
-						t[1L, j] - t[1L, k] == t[2L, j] - t[2L, k]) {
-						# merge anchors
-						keep[j] <- FALSE
-						t[3L, k] <- t[3L, j] + t[1L, j] - t[1L, k]
-					} else {
-						k <- j
-					}
-				}
-				j <- j + 1L
-			}
-			
-			# record final anchors
-			k <- 0L
-			for (j in seq_len(n))
-				if (keep[j])
-					k <- k + 1L
-			res[[i]] <- matrix(0, nrow=4, ncol=k)
-			k <- 0L
-			for (j in seq_len(n)) {
-				if (keep[j]) {
-					k <- k + 1L
-					res[[i]][1L, k] <- t[1L, j]
-					res[[i]][2L, k] <- t[1L, j] + t[3L, j] - 1L
-					res[[i]][3L, k] <- t[2L, j]
-					res[[i]][4L, k] <- t[2L, j] + t[3L, j] - 1L
-					# remove overlap
-					if (k > 1L) {
-						delta <- res[[i]][2L, k - 1L] - res[[i]][1L, k]
-						if (delta >= 0) {
-							res[[i]][1L, k] <- res[[i]][1L, k] + delta + 1L
-							res[[i]][3L, k] <- res[[i]][3L, k] + delta + 1L
-						}
-						delta <- res[[i]][4L, k - 1L] - res[[i]][3L, k]
-						if (delta >= 0) {
-							res[[i]][1L, k] <- res[[i]][1L, k] + delta + 1L
-							res[[i]][3L, k] <- res[[i]][3L, k] + delta + 1L
-						}
-					}
-				}
-			}
+			s/ov
+		} else {
+			0
 		}
-		
-		res
 	}
 	
 	if (typeX==3L) { # AAStringSet
@@ -335,48 +232,52 @@ IdClusters <- function(myXStringSet,
 			TRUE, # mask repeats
 			PACKAGE="DECIPHER")
 	}
-	Z <- z <- lapply(v, order)
+	Z <- z <- lapply(V, order)
+	wu <- sapply(seq_along(V),
+		function(x) {
+			res <- overlap(x, x)[[1L]]
+			sum(res[2L,] - res[1L,] + 1)
+		})
 	
 	# order sequences by approximate similarity
-	var <- rep(1, length(v))
+	var <- rep(length(v), length(v))
 	avg_cor <- 0
 	for (i in seq_len(maxReps)) {
-		repeat {
-			r <- sample(length(v), 4L, prob=var)
-			res <- f(r[1], r[2:4])
-			m <- sapply(res,
-				function(x)
-					sum(x[2,] - x[1,]))
-			w <- which.max(m)
-			i1 <- intersect(v[[r[1L]]], v[[r[w + 1L]]])
-			w <- (2:4)[-w]
-			i2 <- intersect(v[[r[w[1L]]]], v[[r[w[2L]]]])
-			k1 <- i1[!(i1 %in% i2)]
-			k2 <- i2[!(i2 %in% i1)]
-			if (length(k1) > length(i1)/denom &&
-				length(k2) > length(i2)/denom &&
-				length(k1) > length(k2)/denom &&
-				length(k2) > length(k1)/denom)
-				break
-		}
-		
-		d <- sapply(v,
-			function(x)
-				sum(k1 %in% x)/length(k1) - sum(k2 %in% x)/length(k2))
+		r <- sample(length(v), 2L, prob=var)
+		res1 <- overlap(r[1L], seq_along(v))
+		res2 <- overlap(r[2L], seq_along(v))
+		m1 <- mapply(similarity, res1, wu[r[1L]], wu)
+		m2 <- mapply(similarity, res2, wu[r[2L]], wu)
+		d <- m1 - m2
 		
 		if (i > 1) {
 			if (cor(rS, d) < 0) # negatively correlated
 				d <- -d
 			rS <- rS + d
 			
-			var <- alpha*abs(d/rS) + (1 - alpha)*var
-			w <- which(is.na(var))
-			var[w] <- 1
-			w <- which(var > 1)
-			var[w] <- 1
-			avg_cor <- alpha*(1 - sum(var)/length(var)) + (1 - alpha)*avg_cor
+			o <- order(rS,
+				wu,
+				t, # frequency
+				decreasing=TRUE,
+				method="radix")
+			r <- order(o,
+				method="radix")
+			
+			var <- alpha*abs(R - r) + (1 - alpha)*var # exponential moving average of change in rank order
+			avg_cor <- alpha*sum(var < maxComparisons/2)/length(var) + (1 - alpha)*avg_cor # exponential moving average of fraction stabilized in rank order
+			
+			O <- o
+			R <- r
 		} else {
 			rS <- d
+			
+			O <- order(rS,
+				wu,
+				t, # frequency
+				decreasing=TRUE,
+				method="radix")
+			R <- order(O,
+				method="radix")
 		}
 		
 		if (verbose && interactive()) {
@@ -385,13 +286,14 @@ IdClusters <- function(myXStringSet,
 				" of up to ",
 				maxReps,
 				" (stability = ",
-				round(100*avg_cor),
+				formatC(100*avg_cor, digits=1, format="f"),
 				"%) ",
 				sep="")
 		}
-		if (avg_cor >= 0.995) # rounds to 100%
-			break # reached stasis
+		if (avg_cor >= 0.9995) # rounds to 100%
+			break # reached rank order stability
 	}
+	rS <- rS/i # normalize per iteration
 	
 	if (verbose) {
 		time.2 <- Sys.time()
@@ -410,34 +312,63 @@ IdClusters <- function(myXStringSet,
 		pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 	}
 	
-	O <- order(rS,
-		wu,
-		t, # frequency
-		decreasing=TRUE,
+	# attempt to find cluster centers
+	S <- smooth.spline(rep(rS[O], t[O]),
+		w=rep(wu[O], t[O]),
+		spar=0.2)
+	S <- predict(S,
+		x=cumsum(t[O]) - (t[O] - 1L)/2,
+		deriv=1L)$y
+	S <- abs(S)
+	P <- order(S,
 		method="radix")
+	P <- O[P]
+	Q <- R[P]
 	
+	buffer <- buffer + 2*cutoff
 	cutoff <- 1 - cutoff
 	for (i in seq_len(lc)) {
 		if (!ASC && i > 1) {
-			O <- order(c[u, i - 1],
-				rS,
-				wu,
-				t, # frequency
-				decreasing=TRUE,
+			P <- order(c[u, i - 1][O],
+				S,
 				method="radix")
+			P <- O[P]
+			Q <- R[P]
 		}
 		
-		v <- V[O]
-		z <- Z[O]
-		o <- u[O]
+		bL <- bR <- integer(l)
+		k <- 1L
+		for (j in seq_len(l)) {
+			while (j - k >= maxComparisons ||
+				(j - k > minAttempts &&
+				rS[O[k]] > rS[O[j]] + buffer[i]))
+				k <- k + 1L
+			bL[j] <- k
+		}
+		k <- l
+		for (j in l:1) {
+			while (k - j >= maxComparisons ||
+				(k - j > minAttempts &&
+				rS[O[j]] > rS[O[k]] + buffer[i]))
+				k <- k - 1L
+			bR[j] <- k
+		}
+		
+		v <- V[P] # reorder k-mers
+		z <- Z[P] # reorder k-mer ordering
+		p <- u[P] # index of sequence
 		
 		cluster_num <- 1L
 		offset <- 0L
-		c[o[1L], i] <- 1L
+		if (invertCenters) {
+			c[p[1L], i] <- -1L
+		} else {
+			c[p[1L], i] <- 1L
+		}
 		seeds.index <- integer(l)
-		seeds.index[1] <- 1L
+		seeds.index[Q[1L]] <- 1L
 		
-		for (j in seq_along(o)[-1]) {
+		for (j in seq_along(P)[-1L]) {
 			if (verbose) {
 				value <- round(((i - 1)*l + j)/lc/l, 2)
 				if (value > lastValue) {
@@ -446,88 +377,99 @@ IdClusters <- function(myXStringSet,
 				}
 			}
 			
-			if (!ASC && i > 1) {
-				if (c[o[j], i - 1] != c[o[j - 1], i - 1]) {
+			if (!ASC && i > 1L) {
+				if (c[p[j], i - 1L] != c[p[j - 1L], i - 1L]) {
 					# different clusters in last cutoff
 					offset <- offset + cluster_num
 					cluster_num <- 1L
-					c[o[j], i] <- cluster_num + offset
-					seeds.index[1] <- j
+					c[p[j], i] <- cluster_num + offset
+					seeds.index[Q[j]] <- j
 					next
-				} else if (c[o[j], i] > 0) { # cluster pre-assigned
-					c[o[j], i] <- c[c[o[j], i], i]
+				} else if (c[p[j], i] > 0L) { # cluster pre-assigned
+					if (invertCenters) {
+						c[p[j], i] <- abs(c[c[p[j], i], i])
+					} else {
+						c[p[j], i] <- c[c[p[j], i], i]
+					}
 					next
 				}
 			}
 			
-			compare <- seq(to=cluster_num, length.out=min(cluster_num, maxAttempts))
-			res <- f(j, seeds.index[compare])
-#			m <- .Call("matchListsDual",
-#				v[j],
-#				v[seeds.index[seq_len(cluster_num)]],
-#				FALSE, # verbose
-#				NULL, # pBar
-#				processors,
-#				PACKAGE="DECIPHER")
-			m <- sapply(res,
-				function(x) {
-					n <- ncol(x)
-					if (n > 0) {
-						diff_s <- x[3L, 1L] - x[1L, 1L] # start difference
-						diff_e <- widths[o[j]] - x[4L, n] + x[2L, n] # end difference
-						sum(x[2,] - x[1,])/(diff_s + diff_e) # fraction shared
-					} else {
-						0
-					}
-				})
-			w <- order(m, decreasing=TRUE)
+			compare <- bL[Q[j]]:bR[Q[j]]
+			compare <- as.integer(compare)
+			compare <- compare[compare >= 1L & compare <= l]
+			if (!ASC && i > 1) { # check bounds
+				if (invertCenters) {
+					compare <- compare[abs(c[p[seeds.index[compare]], i - 1L]) == abs(c[p[j], i - 1L])]
+				} else {
+					compare <- compare[c[p[seeds.index[compare]], i - 1L] == c[p[j], i - 1L]]
+				}
+			}
+			compare <- compare[seeds.index[compare] != 0L]
+			if (length(compare) == 0L) {
+				cluster_num <- cluster_num + 1L
+				c[p[j], i] <- cluster_num + offset
+				if (invertCenters)
+					c[p[j], i] <- -c[p[j], i]
+				seeds.index[Q[j]] <- j
+				next
+			}
 			
-			if (m[w[1L]] < cutoff[i]) {
-				for (k in seq_along(w)) {
-					if (k > attempts) {
-						s <- seq(to=k - 1L, length.out=attempts)
-						if (sum(m[w[s]])/attempts + 3*sd(m[w[s]]) < cutoff[i])
-							break
-					}
-					ali <- AlignProfiles(.subset(myXStringSet, o[j]),
-						.subset(myXStringSet, o[seeds.index[compare[w[k]]]]),
-						anchor=res[[w[k]]])
-					m[w[k]] <- .Call("distMatrix",
-						ali,
-						typeX,
-						FALSE, # includeTerminalGaps
-						FALSE, # penalizeGapGapMatches
-						TRUE, # penalizeGapLetterMatches
-						TRUE, # full matrix
-						2L, # type = "dist"
-						0, # correction
-						FALSE, # verbose
-						NULL, # progress bar
-						1L, # processors
-						PACKAGE="DECIPHER")
-					if (is.na(m[w[k]])) {
-						m[w[k]] <- 0
-					} else {
-						m[w[k]] <- 1 - m[w[k]]
-					}
-					if (m[w[k]] >= cutoff[i])
+			compare <- compare[!duplicated(seeds.index[compare])]
+			res <- overlap(j, seeds.index[compare])
+			m <- mapply(similarity, res, wu[P[j]], wu[P[seeds.index[compare]]])
+			w <- head(order(m, decreasing=TRUE), maxAlignments)
+			
+			for (k in seq_along(w)) {
+				if (k > attempts) {
+					s <- seq(to=k - 1L, length.out=attempts)
+					if (sum(m[w[s]])/attempts + max(0.1, 3*sd(m[w[s]])) < cutoff[i])
 						break
 				}
+				ali <- AlignProfiles(.subset(myXStringSet, p[j]),
+					.subset(myXStringSet, p[seeds.index[compare[w[k]]]]),
+					anchor=res[[w[k]]])
+				m[w[k]] <- .Call("distMatrix",
+					ali,
+					typeX,
+					FALSE, # includeTerminalGaps
+					FALSE, # penalizeGapGapMatches
+					TRUE, # penalizeGapLetterMatches
+					TRUE, # full matrix
+					2L, # type = "dist"
+					0, # correction
+					FALSE, # verbose
+					NULL, # progress bar
+					1L, # processors
+					PACKAGE="DECIPHER")
+				if (is.na(m[w[k]])) {
+					m[w[k]] <- 0
+				} else {
+					m[w[k]] <- 1 - m[w[k]]
+				}
+				if (m[w[k]] >= cutoff[i])
+					break
 			}
-			w <- which.max(m)
+			w <- w[which.max(m[w])]
 			
-			if (length(w)==0 ||
+			if (length(w) == 0L ||
 				m[w] < cutoff[i]) { # form a new group
 				cluster_num <- cluster_num + 1L
-				c[o[j], i] <- cluster_num
-				seeds.index[cluster_num] <- j
+				c[p[j], i] <- cluster_num + offset
+				if (invertCenters)
+					c[p[j], i] <- -c[p[j], i]
+				seeds.index[Q[j]] <- j
 			} else { # part of an existing group
-				c[o[j], i] <- compare[w] + offset
+				if (invertCenters) {
+					c[p[j], i] <- -c[p[seeds.index[compare[w]]], i]
+				} else {
+					c[p[j], i] <- c[p[seeds.index[compare[w]]], i]
+				}
 				if (!ASC && i < lc) {
 					cols <- (i + 1):lc
 					cols <- cols[which(m[w] >= cutoff[cols])]
-					if (length(cols) > 0) # assign forward
-						c[o[j], cols] <- o[seeds.index[compare[w]]]
+					if (length(cols) > 0L) # assign forward
+						c[p[j], cols] <- p[seeds.index[compare[w]]]
 				}
 			}
 		}

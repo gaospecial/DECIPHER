@@ -27,6 +27,9 @@
 #include <omp.h>
 #endif
 
+// for calloc/free
+#include <stdlib.h>
+
 // DECIPHER header file
 #include "DECIPHER.h"
 
@@ -938,4 +941,179 @@ SEXP groupMax(SEXP x, SEXP y, SEXP z)
 	UNPROTECT(1);
 	
 	return ans;
+}
+
+// ranges of exact overlap between indicies x (length == 1) and y (length >= 1)
+SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP z, SEXP wordSize)
+{
+	int i, j, k, l, n, p, d, lx, ly, new, *I, *X, *Y, *OX, *OY;
+	
+	int i1 = asInteger(x) - 1;
+	I = INTEGER(y);
+	X = INTEGER(VECTOR_ELT(v, i1));
+	OX = INTEGER(VECTOR_ELT(z, i1));
+	lx = length(VECTOR_ELT(v, i1));
+	int wS = asInteger(wordSize);
+	l = length(y);
+	
+	SEXP ret_list;
+	PROTECT(ret_list = allocVector(VECSXP, l));
+	
+	//#pragma omp parallel for private(i, j, k, n, p, d, new, Y, OY, ly) schedule(guided) num_threads(nthreads)
+	for (i = 0; i < l; i++) {
+		Y = INTEGER(VECTOR_ELT(v, I[i] - 1));
+		OY = INTEGER(VECTOR_ELT(z, I[i] - 1));
+		ly = length(VECTOR_ELT(v, I[i] - 1));
+		
+		int *m = (int *) calloc(lx, sizeof(int)); // initialized to zero (thread-safe on Windows)
+		j = 0;
+		k = 0;
+		while (j < lx && k < ly) {
+			if (X[OX[j] - 1] == NA_INTEGER || Y[OY[k] - 1] == NA_INTEGER) {
+				break; // NA values are ordered at the end
+			} else if (X[OX[j] - 1] == Y[OY[k] - 1]) {
+				m[OX[j] - 1] = OY[k];
+				j++;
+				k++;
+			} else if (X[OX[j] - 1] < Y[OY[k] - 1]) {
+				j++;
+			} else {
+				k++;
+			}
+		}
+		
+		// count the number of anchors
+		n = 0;
+		new = 1;
+		for (j = 0; j < lx; j++) {
+			if (m[j] > 0) {
+				if (new) {
+					new = 0;
+					n++;
+				} else if (m[j] != m[j - 1] + 1) {
+					n++;
+				}
+			} else {
+				new = 1;
+			}
+		}
+		
+		// record anchor ranges
+		int *t = (int *) calloc(3*n, sizeof(int)); // initialized to zero (thread-safe on Windows)
+		k = -1;
+		new = 1;
+		for (j = 0; j < lx; j++) {
+			if (m[j] > 0) {
+				if (new ||
+					m[j] != m[j - 1] + 1) {
+					new = 0;
+					k++;
+					t[0 + 3*k] = j + 1;
+					t[1 + 3*k] = m[j];
+					t[2 + 3*k] = wS;
+				} else {
+					t[2 + 3*k]++;
+				}
+			} else {
+				if (k == n - 1)
+					break;
+				new = 1;
+			}
+		}
+		free(m);
+		
+		// chain anchors
+		int *b = (int *) calloc(n, sizeof(int)); // initialized to zero (thread-safe on Windows)
+		int *s = (int *) calloc(n, sizeof(int)); // initialized to zero (thread-safe on Windows)
+		for (j = 0; j < n; j++) {
+			b[j] = -1;
+			s[j] = t[2 + 3*j];
+		}
+		j = 1;
+		p = 0;
+		while (j < n) {
+			for (k = 0; k < j; k++) {
+				if (t[1 + 3*k] < t[1 + 3*j] && // starts within bounds
+					((t[1 + 3*k] + t[2 + 3*k] <= t[1 + 3*j] &&
+					t[0 + 3*k] + t[2 + 3*k] <= t[0 + 3*j]) ||
+					t[0 + 3*j] - t[0 + 3*k] >= t[1 + 3*j] - t[1 + 3*k])) { // ends are compatible
+					if (s[k] + t[2 + 3*j] > s[j]) { // extend chain
+						s[j] = s[k] + t[2 + 3*j];
+						b[j] = k;
+					}
+				}
+			}
+			if (s[j] > s[p]) // higher score
+				p = j;
+			j++;
+		}
+		free(s);
+		
+		// rectify anchors
+		int *keep = (int *) calloc(n, sizeof(int)); // initialized to zero (thread-safe on Windows)
+		if (n > 0) {
+			while (p >= 0) { // traceback
+				keep[p] = 1;
+				p = b[p];
+			}
+		}
+		free(b);
+		k = -1;
+		j = 0;
+		while (j < n) {
+			if (keep[j]) {
+				if (k >= 0 &&
+					t[0 + 3*k] + t[2 + 3*k] >= t[0 + 3*j] &&
+					t[0 + 3*j] - t[0 + 3*k] == t[1 + 3*j] - t[1 + 3*k]) {
+					// merge anchors
+					keep[j] = 0;
+					t[2 + 3*k] = t[2 + 3*j] + t[0 + 3*j] - t[0 + 3*k];
+				} else {
+					k = j;
+				}
+			}
+			j++;
+		}
+		
+		// record final anchors
+		k = 0;
+		for (j = 0; j < n; j++)
+			if (keep[j])
+				k++;
+		SEXP ans;
+		PROTECT(ans = allocMatrix(INTSXP, 4, k));
+		int *res = INTEGER(ans);
+		k = -1;
+		for (j = 0; j < n; j++) {
+			if (keep[j]) {
+				k++;
+				res[0 + 4*k] = t[0 + 3*j];
+				res[1 + 4*k] = t[0 + 3*j] + t[2 + 3*j] - 1;
+				res[2 + 4*k] = t[1 + 3*j];
+				res[3 + 4*k] = t[1 + 3*j] + t[2 + 3*j] - 1;
+				// remove overlap
+				if (k > 0) {
+					d = res[1 + 4*(k - 1)] - res[0 + 4*k];
+					if (d >= 0) {
+						res[0 + 4*k] = res[0 + 4*k] + d + 1;
+						res[2 + 4*k] = res[2 + 4*k] + d + 1;
+					}
+					d = res[3 + 4*(k - 1)] - res[2 + 4*k];
+					if (d >= 0) {
+						res[0 + 4*k] = res[0 + 4*k] + d + 1;
+						res[2 + 4*k] = res[2 + 4*k] + d + 1;
+					}
+				}
+			}
+		}
+		free(keep);
+		free(t);
+		
+		SET_VECTOR_ELT(ret_list, i, ans);
+		UNPROTECT(1);
+	}
+	
+	UNPROTECT(1);
+	
+	return ret_list;
 }

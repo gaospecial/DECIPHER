@@ -401,8 +401,11 @@ to.dendrogram <- function(object, states=NULL, p=NULL, s=NULL) {
 		var[free] <- o$par
 	}
 	
-	if (empirical && length(w) > 0)
+	if (empirical && length(w) > 0) {
 		var[w] <- defaults[w]
+		if (indels)
+			var[5] <- defaults[5]
+	}
 	
 	LnL <- o$value
 	K <- 2*dim(myClusters)[1] - 1 + tot
@@ -522,6 +525,8 @@ to.dendrogram <- function(object, states=NULL, p=NULL, s=NULL) {
 	
 	if (empirical)
 		var[211] <- defaults[211]
+	if (!indels)
+		var[211:212] <- 0
 	
 	LnL <- o$value
 	K <- 2*dim(myClusters)[1] - 1 + tot
@@ -2053,14 +2058,14 @@ TreeLine <- function(myXStringSet=NULL,
 		} else {
 			indels <- FALSE
 		}
-		rates <- sub("([^+]*)(\\+G(\\d+))?", "\\3", submodels, ignore.case=TRUE)
-		submodels <- sub("([^+]*)(\\+G(\\d+))?", "\\1", submodels, ignore.case=TRUE)
 		empirical <- grepl("\\+F", submodels, ignore.case=TRUE)
 		if (any(empirical)) {
 			submodels <- gsub("\\+F", "", submodels, ignore.case=TRUE)
 			if (any(empirical & (submodels %in% c("JC69", "K80", "SYM"))))
 				stop("model cannot be 'JC69', 'K80', or 'SYM' with '+F'.")
 		}
+		rates <- sub("([^+]*)(\\+G(\\d+))?", "\\3", submodels, ignore.case=TRUE)
+		submodels <- sub("([^+]*)(\\+G(\\d+))?", "\\1", submodels, ignore.case=TRUE)
 		
 		if (typeX == 3L) { # amino acids
 			MODELS <- MODELS$Protein
@@ -3879,9 +3884,8 @@ TreeLine <- function(myXStringSet=NULL,
 		
 		if (length(cutoff) > 1) {
 			names(c) <- paste("cluster",
-				gsub("\\.", "_", cutoff[1]),
-				METHODS[method],
-				sep="")
+				gsub(".", "_", prettyNum(cutoff[1]), fixed=TRUE),
+				sep="_")
 			for (i in 2:length(cutoff)) {
 				if (method == 1 ||
 					method == 3 ||
@@ -3905,9 +3909,8 @@ TreeLine <- function(myXStringSet=NULL,
 					!ASC) # ensure clusters are subsets
 					x[, 1] <- .splitClusters(x[, 1], c[, dim(c)[2]])
 				names(x) <- paste("cluster",
-					gsub("\\.", "_", cutoff[i]),
-					METHODS[method],
-					sep="")
+					gsub(".", "_", prettyNum(cutoff[i]), fixed=TRUE),
+					sep="_")
 				c <- cbind(c, x)
 			}
 		}

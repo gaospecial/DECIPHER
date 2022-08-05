@@ -88,6 +88,8 @@ SEXP matchListsDual(SEXP x, SEXP y, SEXP verbose, SEXP pBar, SEXP nThreads);
 
 SEXP groupMax(SEXP x, SEXP y, SEXP z);
 
+SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP z, SEXP wordSize);
+
 // ReplaceChars.c
 
 SEXP replaceChars(SEXP x, SEXP r, SEXP t);

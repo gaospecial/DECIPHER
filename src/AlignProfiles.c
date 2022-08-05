@@ -646,7 +646,7 @@ SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SE
 		if (*(m + i*(ls + 1) + ls) >= *(m + maxp*(ls + 1) + ls))
 			maxp = i;
 	
-	if (*(m + lp*(ls + 1) + maxs) > *(m + maxp*(ls + 1) + ls)) {
+	if (*(m + lp*(ls + 1) + maxs) >= *(m + maxp*(ls + 1) + ls)) {
 		maxp = lp;
 	} else {
 		maxs = ls;
@@ -1473,7 +1473,7 @@ SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SE
 		if (*(m + i*(ls + 1) + ls) >= *(m + maxp*(ls + 1) + ls))
 			maxp = i;
 	
-	if (*(m + lp*(ls + 1) + maxs) > *(m + maxp*(ls + 1) + ls)) {
+	if (*(m + lp*(ls + 1) + maxs) >= *(m + maxp*(ls + 1) + ls)) {
 		maxp = lp;
 	} else {
 		maxs = ls;

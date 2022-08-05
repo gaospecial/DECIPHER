@@ -507,7 +507,9 @@ SEXP chainSegments(SEXP x_s, SEXP x_e, SEXP x_i, SEXP x_f, SEXP y_s, SEXP y_e, S
 				}
 				if (gap <= maxG && sep <= maxS) {
 					temp = scores[minX] + score + sepC*sep + gapC*gap;
-					if (temp >= minS)
+					if (temp >= minS &&
+						minDx >= 0 &&
+						minDy >= 0)
 						merge = 1;
 				}
 			}
