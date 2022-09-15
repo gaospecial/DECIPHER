@@ -23,6 +23,7 @@ DB2Seqs(file,
          chunkSize = 1e5,
          sep = "::",
          clause = "",
+         processors = 1,
          verbose = TRUE)
 }
 \arguments{
@@ -73,6 +74,9 @@ Character string providing the separator between fields in each sequence's name,
 }
   \item{clause}{
 An optional character string to append to the query as part of a ``where clause''.
+}
+  \item{processors}{
+The number of processors to use, or \code{NULL} to automatically detect and use all available processors.
 }
   \item{verbose}{
 Logical indicating whether to display status.

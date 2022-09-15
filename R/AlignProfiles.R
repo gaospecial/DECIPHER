@@ -549,11 +549,6 @@ AlignProfiles <- function(pattern,
 	
 	ns.p <- names(pattern)
 	ns.s <- names(subject)
-	if (is.null(ns.p))
-		ns.p <- rep(NA_character_, length(pattern))
-	if (is.null(ns.s))
-		ns.s <- rep(NA_character_, length(subject))
-	ns <- c(ns.p, ns.s)
 	
 	if (length(inserts[[1]]) > 0) {
 		o <- order(inserts[[1]])
@@ -577,7 +572,14 @@ AlignProfiles <- function(pattern,
 	}
 	
 	result <- .append(pattern, subject)
-	names(result) <- ns
+	
+	if (!(is.null(ns.p) && is.null(ns.s))) {
+		if (is.null(ns.p))
+			ns.p <- rep(NA_character_, length(pattern))
+		if (is.null(ns.s))
+			ns.s <- rep(NA_character_, length(subject))
+		names(result) <- c(ns.p, ns.s)
+	}
 	
 	return(result)
 }

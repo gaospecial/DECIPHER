@@ -77,7 +77,7 @@ SearchDB <- function(dbFile,
 				stop("limit must be a whole number or two comma-separated whole numbers specifying offset,limit.")
 		}
 	}
-	if (limit > 0 && countOnly)
+	if (countOnly && (is.character(limit) || limit > 0))
 		stop("limit cannot be specified when countOnly is TRUE.")
 	
 	if (verbose)

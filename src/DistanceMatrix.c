@@ -27,6 +27,9 @@
 #include <omp.h>
 #endif
 
+// for calloc/free
+#include <stdlib.h>
+
 /*
  * Biostrings_interface.h is needed for the DNAencode(), get_XString_asRoSeq(),
  * init_match_reporting(), report_match() and reported_matches_asSEXP()
@@ -37,10 +40,10 @@
 // DECIPHER header file
 #include "DECIPHER.h"
 
-static double distance(const Chars_holder *P, const Chars_holder *S, int start, int end, int pGapsGaps, int pGapLetters)
+static double distance(const Chars_holder *P, const Chars_holder *S, int start, int end, int pGapLetters, int minWidth, double coverage)
 {
 	double distance;
-	int i, j, mismatches, gapGapMatches, gapLetterMatches, count;
+	int i, j, mismatches, gapGapMatches, gapLetterMatches, count, letters, state;
 	const char *p, *s;
 	
 	distance = 0;
@@ -48,6 +51,8 @@ static double distance(const Chars_holder *P, const Chars_holder *S, int start, 
 	gapLetterMatches = 0;
 	mismatches = 0;
 	count = 0;
+	letters = 0;
+	state = 0;
 	
 	// walk along the sequence from (position start + 1) to (length - end - 1)
 	for (i = start, j = start, p = (P->ptr + start), s = (S->ptr + start);
@@ -58,27 +63,40 @@ static double distance(const Chars_holder *P, const Chars_holder *S, int start, 
 			count++; // increment the length covered
 			if (!((*p) & (*s))) { // sequences are not equal
 				if (((*p) & 0x40 && (*s) & 0x10) || ((*p) & 0x10 && (*s) & 0x40)) { // gap-gap match
-					if (!pGapsGaps) { // don't penalize gap-gap matches
-						gapGapMatches++; // don't include gap-gap matches in length
-					} else { // penalize gap-gap matches
-						mismatches++; // count gap-gap matches as mis-matches
-					}
+					gapGapMatches++; // don't include gap-gap matches in length
 				} else if ((*p) & 0x10 || (*s) & 0x10 || (*p) & 0x40 || (*s) & 0x40) { // gap-letter match
-					if (!pGapLetters) { // don't penalize gap-letter matches
+					if (pGapLetters == 0) { // don't penalize gap-letter matches
 						gapLetterMatches++; // don't include gap-letter matches in length
-					} else { // penalize gap-letter matches
+					} else if (pGapLetters == 1) { // penalize gap-letter matches
 						mismatches++; // count gap-letter matches as mis-matches
+					} else { // penalize state changes
+						if ((*p) & 0x10 || (*p) & 0x40) {
+							if (state != 1) {
+								mismatches++;
+							} else {
+								gapLetterMatches++;
+							}
+							state = 1;
+						} else {
+							if (state != 2) {
+								mismatches++;
+							} else {
+								gapLetterMatches++;
+							}
+							state = 2;
+						}
 					}
 				} else {
 					mismatches++; // mis-match
+					letters++;
+					state = 0;
 				}
 			} else { // sequences are equal
 				if (((*p) & 0x10 && (*s) & 0x10) || ((*p) & 0x40 && (*s) & 0x40)) { // gap-gap match
-					if (!pGapsGaps) { // don't penalize gap-gap matches
-						gapGapMatches++; // don't include gap-gap matches in length
-					} else { // penalize gap-gap matches
-						mismatches++; // count gap-gap matches as mis-matches
-					}
+					gapGapMatches++; // don't include gap-gap matches in length
+				} else {
+					letters++;
+					state = 0;
 				}
 			}
 		}
@@ -88,14 +106,18 @@ static double distance(const Chars_holder *P, const Chars_holder *S, int start, 
 	//Rprintf("\nmismatches:%d gapGapMatches:%d gapLetterMatches:%d count:%d",mismatches,gapGapMatches,gapLetterMatches,count);
 	
 	// calculate distance as the percent mis-matches
-	distance = (double)mismatches/((double)count - (double)gapGapMatches - (double)gapLetterMatches);
+	if ((double)letters/(double)minWidth < coverage) {
+		distance = NA_REAL;
+	} else {
+		distance = (double)mismatches/((double)count - (double)gapGapMatches - (double)gapLetterMatches);
+	}
 	return distance;
 }
 
-static double distanceAA(const Chars_holder *P, const Chars_holder *S, int start, int end, int pGapsGaps, int pGapLetters)
+static double distanceAA(const Chars_holder *P, const Chars_holder *S, int start, int end, int pGapLetters, int minWidth, double coverage)
 {
 	double distance;
-	int i, j, mismatches, gapGapMatches, gapLetterMatches, count;
+	int i, j, mismatches, gapGapMatches, gapLetterMatches, count, letters, state;
 	const char *p, *s;
 	
 	distance = 0;
@@ -103,6 +125,8 @@ static double distanceAA(const Chars_holder *P, const Chars_holder *S, int start
 	gapLetterMatches = 0;
 	mismatches = 0;
 	count = 0;
+	letters = 0;
+	state = 0;
 	
 	// walk along the sequence from (position start + 1) to (length - end - 1)
 	for (i = start, j = start, p = (P->ptr + start), s = (S->ptr + start);
@@ -117,27 +141,40 @@ static double distanceAA(const Chars_holder *P, const Chars_holder *S, int start
 				!(!((*p) ^ 0x4A) && (!((*s) ^ 0x49) || !((*s) ^ 0x4C))) && !(!((*s) ^ 0x4A) && (!((*p) ^ 0x49) || !((*p) ^ 0x4C))) && // not (J && (I or L))
 				!(!((*p) ^ 0x5A) && (!((*s) ^ 0x51) || !((*s) ^ 0x45))) && !(!((*s) ^ 0x5A) && (!((*p) ^ 0x51) || !((*p) ^ 0x45)))) { // not (Z && (Q or E))
 				if ((!((*p) ^ 0x2D) && !((*s) ^ 0x2E)) || (!((*p) ^ 0x2E) && !((*s) ^ 0x2D))) { // gap-gap match
-					if (!pGapsGaps) { // don't penalize gap-gap matches
-						gapGapMatches++; // don't include gap-gap matches in length
-					} else { // penalize gap-gap matches
-						mismatches++; // count gap-gap matches as mis-matches
-					}
+					gapGapMatches++; // don't include gap-gap matches in length
 				} else if (!((*p) ^ 0x2D) || !((*s) ^ 0x2D) || !((*p) ^ 0x2E) || !((*s) ^ 0x2E)) { // gap-letter match
-					if (!pGapLetters) { // don't penalize gap-letter matches
+					if (pGapLetters == 0) { // don't penalize gap-letter matches
 						gapLetterMatches++; // don't include gap-letter matches in length
-					} else { // penalize gap-letter matches
+					} else if (pGapLetters == 1) { // penalize gap-letter matches
 						mismatches++; // count gap-letter matches as mis-matches
+					} else { // penalize state changes
+						if ((*p) ^ 0x2D && (*p) ^ 0x2E) {
+							if (state != 1) {
+								mismatches++;
+							} else {
+								gapLetterMatches++;
+							}
+							state = 1;
+						} else {
+							if (state != 2) {
+								mismatches++;
+							} else {
+								gapLetterMatches++;
+							}
+							state = 2;
+						}
 					}
 				} else {
 					mismatches++; // mis-match
+					letters++;
+					state = 0;
 				}
 			} else { // sequences are equal
 				if ((!((*p) ^ 0x2D) && !((*s) ^ 0x2D)) || (!((*p) ^ 0x2E) && !((*s) ^ 0x2E))) { // gap-gap match
-					if (!pGapsGaps) { // don't penalize gap-gap matches
-						gapGapMatches++; // don't include gap-gap matches in length
-					} else { // penalize gap-gap matches
-						mismatches++; // count gap-gap matches as mis-matches
-					}
+					gapGapMatches++; // don't include gap-gap matches in length
+				} else {
+					letters++;
+					state = 0;
 				}
 			}
 		}
@@ -147,7 +184,11 @@ static double distanceAA(const Chars_holder *P, const Chars_holder *S, int start
 	//Rprintf("\nmismatches:%d gapGapMatches:%d gapLetterMatches:%d count:%d",mismatches,gapGapMatches,gapLetterMatches,count);
 	
 	// calculate distance as the percent mis-matches
-	distance = (double)mismatches/((double)count - (double)gapGapMatches - (double)gapLetterMatches);
+	if ((double)letters/(double)minWidth < coverage) {
+		distance = NA_REAL;
+	} else {
+		distance = (double)mismatches/((double)count - (double)gapGapMatches - (double)gapLetterMatches);
+	}
 	return distance;
 }
 
@@ -187,6 +228,23 @@ static int endTerminalGaps(const Chars_holder *P)
 		} else { // not a gap
 			return gaps;
 		}
+	}
+	return gaps;
+}
+
+static int totalGaps(const Chars_holder *P)
+{
+	int i, gaps;
+	const char *p;
+	gaps = 0;
+	
+	// start from the beginning of the sequence
+	for (i = 0, p = P->ptr;
+		i < P->length;
+		i++, p++)
+	{
+		if ((*p) & 0x10 || (*p) & 0x40) // gap character
+			gaps++; // count gaps
 	}
 	return gaps;
 }
@@ -231,18 +289,37 @@ static int endTerminalGapsAA(const Chars_holder *P)
 	return gaps;
 }
 
-SEXP distMatrix(SEXP x, SEXP t, SEXP terminalGaps, SEXP penalizeGapGaps, SEXP penalizeGapLetters, SEXP fullMatrix, SEXP output, SEXP e, SEXP verbose, SEXP pBar, SEXP nThreads)
+static int totalGapsAA(const Chars_holder *P)
+{
+	int i, gaps;
+	const char *p;
+	gaps = 0;
+	
+	// start from the beginning of the sequence
+	for (i = 0, p = P->ptr;
+		i < P->length;
+		i++, p++)
+	{
+		if (!((*p) ^ 0x2D) || !((*p) ^ 0x2E)) // gap character
+			gaps++; // count gaps
+	}
+	return gaps;
+}
+
+SEXP distMatrix(SEXP x, SEXP t, SEXP terminalGaps, SEXP penalizeGapLetters, SEXP fullMatrix, SEXP output, SEXP e, SEXP minCoverage, SEXP method, SEXP verbose, SEXP pBar, SEXP nThreads)
 {
 	XStringSet_holder x_set;
 	Chars_holder x_i, x_j;
-	int start, end, seqLength_i, seqLength_j, index;
+	int start, end, seqLength_i, seqLength_j, index, minWidth;
 	double E = asReal(e);
 	R_xlen_t x_length, i, j, last;
-	int pGapLetters, pGapsGaps, tGaps, fM = asLogical(fullMatrix);
+	int pGapLetters, tGaps, fM = asLogical(fullMatrix);
 	int before, v, *rPercentComplete;
 	double *rans, soFar;
 	int nthreads = asInteger(nThreads);
 	int o = asInteger(output);
+	double coverage = asReal(minCoverage);
+	int mode = asInteger(method);
 	SEXP ans, percentComplete, utilsPackage;
 	v = asLogical(verbose);
 	if (v) { // percent complete variables
@@ -256,7 +333,6 @@ SEXP distMatrix(SEXP x, SEXP t, SEXP terminalGaps, SEXP penalizeGapGaps, SEXP pe
 	
 	x_set = hold_XStringSet(x);
 	x_length = get_length_from_XStringSet_holder(&x_set);
-	int gapLengths[x_length][2];
 	
 	if (x_length < 2) { // there is only one sequence
 		PROTECT(ans = NEW_INTEGER(0));
@@ -277,31 +353,47 @@ SEXP distMatrix(SEXP x, SEXP t, SEXP terminalGaps, SEXP penalizeGapGaps, SEXP pe
 		
 		// find the terminal gap lengths
 		// always needed to identify no-overlap
+		int *gapLengths[2];
+		gapLengths[0] = (int *) calloc(x_length, sizeof(int)); // initialized to zero (thread-safe on Windows)
+		gapLengths[1] = (int *) calloc(x_length, sizeof(int)); // initialized to zero (thread-safe on Windows)
 		if (asInteger(t)==3) { // AAStringSet
 			for (i = 0; i < x_length; i++) {
 				x_i = get_elt_from_XStringSet_holder(&x_set, i);
-				gapLengths[i][0] = frontTerminalGapsAA(&x_i);
-				gapLengths[i][1] = endTerminalGapsAA(&x_i);
-				//Rprintf("\nstart:%dend:%d",gapLengths[i][0],gapLengths[i][1]);
+				gapLengths[0][i] = frontTerminalGapsAA(&x_i);
+				gapLengths[1][i] = endTerminalGapsAA(&x_i);
+				//Rprintf("\nstart:%dend:%d",gapLengths[0][i],gapLengths[1][i]);
 			}
 		} else { // DNAStringSet or RNAStringSet
 			for (i = 0; i < x_length; i++) {
 				x_i = get_elt_from_XStringSet_holder(&x_set, i);
-				gapLengths[i][0] = frontTerminalGaps(&x_i);
-				gapLengths[i][1] = endTerminalGaps(&x_i);
-				//Rprintf("\nstart:%dend:%d",gapLengths[i][0],gapLengths[i][1]);
+				gapLengths[0][i] = frontTerminalGaps(&x_i);
+				gapLengths[1][i] = endTerminalGaps(&x_i);
+				//Rprintf("\nstart:%dend:%d",gapLengths[0][i],gapLengths[1][i]);
+			}
+		}
+		
+		// find the sequence lengths
+		int *seqLengths = (int *) calloc(x_length, sizeof(int)); // initialized to zero (thread-safe on Windows)
+		if (asInteger(t)==3) { // AAStringSet
+			for (i = 0; i < x_length; i++) {
+				x_i = get_elt_from_XStringSet_holder(&x_set, i);
+				seqLengths[i] = x_i.length - totalGapsAA(&x_i);
+			}
+		} else { // DNAStringSet or RNAStringSet
+			for (i = 0; i < x_length; i++) {
+				x_i = get_elt_from_XStringSet_holder(&x_set, i);
+				seqLengths[i] = x_i.length - totalGaps(&x_i);
 			}
 		}
 		
 		tGaps = asLogical(terminalGaps);
-		pGapsGaps = asLogical(penalizeGapGaps);
 		pGapLetters = asLogical(penalizeGapLetters);
 		for (i = 0; i < last; i++) {
 			// extract each ith DNAString from the DNAStringSet
 			x_i = get_elt_from_XStringSet_holder(&x_set, i);
 			seqLength_i = x_i.length;
 			
-			#pragma omp parallel for private(j,x_j,seqLength_j,start,end,index) schedule(guided) num_threads(nthreads)
+			#pragma omp parallel for private(j,x_j,seqLength_j,start,end,index,minWidth) schedule(guided) num_threads(nthreads)
 			for (j = (i+1); j < x_length; j++) {
 				// extract each jth DNAString from the DNAStringSet
 				x_j = get_elt_from_XStringSet_holder(&x_set, j);
@@ -314,10 +406,11 @@ SEXP distMatrix(SEXP x, SEXP t, SEXP terminalGaps, SEXP penalizeGapGaps, SEXP pe
 				}
 				
 				// find the distance for each row of the matrix
-				if ((seqLength_i - gapLengths[i][1]) <= gapLengths[j][0] ||
-					gapLengths[i][0] >= (seqLength_j - gapLengths[j][1])) {
+				if ((seqLength_i - gapLengths[1][i]) <= gapLengths[0][j] ||
+					gapLengths[0][i] >= (seqLength_j - gapLengths[1][j])) {
 					// no overlap between sequences
-					if (tGaps) { // include terminal gaps
+					if (tGaps && // include terminal gaps
+						coverage == 0) { // do not require coverage
 						rans[index] = 1;
 					} else {
 						rans[index] = NA_REAL;
@@ -326,25 +419,56 @@ SEXP distMatrix(SEXP x, SEXP t, SEXP terminalGaps, SEXP penalizeGapGaps, SEXP pe
 					if (!tGaps) { // don't include terminal gaps
 						// find the intersection of both string's ranges
 						// to shorten the sequence comparison for speed
-						if (gapLengths[i][0] >= gapLengths[j][0]) {
-							start = gapLengths[i][0];
+						if (gapLengths[0][i] >= gapLengths[0][j]) {
+							start = gapLengths[0][i];
 						} else {
-							start = gapLengths[j][0];
+							start = gapLengths[0][j];
 						}
-						if ((seqLength_i - gapLengths[i][1]) <= (seqLength_j - gapLengths[j][1])) {
-							end = gapLengths[i][1];
+						if ((seqLength_i - gapLengths[1][i]) <= (seqLength_j - gapLengths[1][j])) {
+							end = gapLengths[1][i];
 						} else {
-							end = gapLengths[j][1];
+							end = gapLengths[1][j];
 						}
-						
+						if (seqLengths[i] <= seqLengths[j]) {
+							minWidth = seqLengths[i];
+						} else {
+							minWidth = seqLengths[j];
+						}
 					} else { // use whole sequence including terminal gaps
-						start = 0;
-						end = 0;
+						if (mode == 1) { // overlap
+							start = 0;
+							end = 0;
+							if (seqLengths[i] <= seqLengths[j]) {
+								minWidth = seqLengths[i];
+							} else {
+								minWidth = seqLengths[j];
+							}
+						} else if (mode == 2) { // shortest
+							if (seqLengths[i] <= seqLengths[j]) {
+								minWidth = seqLengths[i];
+								start = gapLengths[0][i];
+								end = gapLengths[1][i];
+							} else {
+								minWidth = seqLengths[j];
+								start = gapLengths[0][j];
+								end = gapLengths[1][j];
+							}
+						} else { // longest
+							if (seqLengths[i] >= seqLengths[j]) {
+								minWidth = seqLengths[j];
+								start = gapLengths[0][i];
+								end = gapLengths[1][i];
+							} else {
+								minWidth = seqLengths[i];
+								start = gapLengths[0][j];
+								end = gapLengths[1][j];
+							}
+						}
 					}
 					if (asInteger(t)==3) { // AAStringSet
-						rans[index] = distanceAA(&x_i, &x_j, start, end, pGapsGaps, pGapLetters);
+						rans[index] = distanceAA(&x_i, &x_j, start, end, pGapLetters, minWidth, coverage);
 					} else {
-						rans[index] = distance(&x_i, &x_j, start, end, pGapsGaps, pGapLetters);
+						rans[index] = distance(&x_i, &x_j, start, end, pGapLetters, minWidth, coverage);
 					}
 					if (E > 0) {
 						if (rans[index] >= E) {
@@ -377,6 +501,10 @@ SEXP distMatrix(SEXP x, SEXP t, SEXP terminalGaps, SEXP penalizeGapGaps, SEXP pe
 		}
 		if (fM && o==1) // set the last element of the diagonal to zero
 			rans[(x_length - 1)*x_length+(x_length - 1)] = 0;
+		
+		free(gapLengths[0]);
+		free(gapLengths[1]);
+		free(seqLengths);
 	}
 	
 	if (v) {
@@ -388,7 +516,7 @@ SEXP distMatrix(SEXP x, SEXP t, SEXP terminalGaps, SEXP penalizeGapGaps, SEXP pe
 	return ans;	
 }
 
-//ans_start <- .Call("gaps", myDNAStringSet, 1L, PACKAGE="DECIPHER")
+//.Call("gaps", myDNAStringSet, 1L, PACKAGE="DECIPHER")
 SEXP gaps(SEXP x, SEXP t)
 {
 	XStringSet_holder x_set;
@@ -424,7 +552,7 @@ SEXP gaps(SEXP x, SEXP t)
 	return ans;
 }
 
-//ans_start <- .Call("firstSeqsEqual", dna1, dna2, start1, end1, start2, end2, first1, first2, PACKAGE="DECIPHER")
+//.Call("firstSeqsEqual", dna1, dna2, start1, end1, start2, end2, first1, first2, PACKAGE="DECIPHER")
 SEXP firstSeqsEqual(SEXP x, SEXP y, SEXP start_x, SEXP end_x, SEXP start_y, SEXP end_y, SEXP first_x, SEXP first_y)
 {	
 	int i, j;
@@ -707,4 +835,187 @@ SEXP firstSeqsPosEqual(SEXP x, SEXP y, SEXP start_x, SEXP end_x, SEXP start_y, S
 	} else {
 		return R_NilValue;
 	}
+}
+
+// approximate similarity from anchor ranges
+SEXP similarities(SEXP res, SEXP widths1, SEXP widths2, SEXP terminalGaps, SEXP penalizeGapLetters, SEXP minCoverage, SEXP method, SEXP nThreads)
+{
+	int i, j, n, s, p1, p2, t1, t2, ov, OV, g1, g2, g, o, count, *r;
+	int w1 = asInteger(widths1);
+	int *w2 = INTEGER(widths2);
+	int tGaps = asLogical(terminalGaps);
+	int pGapLetters = asLogical(penalizeGapLetters);
+	double coverage = asReal(minCoverage);
+	int mode = asInteger(method);
+	int nthreads = asInteger(nThreads);
+	int global = tGaps != 0 && pGapLetters != 0;
+	
+	int l = length(res);
+	int **pr = (int **) calloc(l, sizeof(int *)); // initialized to zero (thread-safe on Windows)
+	int *pn = (int *) calloc(l, sizeof(int)); // initialized to zero (thread-safe on Windows)
+	
+	for (i = 0; i < l; i++) {
+		pr[i] = INTEGER(VECTOR_ELT(res, i)); // matrix of anchor ranges
+		pn[i] = length(VECTOR_ELT(res, i));
+	}
+	
+	SEXP ans;
+	PROTECT(ans = allocVector(REALSXP, l));
+	double *rans = REAL(ans);
+	
+	#pragma omp parallel for private(i,j,n,s,p1,p2,t1,t2,ov,OV,g1,g2,g,o,count,r) schedule(guided) num_threads(nthreads)
+	for (i = 0; i < l; i++) {
+		r = pr[i];
+		n = pn[i];
+		
+		if (n > 0) { // any anchors
+			n /= 4; // number of columns
+			
+			s = 0; // positions in anchors
+			for (j = 0; j < n; j++)
+				s += r[j*4 + 1] - r[j*4] + 1;
+			
+			p1 = r[0]; // starting position in 1
+			p2 = r[2]; // starting position in 2
+			t1 = w1 - r[(n - 1)*4 + 1]; // remaining positions in 1
+			t2 = w2[i] - r[(n - 1)*4 + 3]; // remaining positions in 2
+			
+			if (global) {
+				if (mode == 1) { // overlap
+					if (p1 >= p2) {
+						o = 1;
+						if (t1 >= t2) { // 2 within 1
+							ov = w1;
+						} else { // end of 1 overlaps start of 2
+							ov = w1 + t2 - t1;
+						}
+					} else {
+						o = 2;
+						if (t2 >= t1) { // 1 within 2
+							ov = w2[i];
+						} else { // end of 2 overlaps start of 1
+							ov = w2[i] + t1 - t2;
+						}
+					}
+				} else if (mode == 2) { // shortest
+					if (w1 < w2[i]) {
+						ov = w1;
+						o = 1;
+					} else {
+						ov = w2[i];
+						o = 2;
+					}
+				} else { // longest
+					if (w1 < w2[i]) {
+						ov = w2[i];
+						o = 2;
+					} else {
+						ov = w1;
+						o = 1;
+					}
+				}
+			}
+			
+			if (coverage > 0 ||
+				global == 0) {
+				if (t1 > t2) {
+					t1 = t1 - t2;
+					t2 = 0;
+				} else if (t2 > t1) {
+					t2 = t2 - t1;
+					t1 = 0;
+				} else {
+					t1 = 0;
+					t2 = 0;
+				}
+				if (p1 <= p2 && t1 <= t2) { // 1 within 2
+					OV = w1;
+					if (global == 0)
+						o = 1;
+				} else if (p2 <= p1 && t2 <= t1) { // 2 within 1
+					OV = w2[i];
+					if (global == 0)
+						o = 2;
+				} else if (p1 > p2) { // end of 1 overlaps start of 2
+					if (w1 - p1 + p2 > w2[i] - t2) {
+						OV = w1 - p1 + p2;
+						if (global == 0)
+							o = 1;
+					} else {
+						OV = w2[i] - t2;
+						if (global == 0)
+							o = 2;
+					}
+				} else { // end of 2 overlaps start of 1
+					if (w2[i] - p2 + p1 > w1 - t1) {
+						OV = w2[i] - p2 + p1;
+						if (global == 0)
+							o = 2;
+					} else {
+						OV = w1 - t1;
+						if (global == 0)
+							o = 1;
+					}
+				}
+				
+				if (global == 0) // only the overlapping region
+					ov = OV;
+			}
+			
+			g1 = 0;
+			g2 = 0;
+			count = 0;
+			if (n > 1) {
+				for (j = 1; j < n; j++) {
+					g = r[j*4 + 2] - r[(j - 1)*4 + 3] - r[j*4] + r[(j - 1)*4 + 1];
+					if (g > 0) {
+						g2 -= g;
+						count++;
+					} else if (g < 0) {
+						g1 += g;
+						count++;
+					} // else g = 0
+				}
+			}
+			if (g1 < g2) {
+				g = g1;
+			} else {
+				g = g2;
+			}
+			
+			if (coverage > 0 &&
+				(double)(OV + g)/(double)w1 < coverage &&
+				(double)(OV + g)/(double)w2[i] < coverage) {
+				rans[i] = 0;
+			} else {
+				if (pGapLetters == 1) {
+					if (o == 1) {
+						rans[i] = (double)s/((double)(ov - g2));
+					} else {
+						rans[i] = (double)s/((double)(ov - g1));
+					}
+				} else if (pGapLetters == 0) {
+					if (o == 1) {
+						rans[i] = ((double)(s - g1))/(double)ov;
+					} else {
+						rans[i] = ((double)(s - g2))/(double)ov;
+					}
+				} else {
+					if (o == 1) {
+						rans[i] = (double)s/((double)(ov + count));
+					} else {
+						rans[i] = (double)s/((double)(ov + count));
+					}
+				}
+			}
+		} else {
+			rans[i]= 0;
+		}
+	}
+	free(pr);
+	free(pn);
+	
+	UNPROTECT(1);
+	
+	return ans;
 }

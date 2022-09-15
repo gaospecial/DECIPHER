@@ -657,14 +657,14 @@ SEXP alignProfiles(SEXP p, SEXP s, SEXP type, SEXP subMatrix, SEXP dbnMatrix, SE
 		if (i % (ls + 1) == 0) {
 			Rprintf("\n");
 		}
-		Rprintf("%d ", (int)m[i]);
+		Rprintf("%1.1f ", m[i]);
 	}
 	Rprintf("\n");
 	for (i = 0; i < lp*ls; i++) {
 		if (i % ls == 0) {
 			Rprintf("\n");
 		}
-		Rprintf("%d ", (int)o[i]);
+		Rprintf("%d ", o[i]);
 	}
 	Rprintf("\n");
 	*/
@@ -1484,14 +1484,14 @@ SEXP alignProfilesAA(SEXP p, SEXP s, SEXP subMatrix, SEXP hecMatrix, SEXP go, SE
 		if (i % (ls + 1) == 0) {
 			Rprintf("\n");
 		}
-		Rprintf("%d ", (int)m[i]);
+		Rprintf("%1.1f ", m[i]);
 	}
 	Rprintf("\n");
 	for (i = 0; i < lp*ls; i++) {
 		if (i % ls == 0) {
 			Rprintf("\n");
 		}
-		Rprintf("%d ", (int)o[i]);
+		Rprintf("%d ", o[i]);
 	}
 	Rprintf("\n");
 	*/

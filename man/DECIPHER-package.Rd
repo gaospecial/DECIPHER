@@ -40,6 +40,7 @@ CalculateEfficiencyArray Predict the Hybridization Efficiency of
 CalculateEfficiencyFISH  Predict Thermodynamic Parameters of Probe/Target
                          Sequence Pairs
 CalculateEfficiencyPCR   Predict Amplification Efficiency of Primer Sequences
+Clusterize               Cluster Sequences By Similarity
 Codec                    Compression/Decompression of Character Vectors
 ConsensusSequence        Create a Consensus Sequence
 Cophenetic               Compute cophenetic distances on dendrogram objects
@@ -79,10 +80,9 @@ FormGroups               Forms Groups By Rank
 Genes-class              Genes objects and accessors
 HEC_MI                   Mutual Information for Protein Secondary Structure
                          Prediction
-IdClusters               Cluster Sequences By Similarity
 IdConsensus              Create Consensus Sequences by Groups
 IdentifyByRank           Identify By Taxonomic Rank
-IdLengths                Determine the Number of Bases, Nonbases, and Width
+IdLengths                Determine the Number of Characters in Each Sequence
                          of Each Sequence
 IdTaxa                   Assign Sequences a Taxonomic Classification
 LearnNonCoding           Learn a Non-Coding RNA Model

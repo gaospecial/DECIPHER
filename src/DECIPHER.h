@@ -22,7 +22,7 @@ SEXP shiftGapsAA(SEXP x, SEXP subMatrix, SEXP go, SEXP ge, SEXP gl, SEXP sc, SEX
 
 // DistanceMatrix.c
 
-SEXP distMatrix(SEXP x, SEXP t, SEXP terminalGaps, SEXP penalizeGapGaps, SEXP penalizeGapLetters, SEXP fullMatrix, SEXP output, SEXP e, SEXP verbose, SEXP pBar, SEXP nThreads);
+SEXP distMatrix(SEXP x, SEXP t, SEXP terminalGaps, SEXP penalizeGapLetters, SEXP fullMatrix, SEXP output, SEXP e, SEXP minCoverage, SEXP method, SEXP verbose, SEXP pBar, SEXP nThreads);
 
 SEXP gaps(SEXP x, SEXP t);
 
@@ -31,6 +31,8 @@ SEXP firstSeqsEqual(SEXP x, SEXP y, SEXP start_x, SEXP end_x, SEXP start_y, SEXP
 SEXP firstSeqsGapsEqual(SEXP x, SEXP y, SEXP start_x, SEXP end_x, SEXP start_y, SEXP end_y, SEXP t, SEXP first_x, SEXP first_y);
 
 SEXP firstSeqsPosEqual(SEXP x, SEXP y, SEXP start_x, SEXP end_x, SEXP start_y, SEXP end_y, SEXP t, SEXP first_x, SEXP first_y);
+
+SEXP similarities(SEXP res, SEXP widths1, SEXP widths2, SEXP terminalGaps, SEXP penalizeGapLetters, SEXP minCoverage, SEXP method, SEXP nThreads);
 
 // Cluster.c
 
@@ -88,7 +90,7 @@ SEXP matchListsDual(SEXP x, SEXP y, SEXP verbose, SEXP pBar, SEXP nThreads);
 
 SEXP groupMax(SEXP x, SEXP y, SEXP z);
 
-SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP z, SEXP wordSize);
+SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP wordSize, SEXP nThreads);
 
 // ReplaceChars.c
 
@@ -141,6 +143,10 @@ SEXP alphabetSizeReducedAA(SEXP x, SEXP alphabet);
 SEXP alphabetSize(SEXP x);
 
 SEXP maskRepeats(SEXP e, int n, int l1, int l2, int l3);
+
+SEXP frequencies(SEXP x, SEXP wordSize);
+
+SEXP frequenciesReducedAA(SEXP x, SEXP wordSize, SEXP alphabet);
 
 // Compositions.c
 
@@ -333,3 +339,11 @@ SEXP dist(SEXP x, SEXP nThreads);
 // ClusterMP.c
 
 SEXP clusterMP(SEXP x, SEXP z, SEXP s, SEXP sizes, SEXP scoreOnly, SEXP add, SEXP weights, SEXP nThreads);
+
+// PairwiseAlignment.c
+
+SEXP alignPair(SEXP x, SEXP y, SEXP s1, SEXP e1, SEXP s2, SEXP e2, SEXP go, SEXP ge, SEXP tg, SEXP maxLength, SEXP type, SEXP subMatrix, SEXP nThreads);
+
+// SphericalKmeans.c
+
+SEXP sphericalKmeans(SEXP X, SEXP Y, SEXP Kmeans, SEXP tolerance, SEXP maxIterations, SEXP verbose, SEXP nThreads);

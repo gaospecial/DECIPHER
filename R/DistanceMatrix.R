@@ -1,8 +1,9 @@
 DistanceMatrix <- function(myXStringSet,
+	method="overlap",
 	type="matrix",
 	includeTerminalGaps=FALSE,
 	penalizeGapLetterMatches=TRUE,
-	penalizeGapGapMatches=FALSE,
+	minCoverage=0,
 	correction="none",
 	processors=1,
 	verbose=TRUE) {
@@ -14,6 +15,12 @@ DistanceMatrix <- function(myXStringSet,
 		stop("Invalid type.")
 	if (type==-1)
 		stop("Ambiguous type.")
+	METHODS <- c("overlap", "shortest", "longest")
+	method <- pmatch(method[1], METHODS)
+	if (is.na(method))
+		stop("Invalid method.")
+	if (method==-1)
+		stop("Ambiguous method.")
 	CORRECTIONS <- c("none", "Jukes-Cantor", "JC", "JC69", "F81")
 	correction <- pmatch(correction, CORRECTIONS)
 	if (is.na(correction))
@@ -24,10 +31,14 @@ DistanceMatrix <- function(myXStringSet,
 		correction <- 2
 	if (!is.logical(includeTerminalGaps))
 		stop("includeTerminalGaps must be a logical.")
-	if (!is.logical(penalizeGapGapMatches))
-		stop("penalizeGapGapMatches must be a logical.")
 	if (!is.logical(penalizeGapLetterMatches))
 		stop("penalizeGapLetterMatches must be a logical.")
+	if (!is.numeric(minCoverage))
+		stop("maxCoverage must be a numeric.")
+	if (minCoverage < 0)
+		stop("minCoverage must be at least zero.")
+	if (minCoverage > 1)
+		stop("minCoverage can be at most one.")
 	if (!is.logical(verbose))
 		stop("verbose must be a logical.")
 	if (!is(myXStringSet, "XStringSet"))
@@ -69,22 +80,19 @@ DistanceMatrix <- function(myXStringSet,
 	# calculate distance correction
 	if (correction != 1L) {
 		if (is(myXStringSet, "DNAStringSet")) {
-			if (penalizeGapLetterMatches ||
-				penalizeGapGapMatches) {
+			if (penalizeGapLetterMatches) {
 				alphabet <- c(DNA_BASES, "-")
 			} else {
 				alphabet <- DNA_BASES
 			}
 		} else if (is(myXStringSet, "RNAStringSet")) {
-			if (penalizeGapLetterMatches ||
-				penalizeGapGapMatches) {
+			if (penalizeGapLetterMatches) {
 				alphabet <- c(RNA_BASES, "-")
 			} else {
 				alphabet <- RNA_BASES
 			}
 		} else if (is(myXStringSet, "AAStringSet")) {
-			if (penalizeGapLetterMatches ||
-				penalizeGapGapMatches) {
+			if (penalizeGapLetterMatches) {
 				alphabet <- c(AA_STANDARD, "-")
 			} else {
 				alphabet <- AA_STANDARD
@@ -109,11 +117,12 @@ DistanceMatrix <- function(myXStringSet,
 		myXStringSet,
 		ifelse(is(myXStringSet, "AAStringSet"), 3L, 1L),
 		includeTerminalGaps,
-		penalizeGapGapMatches,
 		penalizeGapLetterMatches,
 		TRUE, # full matrix
 		type,
 		E,
+		minCoverage,
+		method,
 		verbose,
 		pBar,
 		processors,

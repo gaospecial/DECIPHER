@@ -34,7 +34,7 @@ static const R_CallMethodDef callMethods[] = { // method call, pointer, num args
 	{"reclusterNJ", (DL_FUNC) &reclusterNJ, 2},
 	{"reclusterUPGMA", (DL_FUNC) &reclusterUPGMA, 2},
 	{"clusterML", (DL_FUNC) &clusterML, 9},
-	{"distMatrix", (DL_FUNC) &distMatrix, 11},
+	{"distMatrix", (DL_FUNC) &distMatrix, 12},
 	{"gaps", (DL_FUNC) &gaps, 2},
 	{"designProbes", (DL_FUNC) &designProbes, 16},
 	{"commonGaps", (DL_FUNC) &commonGaps, 1},
@@ -155,6 +155,11 @@ static const R_CallMethodDef callMethods[] = { // method call, pointer, num args
 	{"clusterMP", (DL_FUNC) &clusterMP, 8},
 	{"expM", (DL_FUNC) &expM, 3},
 	{"matchOverlap", (DL_FUNC) &matchOverlap, 5},
+	{"similarities", (DL_FUNC) &similarities, 8},
+	{"alignPair", (DL_FUNC) &alignPair, 13},
+	{"frequencies", (DL_FUNC) &frequencies, 2},
+	{"frequenciesReducedAA", (DL_FUNC) &frequenciesReducedAA, 3},
+	{"sphericalKmeans", (DL_FUNC) &sphericalKmeans, 7},
 	{NULL, NULL, 0}
 };
 

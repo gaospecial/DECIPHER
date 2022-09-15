@@ -14,6 +14,7 @@ DB2Seqs <- function(file,
 	chunkSize=1e5,
 	sep="::",
 	clause="",
+	processors=1,
 	verbose=TRUE) {
 	
 	# error checking
@@ -84,6 +85,17 @@ DB2Seqs <- function(file,
 	}
 	if (type > 4 && removeGaps > 1)
 		stop(paste('removeGaps must be "none" when type is ', TYPES[type], '.', sep=''))
+	if (!is.null(processors) && !is.numeric(processors))
+		stop("processors must be a numeric.")
+	if (!is.null(processors) && floor(processors)!=processors)
+		stop("processors must be a whole number.")
+	if (!is.null(processors) && processors < 1)
+		stop("processors must be at least 1.")
+	if (is.null(processors)) {
+		processors <- detectCores()
+	} else {
+		processors <- as.integer(processors)
+	}
 	
 	# initialize database
 	driver = dbDriver("SQLite")
@@ -189,7 +201,8 @@ DB2Seqs <- function(file,
 		searchResult2 <- searchResult2[m,]
 		
 		# decompress the resulting sequences
-		searchResult2$sequence <- Codec(searchResult2$sequence)
+		searchResult2$sequence <- Codec(searchResult2$sequence,
+			processors=processors)
 		
 		if (type!=4 && type!=8) {
 			# replace characters that are not in the DNA_ALPHABET
@@ -220,7 +233,8 @@ DB2Seqs <- function(file,
 		
 		if (type > 4) {
 			# decompress the resulting qualities
-			searchResult2$quality <- Codec(searchResult2$quality)
+			searchResult2$quality <- Codec(searchResult2$quality,
+				processors=processors)
 		}
 		
 		if (type==1 || type==5) {

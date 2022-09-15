@@ -944,38 +944,55 @@ SEXP groupMax(SEXP x, SEXP y, SEXP z)
 }
 
 // ranges of exact overlap between indicies x (length == 1) and y (length >= 1)
-SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP z, SEXP wordSize)
+SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP wordSize, SEXP nThreads)
 {
-	int i, j, k, l, n, p, d, lx, ly, new, *I, *X, *Y, *OX, *OY;
+	int i, j, k, l, n, p, d, lx, new, *t, *keep, *I, *X, *OX;
 	
 	int i1 = asInteger(x) - 1;
 	I = INTEGER(y);
-	X = INTEGER(VECTOR_ELT(v, i1));
-	OX = INTEGER(VECTOR_ELT(z, i1));
-	lx = length(VECTOR_ELT(v, i1));
+	X = INTEGER(VECTOR_ELT(VECTOR_ELT(v, i1), 0));
+	OX = INTEGER(VECTOR_ELT(VECTOR_ELT(v, i1), 1));
+	lx = length(VECTOR_ELT(VECTOR_ELT(v, i1), 0));
 	int wS = asInteger(wordSize);
+	int nthreads = asInteger(nThreads);
 	l = length(y);
 	
 	SEXP ret_list;
 	PROTECT(ret_list = allocVector(VECSXP, l));
 	
-	//#pragma omp parallel for private(i, j, k, n, p, d, new, Y, OY, ly) schedule(guided) num_threads(nthreads)
+	int **pY = (int **) calloc(l, sizeof(int *)); // initialized to zero (thread-safe on Windows)
+	int **pOY = (int **) calloc(l, sizeof(int *)); // initialized to zero (thread-safe on Windows)
+	int *ly = (int *) calloc(l, sizeof(int)); // initialized to zero (thread-safe on Windows)
+	
 	for (i = 0; i < l; i++) {
-		Y = INTEGER(VECTOR_ELT(v, I[i] - 1));
-		OY = INTEGER(VECTOR_ELT(z, I[i] - 1));
-		ly = length(VECTOR_ELT(v, I[i] - 1));
+		pY[i] = INTEGER(VECTOR_ELT(VECTOR_ELT(v, I[i] - 1), 0));
+		pOY[i] = INTEGER(VECTOR_ELT(VECTOR_ELT(v, I[i] - 1), 1));
+		ly[i] = length(VECTOR_ELT(VECTOR_ELT(v, I[i] - 1), 0));
+	}
+	
+	int maxX = 0;
+	for (i = 0; i < lx; i++)
+		if (OX[i] > maxX)
+			maxX = OX[i];
+	
+	int **pt = (int **) calloc(l, sizeof(int *)); // initialized to zero (thread-safe on Windows)
+	int *N = (int *) calloc(l, sizeof(int)); // initialized to zero (thread-safe on Windows)
+	int **keeps = (int **) calloc(l, sizeof(int *)); // initialized to zero (thread-safe on Windows)
+	
+	#pragma omp parallel for private(i,j,k,n,p,new,t,keep) schedule(guided) num_threads(nthreads)
+	for (i = 0; i < l; i++) {
+		int *Y = pY[i];
+		int *OY = pOY[i];
 		
-		int *m = (int *) calloc(lx, sizeof(int)); // initialized to zero (thread-safe on Windows)
+		int *m = (int *) calloc(maxX, sizeof(int)); // initialized to zero (thread-safe on Windows)
 		j = 0;
 		k = 0;
-		while (j < lx && k < ly) {
-			if (X[OX[j] - 1] == NA_INTEGER || Y[OY[k] - 1] == NA_INTEGER) {
-				break; // NA values are ordered at the end
-			} else if (X[OX[j] - 1] == Y[OY[k] - 1]) {
+		while (j < lx && k < ly[i]) {
+			if (X[j] == Y[k]) {
 				m[OX[j] - 1] = OY[k];
 				j++;
 				k++;
-			} else if (X[OX[j] - 1] < Y[OY[k] - 1]) {
+			} else if (X[j] < Y[k]) {
 				j++;
 			} else {
 				k++;
@@ -985,7 +1002,7 @@ SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP z, SEXP wordSize)
 		// count the number of anchors
 		n = 0;
 		new = 1;
-		for (j = 0; j < lx; j++) {
+		for (j = 0; j < maxX; j++) {
 			if (m[j] > 0) {
 				if (new) {
 					new = 0;
@@ -999,20 +1016,21 @@ SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP z, SEXP wordSize)
 		}
 		
 		// record anchor ranges
-		int *t = (int *) calloc(3*n, sizeof(int)); // initialized to zero (thread-safe on Windows)
+		t = (int *) malloc(3*n*sizeof(int)); // thread-safe on Windows
 		k = -1;
 		new = 1;
-		for (j = 0; j < lx; j++) {
+		for (j = 0; j < maxX; j++) {
 			if (m[j] > 0) {
 				if (new ||
 					m[j] != m[j - 1] + 1) {
 					new = 0;
 					k++;
-					t[0 + 3*k] = j + 1;
-					t[1 + 3*k] = m[j];
-					t[2 + 3*k] = wS;
+					p = 0 + 3*k;
+					t[p++] = j + 1;
+					t[p++] = m[j];
+					t[p] = wS;
 				} else {
-					t[2 + 3*k]++;
+					t[p]++;
 				}
 			} else {
 				if (k == n - 1)
@@ -1022,9 +1040,32 @@ SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP z, SEXP wordSize)
 		}
 		free(m);
 		
+		// separate overlapping regions
+		j = 1;
+		while (j < n) {
+			k = j - 1;
+			while (k >= 0 && k > j - wS) {
+				int d1 = t[0 + 3*j] - t[0 + 3*k] - t[2 + 3*k];
+				int d2 = t[1 + 3*j] - t[1 + 3*k] - t[2 + 3*k];
+				if (d1 < 0 || d2 < 0) {
+					if (d1 < d2) {
+						if (t[2 + 3*k] > -d1)
+							t[2 + 3*k] += d1;
+					} else if (t[2 + 3*k] > -d2) {
+						t[2 + 3*k] += d2;
+					}
+				}
+				k--;
+			}
+			j++;
+		}
+		
+		N[i] = n;
+		pt[i] = t;
+		
 		// chain anchors
-		int *b = (int *) calloc(n, sizeof(int)); // initialized to zero (thread-safe on Windows)
-		int *s = (int *) calloc(n, sizeof(int)); // initialized to zero (thread-safe on Windows)
+		int *b = (int *) malloc(n*sizeof(int)); // thread-safe on Windows
+		int *s = (int *) malloc(n*sizeof(int)); // thread-safe on Windows
 		for (j = 0; j < n; j++) {
 			b[j] = -1;
 			s[j] = t[2 + 3*j];
@@ -1036,7 +1077,7 @@ SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP z, SEXP wordSize)
 				if (t[1 + 3*k] < t[1 + 3*j] && // starts within bounds
 					((t[1 + 3*k] + t[2 + 3*k] <= t[1 + 3*j] &&
 					t[0 + 3*k] + t[2 + 3*k] <= t[0 + 3*j]) ||
-					t[0 + 3*j] - t[0 + 3*k] >= t[1 + 3*j] - t[1 + 3*k])) { // ends are compatible
+					t[0 + 3*j] - t[0 + 3*k] == t[1 + 3*j] - t[1 + 3*k])) { // ends are compatible
 					if (s[k] + t[2 + 3*j] > s[j]) { // extend chain
 						s[j] = s[k] + t[2 + 3*j];
 						b[j] = k;
@@ -1050,7 +1091,7 @@ SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP z, SEXP wordSize)
 		free(s);
 		
 		// rectify anchors
-		int *keep = (int *) calloc(n, sizeof(int)); // initialized to zero (thread-safe on Windows)
+		keep = (int *) calloc(n, sizeof(int)); // initialized to zero (thread-safe on Windows)
 		if (n > 0) {
 			while (p >= 0) { // traceback
 				keep[p] = 1;
@@ -1074,6 +1115,18 @@ SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP z, SEXP wordSize)
 			}
 			j++;
 		}
+		
+		keeps[i] = keep;
+	}
+	free(pY);
+	free(pOY);
+	free(ly);
+	
+	// second loop not tread-safe
+	for (i = 0; i < l; i++) {
+		t = pt[i];
+		n = N[i];
+		keep = keeps[i];
 		
 		// record final anchors
 		k = 0;
@@ -1112,6 +1165,9 @@ SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP z, SEXP wordSize)
 		SET_VECTOR_ELT(ret_list, i, ans);
 		UNPROTECT(1);
 	}
+	free(pt);
+	free(N);
+	free(keeps);
 	
 	UNPROTECT(1);
 	

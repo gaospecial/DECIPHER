@@ -8,10 +8,11 @@ Calculates a distance matrix for an \code{XStringSet}.  Each element of the dist
 }
 \usage{
 DistanceMatrix(myXStringSet,
+               method = "overlap",
                type = "matrix",
                includeTerminalGaps = FALSE,
                penalizeGapLetterMatches = TRUE,
-               penalizeGapGapMatches = FALSE,
+               minCoverage = 0,
                correction = "none",
                processors = 1,
                verbose = TRUE)
@@ -23,14 +24,17 @@ A \code{DNAStringSet}, \code{RNAStringSet}, or \code{AAStringSet} object of alig
   \item{type}{
 Character string indicating the type of output desired.  This should be either \code{"matrix"} or \code{"dist"}.  (See value section below.)
 }
+  \item{method}{
+Character string determining the region in which distance is calculated.  This should be (an unambiguous abbreviation of) one of \code{"overlap"}, \code{"shortest"}, or \code{"longest"}.  The default \code{method} (\code{"overlap"}) calculates distance from the overlapping region between terminal gaps when \code{includeTerminalGaps} is \code{FALSE} and the entire alignment otherwise.  Setting \code{method} to \code{"shortest"} or \code{"longest"} will use the region between the start and end of the shortest or longest sequence, respectively, for each pairwise distance.  The \code{method} is only applicable when \code{includeTerminalGaps} is \code{TRUE}.
+}
   \item{includeTerminalGaps}{
 Logical specifying whether or not to include terminal gaps ("-" or "." characters on each end of the sequence) into the calculation of distance.
 }
   \item{penalizeGapLetterMatches}{
-Logical specifying whether or not to consider gap-to-letter matches as mismatches.  If \code{FALSE}, then gap-to-letter matches are not included in the total length used to calculate distance.
+Logical specifying whether or not to consider gap-to-letter matches as mismatches.  If \code{FALSE}, then gap-to-letter matches are not included in the total length used to calculate distance.  The default (\code{TRUE}) is to penalize gap-to-letter mismatches the same as letter-to-letter mismatches.  If \code{NA} then gap-to-letter mismatches are only penalized once per insertion or deletion, i.e., when changing to gap-to-letter or letter-to-gap.
 }
-  \item{penalizeGapGapMatches}{
-Logical specifying whether or not to consider gap-to-gap matches as mismatches.  If \code{FALSE} (the default), then gap-to-gap matches are not included in the total length used to calculate distance.
+  \item{minCoverage}{
+Numeric between zero and one giving the minimum fraction of sequence positions (not gap or mask) in the shortest sequence that must be overlapping with the longer sequence in each pair.  Sequences below \code{minCoverage} will be assigned \code{NA} distances.  Note that non-overlapping sequences are always given \code{NA} distances, regardless of \code{minCoverage}, unless \code{includeTerminalGaps} is \code{TRUE} (distance = 100\%).
 }
   \item{correction}{
 The substitution model used for distance correction.  This should be (an abbreviation of) either \code{"none"}, \code{"Jukes-Cantor"} (i.e., \code{"JC69"}), or \code{"F81"}.  For \code{"F81"} letter frequencies are derived from \code{myXStringSet}.
@@ -49,7 +53,7 @@ If \code{includeTerminalGaps = FALSE} then terminal gaps ("-" or "." characters)
 
 Penalizing gap-to-gap and gap-to-letter mismatches specifies whether to penalize these special mismatch types and include them in the total length when calculating distance.  Both "-" and "." characters are interpreted as gaps.  The default behavior is to calculate distance as the fraction of positions that differ across the region of the alignment shared by both sequences (not including gap-to-gap matches).
 
-Two correction factors are available, \code{"JC69"} and \code{"F81"}, which are described in \code{\link{MODELS}}.  Both transform raw distance (\eqn{d}) by \deqn{-E * \log \left( 1 - d / E \right)}, where \deqn{E = 1 - \sum_{i \in sym} f_i^2} and (\eqn{f}) is the relative frequency of each symbol (\eqn{sym}).  In the \code{"JC69"} model symbols are assumed to have equal frequency, whereas in the \code{"F81"} model the symbol frequencies are empirically derived from the input \code{myXStringSet}.  Note that gaps are treated as an additional symbol when \code{penalizeGapLetterMatches} or \code{penalizeGapGapMatches} is \code{TRUE}.
+Two correction factors are available, \code{"JC69"} and \code{"F81"}, which are described in \code{\link{MODELS}}.  Both transform raw distance (\eqn{d}) by \deqn{-E * \log \left( 1 - d / E \right)}, where \deqn{E = 1 - \sum_{i \in sym} f_i^2} and (\eqn{f}) is the relative frequency of each symbol (\eqn{sym}).  In the \code{"JC69"} model symbols are assumed to have equal frequency, whereas in the \code{"F81"} model the symbol frequencies are empirically derived from the input \code{myXStringSet}.  Note that gaps are treated as an additional symbol when \code{penalizeGapLetterMatches} is \code{TRUE}.
 
 The elements of the distance matrix can be referenced by \code{dimnames} corresponding to the \code{names} of the \code{XStringSet}.  Additionally, an attribute named "correction" specifying the method of correction used can be accessed using the function \code{attr}.
 }
@@ -89,27 +93,38 @@ d <- DistanceMatrix(dna)
 d
 # d[1,2] is 1 base in 4 = 0.25
 
-# compare the entire sequence, including gaps:
-dna <- DNAStringSet(c("ANGCT-", "-ACCT-"))
-dna
-d <- DistanceMatrix(dna, includeTerminalGaps=TRUE,
-                    penalizeGapGapMatches=TRUE)
-d
-# d[1,2] is now 3 bases in 6 = 0.50
-
 # compare union of internal positions, without terminal gaps:
 dna <- DNAStringSet(c("ANGCT-", "-ACCT-"))
 dna
-d <- DistanceMatrix(dna, includeTerminalGaps=TRUE,
-                    penalizeGapGapMatches=FALSE)
+d <- DistanceMatrix(dna, includeTerminalGaps=TRUE)
 d
 # d[1,2] is now 2 bases in 5 = 0.40
 
 # gap ("-") and unknown (".") characters are interchangeable:
 dna <- DNAStringSet(c("ANGCT.", ".ACCT-"))
 dna
-d <- DistanceMatrix(dna, includeTerminalGaps=TRUE,
-                    penalizeGapGapMatches=FALSE)
+d <- DistanceMatrix(dna, includeTerminalGaps=TRUE)
 d
 # d[1,2] is still 2 bases in 5 = 0.40
+
+# compare different methods for calculating distance:
+dna <- DNAStringSet(c("--ACTG", "TGAGT-"))
+dna
+DistanceMatrix(dna, method="overlap") # 1/3
+DistanceMatrix(dna, method="overlap",
+               minCoverage=1) # NA (only 3/4 overlapping)
+DistanceMatrix(dna, method="shortest",
+               includeTerminalGaps=FALSE) # 1/3
+DistanceMatrix(dna, method="shortest",
+               includeTerminalGaps=TRUE) # 2/4
+DistanceMatrix(dna, method="shortest",
+               includeTerminalGaps=TRUE,
+               penalizeGapLetterMatches=FALSE) # 1/3
+DistanceMatrix(dna, method="longest",
+               includeTerminalGaps=FALSE) # 1/3
+DistanceMatrix(dna, method="longest",
+               includeTerminalGaps=TRUE) # 3/5
+DistanceMatrix(dna, method="longest",
+               includeTerminalGaps=TRUE,
+               penalizeGapLetterMatches=FALSE) # 1/3
 }

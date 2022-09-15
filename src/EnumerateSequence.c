@@ -806,3 +806,126 @@ SEXP alphabetSizeReducedAA(SEXP x, SEXP alphabet)
 	
 	return ans;
 }
+
+// equalivent to t(oligonucleotideFrequency(x, wordSize, fast.moving.side="left"))
+SEXP frequencies(SEXP x, SEXP wordSize)
+{
+	XStringSet_holder x_set;
+	Chars_holder x_i;
+	int x_length, i, j, k, wS, sum, ambiguous, *rans;
+	
+	// initialize the XStringSet
+	x_set = hold_XStringSet(x);
+	x_length = get_length_from_XStringSet_holder(&x_set);
+	wS = asInteger(wordSize); // [1 to 15]
+	
+	// fill the position weight vector
+	int pwv[wS]; // wS[0] is ignored
+	if (wS > 1)
+		pwv[1] = 4;
+	for (i = 2; i < wS; i++) {
+		pwv[i] = pwv[i - 1]*4;
+	}
+	
+	int words = 4;
+	for (i = 1; i < wS; i++)
+		words *= 4;
+	SEXP ans;
+	PROTECT(ans = allocMatrix(INTSXP, words, x_length));
+	rans = INTEGER(ans);
+	for (i = 0; i < words*x_length; i++)
+		rans[i] = 0;
+	
+	for (i = 0; i < x_length; i++) {
+		x_i = get_elt_from_XStringSet_holder(&x_set, i);
+		int bases[wS];
+		for (j = 0; j < (wS - 1); j++) {
+			alphabetFrequency(&x_i, &bases[j], j); // fill initial numbers
+		}
+		for (j = wS - 1; j < x_i.length; j++) {
+			alphabetFrequency(&x_i, &bases[wS - 1], j);
+			sum = bases[0];
+			ambiguous = 0;
+			if (bases[0] < 0)
+				ambiguous = 1;
+			for (k = 1; k < wS; k++) {
+				sum += bases[k]*pwv[k];
+				if (bases[k] < 0)
+					ambiguous = 1;
+				bases[k - 1] = bases[k]; // shift numbers left
+			}
+			if (ambiguous == 0)
+				(*(rans + words*i + sum))++;
+		}
+		R_CheckUserInterrupt();
+	}
+	
+	UNPROTECT(1);
+	
+	return ans;
+}
+
+SEXP frequenciesReducedAA(SEXP x, SEXP wordSize, SEXP alphabet)
+{
+	XStringSet_holder x_set;
+	Chars_holder x_i;
+	int x_length, i, j, k, wS, sum, ambiguous, *rans;
+	int *alpha = INTEGER(alphabet);
+	
+	// initialize the XStringSet
+	x_set = hold_XStringSet(x);
+	x_length = get_length_from_XStringSet_holder(&x_set);
+	wS = asInteger(wordSize); // [1 to 20]
+	
+	int m = 0; // hold max of alphabet
+	for (i = 0; i < 20; i++) {
+		if (*(alpha + i) > m)
+			m = *(alpha + i);
+	}
+	m++; // start at 1
+	
+	// fill the position weight vector
+	int pwv[wS]; // wS[0] is ignored
+	if (wS > 1)
+		pwv[1] = m;
+	for (i = 2; i < wS; i++) {
+		pwv[i] = pwv[i - 1]*m;
+	}
+	
+	int words = m;
+	for (i = 1; i < wS; i++)
+		words *= m;
+	SEXP ans;
+	PROTECT(ans = allocMatrix(INTSXP, words, x_length));
+	rans = INTEGER(ans);
+	for (i = 0; i < words*x_length; i++)
+		rans[i] = 0;
+	
+	for (i = 0; i < x_length; i++) {
+		x_i = get_elt_from_XStringSet_holder(&x_set, i);
+		int bases[wS];
+		for (j = 0; j < (wS - 1); j++) {
+			alphabetFrequencyReducedAA(&x_i, &bases[j], j, alpha); // fill initial numbers
+		}
+		for (j = wS - 1; j < x_i.length; j++) {
+			alphabetFrequencyReducedAA(&x_i, &bases[wS - 1], j, alpha);
+			sum = bases[0];
+			ambiguous = 0;
+			if (bases[0] < 0)
+				ambiguous = 1;
+			for (k = 1; k < wS; k++) {
+				sum += bases[k]*pwv[k];
+				if (bases[k] < 0)
+					ambiguous = 1;
+				bases[k - 1] = bases[k]; // shift numbers left
+			}
+			if (ambiguous == 0)
+				(*(rans + words*i + sum))++;
+		}
+		R_CheckUserInterrupt();
+	}
+	
+	UNPROTECT(1);
+	
+	return ans;
+}
