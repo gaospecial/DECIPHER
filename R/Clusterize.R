@@ -5,7 +5,7 @@ Clusterize <- function(myXStringSet,
 	penalizeGapLetterMatches=NA,
 	minCoverage=0.5,
 	maxReps=1000,
-	maxComparisons=1000,
+	avgComparisons=5000,
 	maxAlignments=100,
 	invertCenters=FALSE,
 	processors=1,
@@ -56,20 +56,20 @@ Clusterize <- function(myXStringSet,
 		stop("maxReps must be at least 1.")
 	if (floor(maxReps) != maxReps)
 		stop("maxReps must be a whole number.")
-	if (!is.numeric(maxComparisons))
-		stop("maxComparisons must be a numeric.")
-	if (length(maxComparisons) != 1)
-		stop("maxComparisons must only be a single number.")
-	if (maxComparisons < 2)
-		stop("maxComparisons must be at least 2.")
-	if (floor(maxComparisons) != maxComparisons)
-		stop("maxComparisons must be a whole number.")
+	if (!is.numeric(avgComparisons))
+		stop("avgComparisons must be a numeric.")
+	if (length(avgComparisons) != 1)
+		stop("avgComparisons must only be a single number.")
+	if (avgComparisons < 2)
+		stop("avgComparisons must be at least 2.")
+	if (floor(avgComparisons) != avgComparisons)
+		stop("avgComparisons must be a whole number.")
 	if (!is.numeric(maxAlignments))
 		stop("maxAlignments must be a numeric.")
 	if (length(maxAlignments) != 1)
 		stop("maxAlignments must only be a single number.")
-	if (maxAlignments > maxComparisons)
-		stop("maxAlignments must be less than or equal to maxComparisons.")
+	if (maxAlignments > avgComparisons)
+		stop("maxAlignments must be less than or equal to avgComparisons.")
 	if (floor(maxAlignments) != maxAlignments)
 		stop("maxAlignments must be a whole number.")
 	if (!is.logical(invertCenters))
@@ -87,7 +87,6 @@ Clusterize <- function(myXStringSet,
 	} else {
 		processors <- as.integer(processors)
 	}
-	
 	if (is(myXStringSet, "DNAStringSet")) {
 		typeX <- 1L
 	} else if (is(myXStringSet, "RNAStringSet")) {
@@ -111,13 +110,17 @@ Clusterize <- function(myXStringSet,
 		stop("myXStringSet contains no sequences.")
 	
 	# initialize parameters
-	alpha <- 0.1 # weight of exponential moving average
+	alpha <- 0.01 # weight of exponential moving average
 	attempts <- 10L # comparison attempts before possibly skipping
-	minAttempts <- min(attempts, maxComparisons) # minimum number of comparison attempts
+	minAttempts <- min(attempts, avgComparisons) # minimum number of comparison attempts
 	interval <- 0.999 # prediction interval for k-mer similarity limit (> 0 and < 1)
+	minSimilarities <- 1000L # minimum number of similarities to predict limit
+	buffer <- 0.01 # offset applied to k-mer simility limit at every cutoff
 	minAlignments <- 1L # minimum number of alignments (> 0)
-	minSize <- max(5*maxComparisons, 1e3L) # minimum size to continue splitting bins
-	maxVariance <- ifelse(typeX == 3L, 0.3, 0.15) # maximum tolerable variance to stop splitting bins
+	minSize <- max(10*avgComparisons, 1e3L) # minimum size to continue splitting bins
+	maxVariance <- ifelse(typeX == 3L, 0.5, 0.2) # maximum tolerable variance to stop splitting bins
+	batchSize <- 50L # number of k-mer similarities to compute per batch (ideally >> processors)
+	maxComparisons <- 10*avgComparisons
 	totalAlignments <- 10/(1 - interval) # sufficient alignments for predicting similarity
 	if (verbose)
 		time.1 <- Sys.time()
@@ -270,6 +273,15 @@ Clusterize <- function(myXStringSet,
 			PACKAGE="DECIPHER")
 	}
 	
+	countHits <- function(x, y, processors=1L) {
+		.Call("countOverlap",
+			x,
+			y,
+			v,
+			processors,
+			PACKAGE="DECIPHER")
+	}
+	
 	dist <- function(ali) {
 		.Call("distMatrix",
 			ali,
@@ -289,13 +301,13 @@ Clusterize <- function(myXStringSet,
 	
 	align <- function(pattern,
 		subject,
-		anchor,
+		anchor=NULL,
 		GO=-10, # gap opening
 		GE=-2, # gap extension
 		TG=0, # terminal gap
 		maxLength=5, # maximum length to skip alignment in equal length regions
 		processors=1L) {
-		n <- ncol(anchor)
+		n <- as.integer(length(anchor)/4) # ncol(anchor) but works when anchor is NULL
 		start1 <- start2 <- end1 <- end2 <- integer(n + 1L)
 		
 		l1 <- 0L
@@ -349,17 +361,6 @@ Clusterize <- function(myXStringSet,
 		.append(pattern, subject)
 	}
 	
-	zscore <- function(x) {
-		# fit half-normal distribution
-		mu <- median(x) # estimate population mean
-		sd <- sd(x[x >= mu])/0.6028102749890869027638 # sqrt(1 - 2/pi)
-		if (sd == 0)
-			return(numeric(length(x)))
-		x <- (x - mu)/sd
-		x[x < 0] <- 0
-		x
-	}
-	
 	if (typeX == 3L) { # AAStringSet
 		a <- .Call("frequenciesReducedAA",
 			.subset(myXStringSet, u),
@@ -391,6 +392,9 @@ Clusterize <- function(myXStringSet,
 	for (i in seq_along(G))
 		G[[i]] <- which(C == i)
 	ls <- lengths(G)
+	maxReps <- as.integer(min(maxReps, max(ls/2)))
+	if (maxReps < minSimilarities/maxAlignments)
+		maxReps <- 0L
 	
 	if (verbose) {
 		if (length(ls) > 1L) {
@@ -403,10 +407,11 @@ Clusterize <- function(myXStringSet,
 			time.1 <- time.2
 		}
 		
-		cat("Ordering sequences by ",
-			wordSize,
-			"-mer similarity:\n",
-			sep="")
+		if (maxReps > 0L)
+			cat("Ordering sequences by ",
+				wordSize,
+				"-mer similarity:\n",
+				sep="")
 		flush.console()
 	}
 	
@@ -430,12 +435,11 @@ Clusterize <- function(myXStringSet,
 	sizes <- sapply(v, function(x) length(x[[1L]]))
 	
 	# order sequences by approximate similarity
-	maxReps <- as.integer(min(maxReps, max(ls/2)))
 	inPlay <- ls >= 2
 	ksims <- psims <- vector("list", maxReps)
 	batches <- lapply(ls,
 		function(l) {
-			batches <- seq(0L, l, maxComparisons)
+			batches <- seq(0L, l, avgComparisons)
 			if (batches[length(batches)] < l)
 				batches <- c(batches, l)
 			batches
@@ -479,14 +483,30 @@ Clusterize <- function(myXStringSet,
 		rand <- matrix(NA_integer_, length(ls), 2L)
 		time.3 <- Sys.time()
 		for (k in which(inPlay)) {
-			rand[k,] <- G[[k]][sample(ls[k], 2L, prob=var[G[[k]]]*sizes[G[[k]]]*keep[G[[k]]])]
+			rand[k, 1L] <- G[[k]][sample(ls[k], 1L, prob=var[G[[k]]]*sizes[G[[k]]]*keep[G[[k]]])]
+			keep[rand[k, 1L]] <- FALSE
+			
+			# process sequences in batches to reduce memory
+			ov <- integer(ls[k])
+			for (j in seq_len(length(batches[[k]]) - 1L)) {
+				b <- (batches[[k]][j] + 1L):batches[[k]][j + 1L]
+				s <- G[[k]][b]
+				res1 <- overlap(rand[k, 1L], s, optProcessors1)
+				ov[b] <- .Call("overlap",
+					res1,
+					wu[rand[k, 1L]],
+					wu[s],
+					PACKAGE="DECIPHER")
+				m1[s] <- similarity(res1, wu[rand[k, 1L]], wu[s], optProcessors1)
+			}
+			
+			rand[k, 2L] <- G[[k]][sample(ls[k], 1L, prob=(1.001 - m1[G[[k]]])*keep[G[[k]]]/ov)] # maximize distance and overlap to other random sequence
+			keep[rand[k, 2L]] <- FALSE
 			
 			# process sequences in batches to reduce memory
 			for (j in seq_len(length(batches[[k]]) - 1L)) {
 				s <- G[[k]][(batches[[k]][j] + 1L):batches[[k]][j + 1L]]
-				res1 <- overlap(rand[k, 1L], s, optProcessors1)
 				res2 <- overlap(rand[k, 2L], s, optProcessors1)
-				m1[s] <- similarity(res1, wu[rand[k, 1L]], wu[s], optProcessors1)
 				m2[s] <- similarity(res2, wu[rand[k, 2L]], wu[s], optProcessors1)
 			}
 		}
@@ -503,18 +523,28 @@ Clusterize <- function(myXStringSet,
 		if (sum(counts) - length(bins) < totalAlignments) {
 			b1 <- .bincode(m1, bins, include.lowest=TRUE)
 			w <- m1 > 0 & m1 < 1
-			s1 <- sample(length(m1),
-				min(sum(w), maxAlignments),
-				replace=TRUE, # for speed
-				prob=w/counts[b1])
-			s1 <- s1[!duplicated(b1[s1])]
+			n <- min(sum(w), maxAlignments)
+			if (n > 0) {
+				s1 <- sample(length(m1),
+					n,
+					replace=TRUE, # for speed
+					prob=w/counts[b1])
+				s1 <- s1[!duplicated(b1[s1])]
+			} else {
+				s1 <- integer()
+			}
 			b2 <- .bincode(m2, bins, include.lowest=TRUE)
 			w <- m2 > 0 & m2 < 1
-			s2 <- sample(length(m2),
-				min(sum(w), maxAlignments),
-				replace=TRUE, # for speed
-				prob=w/counts[b2])
-			s2 <- s2[!duplicated(b2[s2])]
+			n <- min(sum(w), maxAlignments)
+			if (n > 0) {
+				s2 <- sample(length(m2),
+					n,
+					replace=TRUE, # for speed
+					prob=w/counts[b2])
+				s2 <- s2[!duplicated(b2[s2])]
+			} else {
+				s2 <- integer()
+			}
 			
 			if (i == 1L) {
 				optProcessors2 <- processors
@@ -568,18 +598,14 @@ Clusterize <- function(myXStringSet,
 			psims[[i]] <- 1 - c(pdist1, pdist2)
 		}
 		
-		# normalize similarities
-		for (k in which(inPlay)) {
-			m1[G[[k]]] <- zscore(m1[G[[k]]])
-			m2[G[[k]]] <- zscore(m2[G[[k]]])
-		}
-		
 		d <- m1 - m2
 		if (i > 1L) {
-			if (diff(range(d)) > 0 && cor(rS, d) < 0) { # negatively correlated
-				rS <- rS - d
-			} else {
-				rS <- rS + d
+			for (k in which(inPlay)) {
+				if (diff(range(d[G[[k]]])) > 0 && cor(rS[G[[k]]], d[G[[k]]]) < 0) { # negatively correlated
+					rS[G[[k]]] <- rS[G[[k]]] - d[G[[k]]]
+				} else {
+					rS[G[[k]]] <- rS[G[[k]]] + d[G[[k]]]
+				}
 			}
 			
 			o <- order(C,
@@ -592,14 +618,14 @@ Clusterize <- function(myXStringSet,
 			r[r] <- seq_along(r) # rank
 			
 			w <- which(d != 0) # only update positions that could have moved
-			var[w] <- alpha*abs(R[w] - r[w])*keep[w] + (1 - alpha)*var[w] # exponential moving average of change in rank order
-			avg_cor <- sum(var < maxComparisons/2)/l # exponential moving average of fraction stabilized in rank order
+			var[w] <- alpha*abs(R[w] - r[w]) + (1 - alpha)*var[w] # exponential moving average of change in rank order
+			avg_cor <- sum(var*keep < avgComparisons/2)/l # exponential moving average of fraction stabilized in rank order
 			
 			O <- o
 			R <- r
 			
 			for (k in which(inPlay)) {
-				if (all(var[G[[k]]] < maxComparisons/2)) {
+				if (all(var[G[[k]]] < avgComparisons/2)) {
 					inPlay[k] <- FALSE # 100% stability
 				} else if (sum(keep[G[[k]]]) < 2) {
 					inPlay[k] <- FALSE # no more pairs
@@ -623,7 +649,13 @@ Clusterize <- function(myXStringSet,
 			avg_cor >= 0.9995) # rounds to 100%
 			break # reached rank order stability
 	}
-	optProcessors2 <- which.min(resTime2)
+	if (maxReps > 0L) {
+		optProcessors2 <- which.min(resTime2)
+	} else {
+		optProcessors1 <- optProcessors2 <- processors
+		O <- R <- seq_along(u)
+		rS <- numeric(length(O))
+	}
 	
 	# fit conversion from approximate to actual similarity
 	ksims <- unlist(ksims)
@@ -632,30 +664,52 @@ Clusterize <- function(myXStringSet,
 	ksims <- ksims[w]
 	psims <- psims[w]
 	interval <- ceiling(interval*length(ksims))
-	power <- optimize(function(power)
-			sum(abs(interval - sum(psims < ksims^power))),
-		c(0.01, 1))$minimum
-	limits <- cutoff^(1/power)
+	if (interval < minSimilarities) {
+		limits <- numeric(length(cutoff)) # no limit
+	} else {
+		psims <- psims - 1
+		ksims <- ksims - 1
+		slope <- sum(psims*ksims)/sum(psims^2)
+		delta <- 10
+		while (delta > 0.0001) {
+			temp <- slope + delta
+			if (interval > sum(ksims >= temp*(psims - buffer))) {
+				slope <- temp
+			} else {
+				delta <- delta/2
+			}
+		}
+		limits <- slope*(cutoff - 1) + 1 - slope*buffer
+	}
+	
+	var[var > maxComparisons] <- maxComparisons
+	var <- var[O]/mean(var) # normalized variability
+	bL <- seq_len(l) - as.integer(var*(avgComparisons/2))
+	bR <- seq_len(l) + as.integer(var*(avgComparisons/2))
+	bL[bL < 1L] <- 1L
+	bR[bR > l] <- l
 	
 	if (verbose) {
-		cat("\riteration ",
-			i,
-			" of up to ",
-			maxReps,
-			" (",
-			formatC(100*avg_cor, digits=1, format="f"),
-			"% stability) ",
-			sep="")
-		
-		time.2 <- Sys.time()
-		cat("\n\n")
-		print(round(difftime(time.2,
-			time.1,
-			units='secs'),
-			digits=2))
-		cat("\n")
-		
-		time.1 <- time.2
+		if (maxReps > 0L) {
+			cat("\riteration ",
+				i,
+				" of up to ",
+				maxReps,
+				" (",
+				formatC(100*avg_cor, digits=1, format="f"),
+				"% stability) ",
+				sep="")
+			
+			time.2 <- Sys.time()
+			cat("\n\n")
+			print(round(difftime(time.2,
+				time.1,
+				units='secs'),
+				digits=2))
+			cat("\n")
+			
+			time.1 <- time.2
+		}
 		lastValue <- 0
 		cat("Clustering sequences by similarity:\n",
 			sep="")
@@ -663,8 +717,24 @@ Clusterize <- function(myXStringSet,
 		pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 	}
 	
+	# use slope of relative distance as a tie-breaker
+	if (length(rS) >= 4L) {
+		rS <- rS[O]
+		count <- 0L
+		for (i in rev(seq_along(ls))) { # groups reversed because sorted decreasing
+			s <- (count + 1L):(count + ls[i])
+			S <- smooth.spline(rS[s],
+				spar=0.5)
+			rS[s] <- predict(S,
+				x=seq_along(s),
+				deriv=1L)$y
+			count <- count + ls[i]
+		}
+	}
+	
 	P <- order(sizes[O],
 		t[O],
+		rS,
 		decreasing=TRUE,
 		method="radix")
 	P <- O[P]
@@ -675,24 +745,11 @@ Clusterize <- function(myXStringSet,
 			P <- order(c[u, i - 1][O],
 				sizes[O],
 				t[O],
+				rS,
 				decreasing=TRUE,
 				method="radix")
 			P <- O[P]
 			Q <- R[P]
-		}
-		
-		bL <- bR <- integer(l)
-		k <- 1L
-		for (j in seq_len(l)) {
-			while (j - k >= maxComparisons)
-				k <- k + 1L
-			bL[j] <- k
-		}
-		k <- l
-		for (j in l:1) {
-			while (k - j >= maxComparisons)
-				k <- k - 1L
-			bR[j] <- k
 		}
 		
 		v <- V[P] # reorder k-mers
@@ -707,7 +764,7 @@ Clusterize <- function(myXStringSet,
 		}
 		seeds.index <- integer(l)
 		seeds.index[Q[1L]] <- 1L
-		recent <- integer(maxComparisons)
+		recent <- integer(avgComparisons)
 		count <- 1L
 		recent[count] <- 1L
 		
@@ -729,7 +786,7 @@ Clusterize <- function(myXStringSet,
 					if (invertCenters)
 						c[p[j], i] <- -c[p[j], i]
 					seeds.index[Q[j]] <- j
-					recent <- integer(maxComparisons)
+					recent <- integer(avgComparisons)
 					count <- 1L
 					recent[count] <- j
 					next
@@ -743,14 +800,10 @@ Clusterize <- function(myXStringSet,
 				}
 			}
 			
-			compare <- bL[Q[j]]:bR[Q[j]]
-			if (j > maxComparisons) {
-				compare <- c(compare, # surrounding centers
-					Q[recent]) # most recent centers
-			} else {
-				compare <- c(compare, # surrounding centers
-					Q[recent]) # most recent centers
-			}
+			compare <- Q[recent] # most recent centers
+			compare <- compare[.Call("radixOrder", abs(Q[j] - compare), 1L, PACKAGE="DECIPHER")] # order by proximity
+			compare <- c(bL[Q[j]]:bR[Q[j]], # surrounding centers
+				compare)
 			compare <- compare[seeds.index[compare] != 0L]
 			if (!ASC && i > 1) { # check bounds
 				if (invertCenters) {
@@ -766,17 +819,50 @@ Clusterize <- function(myXStringSet,
 					c[p[j], i] <- -c[p[j], i]
 				seeds.index[Q[j]] <- j
 				count <- count + 1L
-				if (count > maxComparisons)
+				if (count > avgComparisons)
 					count <- 1L
 				recent[count] <- j
 				next
 			}
-			
+			compare <- head(compare, bR[Q[j]] - bL[Q[j]] + 1L)
 			compare <- compare[!duplicated(seeds.index[compare])]
-			compare <- head(compare, maxComparisons)
-			res <- overlap(j, seeds.index[compare], optProcessors1)
-			m <- similarity(res, wu[P[j]], wu[P[seeds.index[compare]]], optProcessors1)
-			w <- head(order(m, decreasing=TRUE), maxAlignments)
+			
+			counts <- countHits(j, seeds.index[compare], optProcessors1)
+			s <- .Call("radixOrder", counts, 0L, PACKAGE="DECIPHER")
+			m <- numeric(length(s))
+			res <- vector("list", length(s))
+			batches <- seq.int(0L, length(s), batchSize)
+			if (batches[length(batches)] < length(s))
+				batches <- c(batches, length(s))
+			for (k in seq_len(length(batches) - 1L)) {
+				b <- (batches[k] + 1L):batches[k + 1L]
+				r <- overlap(j, seeds.index[compare[s[b]]], optProcessors1)
+				M <- similarity(r, wu[P[j]], wu[P[seeds.index[compare[s[b]]]]], optProcessors1)
+				res[s[b]] <- r
+				m[s[b]] <- M
+				if (any(M >= cutoff[i])) # met similarity threshold
+					break
+				if (k < length(batches) - 1L) {
+					# check for plausibility of reaching limit
+					upper <- max(M)
+					if (upper < limits[i] &&
+						length(M) == batchSize &&
+						upper + 2*sd(M) < limits[i])
+						break # unlikely to reach limit
+					# check for shift to lower similarities
+					if (k == 1L) {
+						lower <- min(M)
+					} else {
+						if (lower > upper)
+							break # unlikely to exceed previous
+					}
+				}
+			}
+			
+			b <- seq_len(batches[k + 1L])
+			w <- s[sort.list(m[s[b]], method="radix", decreasing=TRUE)]
+			if (length(w) > maxAlignments)
+				w <- w[seq_len(maxAlignments)]
 			W <- which(m[w] >= limits[i])
 			if (length(W) >= minAlignments) {
 				w <- w[W]
@@ -819,7 +905,7 @@ Clusterize <- function(myXStringSet,
 					c[p[j], i] <- -c[p[j], i]
 				seeds.index[Q[j]] <- j
 				count <- count + 1L
-				if (count > maxComparisons)
+				if (count > avgComparisons)
 					count <- 1L
 				recent[count] <- j
 			} else { # part of an existing group
@@ -842,6 +928,7 @@ Clusterize <- function(myXStringSet,
 	myClusters <- as.data.frame(c)
 	
 	if (verbose) {
+		setTxtProgressBar(pBar, 1)
 		close(pBar)
 		time.2 <- Sys.time()
 		cat("\n")

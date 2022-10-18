@@ -177,7 +177,7 @@ SEXP sphericalKmeans(SEXP X, SEXP Y, SEXP Kmeans, SEXP tolerance, SEXP maxIterat
 		rans[i]++; // start from 1
 	
 	if (v != 0)
-		Rprintf("\riteration %d (100%% stability)  \n\n", it);
+		Rprintf("\riteration %d (%1.1f%% stability)  \n\n", it, 100*(1 - (double)count/(double)n));
 	
 	UNPROTECT(1);
 	

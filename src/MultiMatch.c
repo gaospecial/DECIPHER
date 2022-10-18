@@ -971,9 +971,12 @@ SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP wordSize, SEXP nThreads)
 	}
 	
 	int maxX = 0;
-	for (i = 0; i < lx; i++)
+	int *ox = (int *) malloc(lx*sizeof(int)); // thread-safe on Windows
+	for (i = 0; i < lx; i++) {
 		if (OX[i] > maxX)
 			maxX = OX[i];
+		ox[i] = OX[i] - 1;
+	}
 	
 	int **pt = (int **) calloc(l, sizeof(int *)); // initialized to zero (thread-safe on Windows)
 	int *N = (int *) calloc(l, sizeof(int)); // initialized to zero (thread-safe on Windows)
@@ -989,7 +992,7 @@ SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP wordSize, SEXP nThreads)
 		k = 0;
 		while (j < lx && k < ly[i]) {
 			if (X[j] == Y[k]) {
-				m[OX[j] - 1] = OY[k];
+				m[ox[j]] = OY[k];
 				j++;
 				k++;
 			} else if (X[j] < Y[k]) {
@@ -1002,14 +1005,17 @@ SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP wordSize, SEXP nThreads)
 		// count the number of anchors
 		n = 0;
 		new = 1;
+		int one, two;
 		for (j = 0; j < maxX; j++) {
-			if (m[j] > 0) {
+			two = m[j];
+			if (two > 0) {
 				if (new) {
 					new = 0;
 					n++;
-				} else if (m[j] != m[j - 1] + 1) {
+				} else if (two != one) {
 					n++;
 				}
+				one = two + 1;
 			} else {
 				new = 1;
 			}
@@ -1019,19 +1025,21 @@ SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP wordSize, SEXP nThreads)
 		t = (int *) malloc(3*n*sizeof(int)); // thread-safe on Windows
 		k = -1;
 		new = 1;
+		p = -1;
 		for (j = 0; j < maxX; j++) {
-			if (m[j] > 0) {
+			two = m[j];
+			if (two > 0) {
 				if (new ||
-					m[j] != m[j - 1] + 1) {
+					two != one) {
 					new = 0;
 					k++;
-					p = 0 + 3*k;
-					t[p++] = j + 1;
-					t[p++] = m[j];
-					t[p] = wS;
+					t[++p] = j + 1;
+					t[++p] = m[j];
+					t[++p] = wS;
 				} else {
 					t[p]++;
 				}
+				one = two + 1;
 			} else {
 				if (k == n - 1)
 					break;
@@ -1118,6 +1126,7 @@ SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP wordSize, SEXP nThreads)
 		
 		keeps[i] = keep;
 	}
+	free(ox);
 	free(pY);
 	free(pOY);
 	free(ly);
@@ -1172,4 +1181,55 @@ SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP wordSize, SEXP nThreads)
 	UNPROTECT(1);
 	
 	return ret_list;
+}
+
+// count of hits between indicies x (length == 1) and y (length >= 1)
+SEXP countOverlap(SEXP x, SEXP y, SEXP v, SEXP nThreads)
+{
+	int i, j, k, lx, *I, *X;
+	
+	int i1 = asInteger(x) - 1;
+	I = INTEGER(y);
+	X = INTEGER(VECTOR_ELT(VECTOR_ELT(v, i1), 0));
+	lx = length(VECTOR_ELT(VECTOR_ELT(v, i1), 0));
+	int l = length(y);
+	int nthreads = asInteger(nThreads);
+	
+	int **pY = (int **) malloc(l*sizeof(int *)); // thread-safe on Windows
+	int *ly = (int *) malloc(l*sizeof(int)); // thread-safe on Windows
+	
+	for (i = 0; i < l; i++) {
+		pY[i] = INTEGER(VECTOR_ELT(VECTOR_ELT(v, I[i] - 1), 0));
+		ly[i] = length(VECTOR_ELT(VECTOR_ELT(v, I[i] - 1), 0));
+	}
+	
+	SEXP ans;
+	PROTECT(ans = allocVector(INTSXP, l));
+	int *res = INTEGER(ans);
+	
+	#pragma omp parallel for private(i,j,k) schedule(guided) num_threads(nthreads)
+	for (i = 0; i < l; i++) {
+		int *Y = pY[i];
+		
+		j = 0;
+		k = 0;
+		res[i] = 0;
+		while (j < lx && k < ly[i]) {
+			if (X[j] == Y[k]) {
+				res[i]++;
+				j++;
+				k++;
+			} else if (X[j] < Y[k]) {
+				j++;
+			} else {
+				k++;
+			}
+		}
+	}
+	free(pY);
+	free(ly);
+	
+	UNPROTECT(1);
+	
+	return ans;
 }

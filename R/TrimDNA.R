@@ -141,7 +141,7 @@ TrimDNA <- function(myDNAStringSet,
 		if (verbose) {
 			n <- length(left) - length(x) - n
 			cat(round(n/length(left)*100, 1),
-				"% flanking\n\n",
+				"% flanking\n",
 				sep="")
 			flush.console()
 		}
@@ -154,8 +154,7 @@ TrimDNA <- function(myDNAStringSet,
 	lefts[] <- 1L
 	for (k in which(nchar(leftPatterns) >= minOverlap)) {
 		if (verbose) {
-			cat(ifelse(k==1, "", "\n"),
-				"Finding left pattern",
+			cat("Finding left pattern",
 				ifelse(length(leftPatterns) > 1,
 					paste(" (#", k, "): ", sep=""),
 					": "),
@@ -183,7 +182,8 @@ TrimDNA <- function(myDNAStringSet,
 	rights <- width(myDNAStringSet)
 	for (k in which(nchar(rightPatterns) >= minOverlap)) {
 		if (verbose) {
-			cat("Finding right pattern",
+			cat(ifelse(k == 1L && any(nchar(leftPatterns) >= minOverlap), "\n", ""),
+				"Finding right pattern",
 				ifelse(length(rightPatterns) > 1,
 					paste(" (#", k, "): ", sep=""),
 					": "),
@@ -199,7 +199,10 @@ TrimDNA <- function(myDNAStringSet,
 	
 	if (!is.null(quality)) {
 		if (verbose) {
-			cat("Trimming by quality score: ")
+			cat(ifelse(any(nchar(leftPatterns) >= minOverlap) ||
+				any(nchar(rightPatterns) >= minOverlap), "\n", ""),
+				"Trimming by quality score: ",
+				sep="")
 			flush.console()
 		}
 		bounds <- .Call("movAvg",
@@ -220,7 +223,7 @@ TrimDNA <- function(myDNAStringSet,
 			cat(100*round(length(wl)/length(lefts), 1),
 				"% left, ",
 				100*round(length(wr)/length(rights), 1),
-				"% right\n\n",
+				"% right\n",
 				sep="")
 			flush.console()
 		}
@@ -262,6 +265,7 @@ TrimDNA <- function(myDNAStringSet,
 	
 	if (verbose) {
 		time.2 <- Sys.time()
+		cat("\n")
 		print(round(difftime(time.2,
 			time.1,
 			units='secs'),

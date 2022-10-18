@@ -880,7 +880,8 @@ SEXP similarities(SEXP res, SEXP widths1, SEXP widths2, SEXP terminalGaps, SEXP 
 			t1 = w1 - r[(n - 1)*4 + 1]; // remaining positions in 1
 			t2 = w2[i] - r[(n - 1)*4 + 3]; // remaining positions in 2
 			
-			if (global) {
+			if (global &&
+				pGapLetters == 1) {
 				if (mode == 1) { // overlap
 					if (p1 >= p2) {
 						o = 1;
@@ -917,7 +918,8 @@ SEXP similarities(SEXP res, SEXP widths1, SEXP widths2, SEXP terminalGaps, SEXP 
 			}
 			
 			if (coverage > 0 ||
-				global == 0) {
+				global == 0 ||
+				pGapLetters != 1) {
 				if (t1 > t2) {
 					t1 = t1 - t2;
 					t2 = 0;
@@ -928,43 +930,49 @@ SEXP similarities(SEXP res, SEXP widths1, SEXP widths2, SEXP terminalGaps, SEXP 
 					t1 = 0;
 					t2 = 0;
 				}
+				if (global && pGapLetters != 0) { // pGapLetters = NA
+					count = (t1 != t2) + (p1 != p2);
+				} else {
+					count = 0;
+				}
 				if (p1 <= p2 && t1 <= t2) { // 1 within 2
 					OV = w1;
-					if (global == 0)
+					if (global == 0 || pGapLetters != 1)
 						o = 1;
 				} else if (p2 <= p1 && t2 <= t1) { // 2 within 1
 					OV = w2[i];
-					if (global == 0)
+					if (global == 0 || pGapLetters != 1)
 						o = 2;
 				} else if (p1 > p2) { // end of 1 overlaps start of 2
 					if (w1 - p1 + p2 > w2[i] - t2) {
 						OV = w1 - p1 + p2;
-						if (global == 0)
+						if (global == 0 || pGapLetters != 1)
 							o = 1;
 					} else {
 						OV = w2[i] - t2;
-						if (global == 0)
+						if (global == 0 || pGapLetters != 1)
 							o = 2;
 					}
 				} else { // end of 2 overlaps start of 1
 					if (w2[i] - p2 + p1 > w1 - t1) {
 						OV = w2[i] - p2 + p1;
-						if (global == 0)
+						if (global == 0 || pGapLetters != 1)
 							o = 2;
 					} else {
 						OV = w1 - t1;
-						if (global == 0)
+						if (global == 0 || pGapLetters != 1)
 							o = 1;
 					}
 				}
 				
-				if (global == 0) // only the overlapping region
+				if (global == 0 || pGapLetters != 1)
 					ov = OV;
+			} else {
+				count = 0;
 			}
 			
 			g1 = 0;
 			g2 = 0;
-			count = 0;
 			if (n > 1) {
 				for (j = 1; j < n; j++) {
 					g = r[j*4 + 2] - r[(j - 1)*4 + 3] - r[j*4] + r[(j - 1)*4 + 1];
@@ -996,15 +1004,15 @@ SEXP similarities(SEXP res, SEXP widths1, SEXP widths2, SEXP terminalGaps, SEXP 
 					}
 				} else if (pGapLetters == 0) {
 					if (o == 1) {
-						rans[i] = ((double)(s - g1))/(double)ov;
+						rans[i] = (double)s/((double)(ov + g1));
 					} else {
-						rans[i] = ((double)(s - g2))/(double)ov;
+						rans[i] = (double)s/((double)(ov + g2));
 					}
 				} else {
 					if (o == 1) {
-						rans[i] = (double)s/((double)(ov + count));
+						rans[i] = (double)s/((double)(ov + count + g1));
 					} else {
-						rans[i] = (double)s/((double)(ov + count));
+						rans[i] = (double)s/((double)(ov + count + g2));
 					}
 				}
 			}
@@ -1018,4 +1026,70 @@ SEXP similarities(SEXP res, SEXP widths1, SEXP widths2, SEXP terminalGaps, SEXP 
 	UNPROTECT(1);
 	
 	return ans;
+}
+
+// difference in overlap between pairs
+SEXP overlap(SEXP res, SEXP widths1, SEXP widths2)
+{
+	int i, l, *x;
+	int w1 = asInteger(widths1);
+	int *w2 = INTEGER(widths2);
+	int n = length(res);
+	
+	SEXP ans;
+	PROTECT(ans = allocVector(INTSXP, n));
+	int *rans = INTEGER(ans);
+	
+	for (i = 0; i < n; i++) {
+		x = INTEGER(VECTOR_ELT(res, i)); // matrix of anchor ranges
+		l = length(VECTOR_ELT(res, i)); // a multiple of 4
+		
+		rans[i] = 1;
+		if (l == 0) {
+			rans[i] += w1 + w2[i];
+		} else {
+			if (x[0] > x[2]) {
+				rans[i] += x[0] - x[2];
+			} else {
+				rans[i] += x[2] - x[0];
+			}
+			int one = w1 - x[l - 3];
+			int two = w2[i] - x[l - 1];
+			if (two > one) {
+				rans[i] += two - one;
+			} else {
+				rans[i] += one - two;
+			}
+		}
+	}
+	
+	UNPROTECT(1);
+	
+	return ans;
+}
+
+// in-place addition of cophenetic distances
+SEXP cophenetic(SEXP Index1, SEXP Index2, SEXP N, SEXP D, SEXP H)
+{
+	int i, j, val;
+	int *I = INTEGER(Index1);
+	int *J = INTEGER(Index2);
+	int l1 = length(Index1);
+	int l2 = length(Index2);
+	int n = asInteger(N);
+	double *d = REAL(D);
+	double h = asReal(H);
+	
+	for (i = 0; i < l1; i++) {
+		for (j = 0; j < l2; j++) {
+			if (I[i] < J[j]) {
+				val = n*(I[i] - 1) - I[i]*(I[i] - 1)/2 + J[j] - I[i] - 1;
+			} else {
+				val = n*(J[j] - 1) - J[j]*(J[j] - 1)/2 + I[i] - J[j] - 1;
+			}
+			d[val] += h;
+		}
+	}
+	
+	return D;
 }

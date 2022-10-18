@@ -112,15 +112,16 @@ MaskAlignment <- function(myXStringSet,
 	
 	gaps <- which(cm > maxFractionGaps)
 	
-	if (windowSize*2 + 1 > length(a) - length(gaps))
-		stop("windowSize is too large.")
-	
-	if (length(gaps) > 0) {
-		a2 <- a[-gaps]
-		c <- .centerPoint(a2, windowSize)
+	if (windowSize*2 + 1 > length(a) - length(gaps)) {
+		a2 <- c <- numeric()
 	} else {
-		a2 <- a
-		c <- .centerPoint(a2, windowSize)
+		if (length(gaps) > 0) {
+			a2 <- a[-gaps]
+			c <- .centerPoint(a2, windowSize)
+		} else {
+			a2 <- a
+			c <- .centerPoint(a2, windowSize)
+		}
 	}
 	
 	W <- which(c < threshold)

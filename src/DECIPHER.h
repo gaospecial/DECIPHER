@@ -34,6 +34,10 @@ SEXP firstSeqsPosEqual(SEXP x, SEXP y, SEXP start_x, SEXP end_x, SEXP start_y, S
 
 SEXP similarities(SEXP res, SEXP widths1, SEXP widths2, SEXP terminalGaps, SEXP penalizeGapLetters, SEXP minCoverage, SEXP method, SEXP nThreads);
 
+SEXP overlap(SEXP res, SEXP widths1, SEXP widths2);
+
+SEXP cophenetic(SEXP Index1, SEXP Index2, SEXP N, SEXP D, SEXP H);
+
 // Cluster.c
 
 SEXP cluster(SEXP x, SEXP cutoff, SEXP method, SEXP l, SEXP verbose, SEXP pBar, SEXP nThreads);
@@ -91,6 +95,8 @@ SEXP matchListsDual(SEXP x, SEXP y, SEXP verbose, SEXP pBar, SEXP nThreads);
 SEXP groupMax(SEXP x, SEXP y, SEXP z);
 
 SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP wordSize, SEXP nThreads);
+
+SEXP countOverlap(SEXP x, SEXP y, SEXP v, SEXP nThreads);
 
 // ReplaceChars.c
 
@@ -200,7 +206,7 @@ SEXP findFrameshifts(SEXP t, SEXP l, SEXP f, SEXP index, SEXP oindex, SEXP maxCo
 
 // Order.c
 
-SEXP radixOrder(SEXP x, SEXP startAt);
+SEXP radixOrder(SEXP x, SEXP ascending);
 
 // ChainSegments.c
 

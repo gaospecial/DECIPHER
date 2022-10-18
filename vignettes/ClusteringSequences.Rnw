@@ -126,7 +126,7 @@ Now you can choose how to parameter\emph{ize} the function, with the only requir
 
 We must also choose whether to custom\emph{ize} the calculation of distance. The defaults will penal\emph{ize} gaps as single events, such that each consecutive set of gaps (i.e., insertion or deletion) is considered equivalent to one mismatch. If you want to standard\emph{ize} the definition of distance to be the same as most other clustering programs then set: \Rfunarg{penalizeGapLetterMatches} to \code{TRUE} (i.e., every gap position is a mismatch), \Rfunarg{method} to \code{"shortest"}, \Rfunarg{minCoverage} to \code{0}, and \Rfunarg{includeTerminalGaps} to \code{TRUE}.
 
-We can further personal\emph{ize} the inputs as desired. The main function argument to emphas\emph{ize} is \Rfunarg{processors}, which controls whether the function is parallelized on multiple computer threads. Setting \Rfunarg{processors} to a value greater than \code{1} will speed up clustering considerably, especially for large s\emph{ize} clustering problems. Once we are ready, it's time to run \Rfunction{Clusterize} and wait for the output to material\emph{ize}!
+We can further personal\emph{ize} the inputs as desired. The main function argument to emphas\emph{ize} is \Rfunarg{processors}, which controls whether the function is parallelized on multiple computer threads (if \Rpackage{DECIPHER}) was built with OpenMP enabled). Setting \Rfunarg{processors} to a value greater than \code{1} will speed up clustering considerably, especially for large s\emph{ize} clustering problems. Once we are ready, it's time to run \Rfunction{Clusterize} and wait for the output to material\emph{ize}!
 
 <<expr3,eval=TRUE>>=
 clusters <- Clusterize(seqs, cutoff=seq(0.5, 0, -0.1), processors=1)

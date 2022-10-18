@@ -24,7 +24,7 @@ TrimDNA(myDNAStringSet,
 }
 \arguments{
   \item{myDNAStringSet}{
-A \code{DNAStringSet} object containing the sequences to be trimmed.
+A \code{DNAStringSet} or \code{QualityScaledDNAStringSet} object containing the sequences to be trimmed.  If \code{"type"} is \code{"sequences"} then the output class will match the class of \code{myXStringSet}.  Note that the qualities of a \code{QualityScaledDNAStringSet} are ignored because the \code{quality} argument must be supplied separately.
 }
   \item{leftPatterns}{
 A \code{DNAStringSet} or character vector of patterns to remove from the left side of \code{myDNAStringSet}, or \code{""} to prevent trimming patterns on the left.
@@ -69,10 +69,10 @@ Logical indicating whether to display progress.
 \details{
 After a sequencing run, it is often necessary to trim the resulting sequences to the high quality region located between a set of patterns.  \code{TrimDNA} works as follows:  first left and right patterns are identified within the sequences if \code{allowInternal} is \code{TRUE} (the default).  If the patterns are not found internally, then a search is conducted at the flanking ends for patterns that partially overlap the sequence.  The region between the \code{leftPatterns} and \code{rightPatterns} is then returned, unless quality information is provided.  Note that the patterns must be in the same orientation as the sequence, which may require using the \code{reverseComplement} of a PCR primer.
 
-If \code{quality} contains quality scores, these are converted to error probabilities and an exponential moving average is applied to smooth the signal.  The longest region between the \code{leftPatterns} and \code{rightPatterns} where the average error probability is below \code{threshold} is then returned, so long as it has an average error rate of at most \code{maxAverageError}.  Note that it is possible to only filter by \code{maxAverageError} by setting \code{threshold} to \code{1}, or vise-versa by setting \code{maxAverageError} to \code{threshold}.
+If \code{quality} contains quality scores, these are converted to error probabilities and an exponential moving average is applied to smooth the signal.  The longest region between the \code{leftPatterns} and \code{rightPatterns} where the average error probability is below \code{threshold} is then returned, so long as it has an average error rate of at most \code{maxAverageError}.  Note that it is possible to only filter by \code{maxAverageError} by setting \code{threshold} to \code{1}, or vise-versa by setting \code{maxAverageError} to the same value as \code{threshold}.
 }
 \value{
-\code{TrimDNA} can return two \code{type}s of results: \code{IRanges} that can be used for trimming \code{myDNAStringSet}, or a trimmed \code{DNAStringSet} containing only those sequences over \code{minWidth} nucleotides after trimming.  Note that ambiguity codes (\code{IUPAC_CODE_MAP}) are supported in the \code{leftPatterns} and \code{rightPatterns}, but not in \code{myDNAStringSet} to prevent trivial matches (e.g., runs of N's).
+\code{TrimDNA} can return two \code{type}s of results: \code{IRanges} that can be used for trimming \code{myDNAStringSet}, or a trimmed \code{DNAStringSet} or \code{QualityScaledDNAStringSet} containing only those sequences over \code{minWidth} nucleotides after trimming.  Note that ambiguity codes (\code{IUPAC_CODE_MAP}) are supported in the \code{leftPatterns} and \code{rightPatterns}, but not in \code{myDNAStringSet} to prevent trivial matches (e.g., runs of N's).
 
 If \code{type} is \code{"ranges"} (the default) the output is an \code{IRanges} object with the start, end, and width of every sequence.  This information can be accessed with the corresponding accessor function (see examples below).  Note that the start will be \code{1} and the end will be \code{0} for sequences that were not at least \code{minWidth} nucleotides after trimming.
 
@@ -103,17 +103,19 @@ x[[1]]
 start(x[[1]])
 end(x[[1]])
 width(x[[1]])
-
+subseq(dna, start(x[[1]]), end(x[[1]]))
 x[[2]]
 
 # example of trimming a FASTQ file by quality scores
 fpath <- system.file("extdata",
 	"s_1_sequence.txt",
 	package="Biostrings")
-reads <- readDNAStringSet(fpath, "fastq", with.qualities=TRUE)
-TrimDNA(reads,
+reads <- readQualityScaledDNAStringSet(fpath)
+trimmed <- TrimDNA(reads,
 	leftPatterns="",
 	rightPatterns="",
 	type="sequences",
-	quality=PhredQuality(mcols(reads)$qualities))
+	quality=quality(reads))
+trimmed
+DNAStringSet(trimmed) # drop the qualities
 }

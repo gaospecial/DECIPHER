@@ -8,8 +8,10 @@ FindNonCoding <- function(x,
 	# error checking
 	if (!is(myXStringSet, "DNAStringSet") && !is(myXStringSet, "RNAStringSet"))
 		stop("myXStringSet must be a DNAStringSet or RNAStringSet.")
-	if (length(myXStringSet)==0)
+	if (length(myXStringSet) == 0L)
 		stop("myXStringSet must contain sequences.")
+	if (sum(width(myXStringSet)) > 1073741823L)
+		stop("Total length of sequences in myXStringSet is too long.")
 	if (is(x, "list")) {
 		if (any(unlist(lapply(x, class)) != "NonCoding"))
 			stop("x must be an object of class 'NonCoding'.")

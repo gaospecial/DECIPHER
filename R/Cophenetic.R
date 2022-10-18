@@ -6,10 +6,6 @@ Cophenetic <- function(x) {
 	
 	n <- attr(x, "members")
 	d <- numeric(n*(n - 1)/2)
-	class(d) <- "dist"
-	attr(d, "Size") <- n
-	attr(d, "Diag") <- TRUE
-	attr(d, "Upper") <- TRUE
 	u <- unlist(x)
 	o <- order(u)
 	u <- u[o]
@@ -17,7 +13,6 @@ Cophenetic <- function(x) {
 		function(x)
 			attr(x, "label"))
 	labs <- labs[o]
-	attr(d, "Labels") <- labs
 	x <- rapply(x,
 		function(y) {
 			y[] <- match(y[1L], u)
@@ -41,16 +36,13 @@ Cophenetic <- function(x) {
 					h <- attr(stack[[pos]], "height") - attr(stack[[pos]][[k]], "height")
 					I <- unlist(stack[[pos]][[k]])
 					J <- seq_len(n)[-I]
-					for (i in I) {
-						for (j in J) {
-							if (i < j) {
-								val <- n*(i - 1) - i*(i - 1)/2 + j - i
-							} else {
-								val <- n*(j - 1) - j*(j - 1)/2 + i - j
-							}
-							d[val] <<- d[val] + h
-						}
-					}
+					d <- .Call("cophenetic", # in-place change of d (requires previous temporary copy)
+						I,
+						J,
+						n,
+						d,
+						h,
+						PACKAGE="DECIPHER")
 				}
 				
 				# replace self in parent
@@ -74,6 +66,11 @@ Cophenetic <- function(x) {
 		return(stack[[1L]])
 	}
 	.dist(x)
+	class(d) <- "dist"
+	attr(d, "Size") <- n
+	attr(d, "Diag") <- TRUE
+	attr(d, "Upper") <- TRUE
+	attr(d, "Labels") <- labs
 	
 	return(d)
 }

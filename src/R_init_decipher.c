@@ -160,6 +160,9 @@ static const R_CallMethodDef callMethods[] = { // method call, pointer, num args
 	{"frequencies", (DL_FUNC) &frequencies, 2},
 	{"frequenciesReducedAA", (DL_FUNC) &frequenciesReducedAA, 3},
 	{"sphericalKmeans", (DL_FUNC) &sphericalKmeans, 7},
+	{"overlap", (DL_FUNC) &overlap, 3},
+	{"countOverlap", (DL_FUNC) &countOverlap, 4},
+	{"cophenetic", (DL_FUNC) &cophenetic, 5},
 	{NULL, NULL, 0}
 };
 
