@@ -160,15 +160,16 @@
 
 PredictDBN <- function(myXStringSet,
 	type="states",
-	minOccupancy=0.5,
+	minOccupancy=0.4,
 	impact=c(1, 1.2, 0.4, -1),
 	avgProdCorr=1,
 	slope=2,
 	shift=1.3,
-	threshold=0.3,
+	threshold=0.4,
 	pseudoknots=1,
 	weight=NA,
 	useFreeEnergy=TRUE,
+	deltaGrules=NULL,
 	processors=1,
 	verbose=TRUE) {
 	
@@ -262,13 +263,15 @@ PredictDBN <- function(myXStringSet,
 			pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
 		}
 		
-		ions <- 1
-		temp <- 37
-		data("deltaHrulesRNA", envir=environment(), package="DECIPHER")
-		data("deltaSrulesRNA", envir=environment(), package="DECIPHER")
-		deltaSrulesRNA <- deltaSrulesRNA + 0.368*log(ions)/1000
-		deltaGrulesRNA <- deltaHrulesRNA - (273.15 + temp)*deltaSrulesRNA
-		max_dG <- 4.065225 # 3.6 - (273.15 + temp)*(-1.5/1000 + 0.368*log(ions)/1000)
+		if (is.null(deltaGrules)) {
+			data("deltaGrulesRNA", envir=environment(), package="DECIPHER")
+			deltaGrules <- deltaGrulesRNA
+		} else {
+			if (!is.numeric(deltaGrules))
+				stop("deltaGrules must be numeric.")
+			if (length(deltaGrules) != 390625L)
+				stop("deltaGrules must be of dimensions 5 x 5 x 5 x 5 x 5 x 5 x 5 x 5.")
+		}
 		
 		pos <- as.matrix(myXStringSet)
 		pos <- lapply(seq_len(nrow(pos)),
@@ -286,77 +289,78 @@ PredictDBN <- function(myXStringSet,
 				allow.wobble=TRUE)
 			
 			dna <- DNAStringSet(pals)
+			s1 <- as.character(subseq(dna, 1L, 1L))
+			e1 <- as.character(subseq(dna, -1L))
+			w <- which((s1 == "A" & e1 == "T") |
+				(s1 == "T" & e1 == "A") |
+				(s1 == "C" & e1 == "G") |
+				(s1 == "G" & e1 == "C") |
+				(s1 == "G" & e1 == "T") |
+				(s1 == "T" & e1 == "G"))
+			pals <- pals[w]
+			dna <- dna[w]
+			
 			arms <- palindromeArmLength(dna,
+				max.mismatch=0,
+				allow.wobble=TRUE)
+			arms1 <- palindromeArmLength(dna,
 				max.mismatch=1,
 				allow.wobble=TRUE)
+			w <- which(arms + 1L != arms1)
+			if (length(w) > 0)
+				arms[w] <- arms1[w] # mismatch not at end
 			max_arms <- as.integer((width(pals) - 3)/2)
-			arms <- ifelse(arms > max_arms,
-				max_arms,
-				arms)
+			w <- which(arms > max_arms)
+			if (length(w) > 0)
+				arms[w] <- max_arms[w]
 			
 			s1 <- start(pals)
 			s2 <- start(pals) + arms - 1L
 			e1 <- end(pals) - arms + 1L
 			e2 <- end(pals)
+			p <- pos[[i]]
+			
+			w <- which(width(dna) - 3L > 2L*arms)
+			arms[w] <- arms[w] + 1L # include end bases
 			
 			dG <- .Call("calculateHairpinDeltaG",
 				dna,
-				arms + 1L, # include end bases
+				arms,
 				deltaGrulesRNA,
 				PACKAGE="DECIPHER")
 			o <- order(dG)
-			o <- o[dG[o] <= max_dG]
+			o <- o[dG[o] < 0]
+			dG <- dG/mean(dG[o][seq_len(sum(cumsum(arms[o]) < length(p)))])
+			dG <- 1 - exp(-dG) # convert to probability
 			
-			if (length(o) > 0) {
-				p <- pos[[i]]
-				row <- col <- integer(100)
-				count <- 0L
-				r <- c <- logical(length(p))
-				for (j in o) {
-					cont <- .Call("allZero",
-						r,
-						c,
-						s1[j],
-						s2[j],
-						e2[j],
-						e1[j],
-						PACKAGE="DECIPHER")
-					if (cont) {
-						p1 <- s1[j]:s2[j]
-						p2 <- e2[j]:e1[j]
-						r[p1] <- TRUE
-						c[p2] <- TRUE
-						p1 <- p[p1]
-						p2 <- p[p2]
-						index <- (count + 1L):(count + length(p1))
-						delta <- index[length(index)] - length(row)
-						if (delta > 0) {
-							row <- c(row, integer(max(100, delta)))
-							col <- c(col, integer(max(100, delta)))
-						}
-						row[index] <- p1
-						col[index] <- p2
-						count <- count + length(p1)
-					}
-				}
-				if (count > 0L) {
-					for (j in seq_len(count)) {
-						m <- match(col[j], J[[row[j]]])
-						if (is.na(m)) {
-							J[[row[j]]] <- c(J[[row[j]]],
-								col[j])
-							W[[row[j]]] <- c(W[[row[j]]],
-								weight[i])
-						} else {
-							W[[row[j]]][m] <- W[[row[j]]][m] + weight[i]
-						}
+			for (j in seq_along(o)) {
+				p1 <- s1[o[j]]:s2[o[j]]
+				p2 <- e2[o[j]]:e1[o[j]]
+				p1 <- p[p1]
+				p2 <- p[p2]
+				for (k in seq_along(p1)) {
+					m <- match(p2[k], J[[p1[k]]])
+					if (is.na(m)) {
+						J[[p1[k]]] <- c(J[[p1[k]]], p2[k])
+						W[[p1[k]]] <- c(W[[p1[k]]], dG[o[j]]*weight[i])
+					} else {
+						W[[p1[k]]][m] <- W[[p1[k]]][m] + dG[o[j]]*weight[i]
 					}
 				}
 			}
+			
 			if (verbose)
 				setTxtProgressBar(pBar, i/l)
 		}
-		W <- lapply(W, `/`, l)
+		
+		t <- TerminalChar(myXStringSet)
+		w <- numeric(u)
+		for (i in seq_along(myXStringSet))
+			if (t[i, 3L] > 0)
+				w[(t[i, 1L] + 1):(u - t[i, 2L])] <- w[(t[i, 1L] + 1):(u - t[i, 2L])] + weight[i]
+		for (i in seq_along(J))
+			W[[i]] <- W[[i]]/pmin(w[J[[i]]], w[i])
+		
 		for (i in seq_along(J)) {
 			if (length(J[[i]]) > 0) {
 				o <- order(J[[i]])

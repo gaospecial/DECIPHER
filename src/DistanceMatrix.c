@@ -485,7 +485,7 @@ SEXP distMatrix(SEXP x, SEXP t, SEXP terminalGaps, SEXP penalizeGapLetters, SEXP
 					rans[i + x_length*j] = rans[j + x_length*i];
 			
 			if (o==1) // set the matrix diagonal to zero distance
-				rans[i*x_length+i] = 0;
+				rans[i*x_length + i] = 0;
 			
 			if (v) { // print the percent completed so far
 				soFar = (2*last - i)*(i + 1);
@@ -500,7 +500,7 @@ SEXP distMatrix(SEXP x, SEXP t, SEXP terminalGaps, SEXP penalizeGapLetters, SEXP
 			}
 		}
 		if (fM && o==1) // set the last element of the diagonal to zero
-			rans[(x_length - 1)*x_length+(x_length - 1)] = 0;
+			rans[(x_length - 1)*x_length + (x_length - 1)] = 0;
 		
 		free(gapLengths[0]);
 		free(gapLengths[1]);
@@ -1069,16 +1069,28 @@ SEXP overlap(SEXP res, SEXP widths1, SEXP widths2)
 }
 
 // in-place addition of cophenetic distances
-SEXP cophenetic(SEXP Index1, SEXP Index2, SEXP N, SEXP D, SEXP H)
+SEXP cophenetic(SEXP Index1, SEXP N, SEXP D, SEXP H)
 {
 	int i, j, val;
 	int *I = INTEGER(Index1);
-	int *J = INTEGER(Index2);
 	int l1 = length(Index1);
-	int l2 = length(Index2);
 	int n = asInteger(N);
 	double *d = REAL(D);
 	double h = asReal(H);
+	
+	char *t = Calloc(n, char);
+	for (i = 0; i < l1; i++)
+		t[I[i] - 1] = 1;
+	int l2 = n;
+	for (i = 0; i < n; i++)
+		if (t[i])
+			l2--;
+	int *J = Calloc(l2, int);
+	j = 0;
+	for (i = 0; i < n; i++)
+		if (!t[i])
+			J[j++] = i + 1;
+	Free(t);
 	
 	for (i = 0; i < l1; i++) {
 		for (j = 0; j < l2; j++) {
@@ -1090,6 +1102,7 @@ SEXP cophenetic(SEXP Index1, SEXP Index2, SEXP N, SEXP D, SEXP H)
 			d[val] += h;
 		}
 	}
+	Free(J);
 	
 	return D;
 }

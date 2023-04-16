@@ -5,7 +5,7 @@
 Change in Entropy of Hybridization of DNA/DNA Quadruplets in Solution
 }
 \description{
-An 8D array with four adjacent base pairs of the DNA duplex.  Each dimension has five elements defining the residue at that position ("A", "C", "G", "T", or "-").  The array contains the standard entropy change of probe binding (dS, [kcal/mol]) for every quadruple base pairing.
+An 8D array with four adjacent base pairs of the DNA duplex.  Each dimension has five elements defining the nucleotide at that position ("A", "C", "G", "T", or "-").  The array contains the standard entropy change of probe binding (dS, [kcal/mol]) for every quadruple base pairing.
 }
 \usage{data(deltaSrules)}
 \format{

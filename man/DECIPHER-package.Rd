@@ -40,7 +40,7 @@ CalculateEfficiencyArray Predict the Hybridization Efficiency of
 CalculateEfficiencyFISH  Predict Thermodynamic Parameters of Probe/Target
                          Sequence Pairs
 CalculateEfficiencyPCR   Predict Amplification Efficiency of Primer Sequences
-Clusterize               Cluster Sequences By Similarity
+Clusterize               Cluster Sequences By Distance
 Codec                    Compression/Decompression of Character Vectors
 ConsensusSequence        Create a Consensus Sequence
 Cophenetic               Compute cophenetic distances on dendrogram objects

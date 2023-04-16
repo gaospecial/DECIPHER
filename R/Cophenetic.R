@@ -35,10 +35,8 @@ Cophenetic <- function(x) {
 				for (k in seq_along(stack[[pos]])) {
 					h <- attr(stack[[pos]], "height") - attr(stack[[pos]][[k]], "height")
 					I <- unlist(stack[[pos]][[k]])
-					J <- seq_len(n)[-I]
 					d <- .Call("cophenetic", # in-place change of d (requires previous temporary copy)
 						I,
-						J,
 						n,
 						d,
 						h,

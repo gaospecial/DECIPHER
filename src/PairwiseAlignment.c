@@ -16,12 +16,6 @@
  */
 #include <R_ext/Rdynload.h>
 
-/* for R_CheckUserInterrupt */
-#include <R_ext/Utils.h>
-
-// for math functions
-#include <math.h>
-
 // for OpenMP parallel processing
 #ifdef SUPPORT_OPENMP
 #include <omp.h>
@@ -36,6 +30,11 @@
  * protoypes, and for the COUNT_MRMODE and START_MRMODE constant symbols.
  */
 #include "Biostrings_interface.h"
+#include "XVector_interface.h"
+#include "S4Vectors_interface.h"
+
+// strcpy
+#include <string.h>
 
 // DECIPHER header file
 #include "DECIPHER.h"
@@ -184,12 +183,11 @@ SEXP alignPair(SEXP x, SEXP y, SEXP s1, SEXP e1, SEXP s2, SEXP e2, SEXP go, SEXP
 	int nthreads = asInteger(nThreads);
 	int n = length(s1); // number of regions
 	
-	XStringSet_holder x_set, y_set;
+	XStringSet_holder x_set, ans_holder;
 	Chars_holder X, Y;
 	x_set = hold_XStringSet(x);
-	y_set = hold_XStringSet(y);
-	X = get_elt_from_XStringSet_holder(&x_set, 0);
-	Y = get_elt_from_XStringSet_holder(&y_set, 0);
+	X = get_elt_from_XStringSet_holder(&x_set, INTEGER(y)[0] - 1);
+	Y = get_elt_from_XStringSet_holder(&x_set, INTEGER(y)[1] - 1);
 	
 	int **P1 = (int **) calloc(n, sizeof(int *)); // initialized to zero (thread-safe on Windows)
 	int **P2 = (int **) calloc(n, sizeof(int *)); // initialized to zero (thread-safe on Windows)
@@ -485,15 +483,10 @@ SEXP alignPair(SEXP x, SEXP y, SEXP s1, SEXP e1, SEXP s2, SEXP e2, SEXP go, SEXP
 		n2 += N2[i];
 	}
 	
-	SEXP ans1, ans2, ans3, ans4;
-	PROTECT(ans1 = allocVector(INTSXP, n1));
-	PROTECT(ans2 = allocVector(INTSXP, n1));
-	PROTECT(ans3 = allocVector(INTSXP, n2));
-	PROTECT(ans4 = allocVector(INTSXP, n2));
-	int *res1 = INTEGER(ans1);
-	int *res2 = INTEGER(ans2);
-	int *res3 = INTEGER(ans3);
-	int *res4 = INTEGER(ans4);
+	int *res1 = (int *) malloc(n1*sizeof(int)); // thread-safe on Windows
+	int *res2 = (int *) malloc(n1*sizeof(int)); // thread-safe on Windows
+	int *res3 = (int *) malloc(n2*sizeof(int)); // thread-safe on Windows
+	int *res4 = (int *) malloc(n2*sizeof(int)); // thread-safe on Windows
 	
 	j1 = 0;
 	j2 = 0;
@@ -533,14 +526,88 @@ SEXP alignPair(SEXP x, SEXP y, SEXP s1, SEXP e1, SEXP s2, SEXP e2, SEXP go, SEXP
 	free(N1);
 	free(N2);
 	
-	SEXP ret_list;
-	PROTECT(ret_list = allocVector(VECSXP, 4));
-	SET_VECTOR_ELT(ret_list, 0, ans1);
-	SET_VECTOR_ELT(ret_list, 1, ans2);
-	SET_VECTOR_ELT(ret_list, 2, ans3);
-	SET_VECTOR_ELT(ret_list, 3, ans4);
+	// insert gaps
+	SEXP ans_width, ans;
 	
-	UNPROTECT(5);
+	// determine the element type of the XStringSet
+	const char *ans_element_type;
+	ans_element_type = get_List_elementType(x);
 	
-	return ret_list;	
+	// determine the widths of the aligned (equal width) XStringSet
+	int sum = 0;
+	for (i = 0; i < n2; i++)
+		sum += res4[i];
+	PROTECT(ans_width = NEW_INTEGER(2));
+	int *width = INTEGER(ans_width);
+	width[0] = X.length + sum;
+	width[1] = width[0]; // same length after alignment
+	
+	// set the class of the XStringSet
+	char ans_classname[40];
+	if (t==1) {
+		strcpy(ans_classname, "DNAStringSet");
+	} else if (t==2) {
+		strcpy(ans_classname, "RNAStringSet");
+	} else { // t==3
+		strcpy(ans_classname, "AAStringSet");
+	}
+	
+	PROTECT(ans = alloc_XRawList(ans_classname, ans_element_type, ans_width));
+	ans_holder = hold_XVectorList(ans);
+	Chars_holder ans_elt_holder;
+	
+	// insert gaps in sequence X
+	ans_elt_holder = get_elt_from_XStringSet_holder(&ans_holder, 0);
+	sum = 0; // position in ans_elt_holder.ptr
+	int start = 0; // position in X
+	for (i = 0; i < n2; i++) {
+		if ((res3[i] - 1) > start) { // copy over sequence
+			memcpy((char *) ans_elt_holder.ptr + sum, X.ptr + start, (res3[i] - 1 - start) * sizeof(char));
+			sum += (res3[i] - 1 - start);
+			start += (res3[i] - 1 - start);
+		}
+		if (res4[i] > 0) { // insert gaps
+			if (t==3) { // AAStringSet
+				memset((char *) ans_elt_holder.ptr + sum, 45, res4[i] * sizeof(char));
+			} else { // DNAStringSet or RNAStringSet
+				memset((char *) ans_elt_holder.ptr + sum, 16, res4[i] * sizeof(char));
+			}
+			sum += res4[i];
+		}
+	}
+	if (sum < ans_elt_holder.length) {
+		memcpy((char *) ans_elt_holder.ptr + sum, X.ptr + start, (ans_elt_holder.length - sum) * sizeof(char));
+	}
+	
+	// insert gaps in sequence Y
+	ans_elt_holder = get_elt_from_XStringSet_holder(&ans_holder, 1);
+	sum = 0; // position in ans_elt_holder.ptr
+	start = 0; // position in Y
+	for (i = 0; i < n1; i++) {
+		if ((res1[i] - 1) > start) { // copy over sequence
+			memcpy((char *) ans_elt_holder.ptr + sum, Y.ptr + start, (res1[i] - 1 - start) * sizeof(char));
+			sum += (res1[i] - 1 - start);
+			start += (res1[i] - 1 - start);
+		}
+		if (res2[i] > 0) { // insert gaps
+			if (t==3) { // AAStringSet
+				memset((char *) ans_elt_holder.ptr + sum, 45, res2[i] * sizeof(char));
+			} else { // DNAStringSet or RNAStringSet
+				memset((char *) ans_elt_holder.ptr + sum, 16, res2[i] * sizeof(char));
+			}
+			sum += res2[i];
+		}
+	}
+	if (sum < ans_elt_holder.length) {
+		memcpy((char *) ans_elt_holder.ptr + sum, Y.ptr + start, (ans_elt_holder.length - sum) * sizeof(char));
+	}
+	
+	free(res1);
+	free(res2);
+	free(res3);
+	free(res4);
+	
+	UNPROTECT(2);
+	
+	return ans;	
 }

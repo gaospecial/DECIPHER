@@ -153,6 +153,8 @@ FindSynteny <- function(dbFile,
 		geneticCode <- rep(list(f(geneticCode)), l)
 	}
 	
+	if (!is.character(alphabet))
+		stop("alphabet must be a character vector.")
 	if (any(alphabet==""))
 		stop("No elements of alphabet can be empty.")
 	r <- strsplit(alphabet, "", fixed=TRUE)

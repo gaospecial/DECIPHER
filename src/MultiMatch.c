@@ -982,7 +982,7 @@ SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP wordSize, SEXP nThreads)
 	int *N = (int *) calloc(l, sizeof(int)); // initialized to zero (thread-safe on Windows)
 	int **keeps = (int **) calloc(l, sizeof(int *)); // initialized to zero (thread-safe on Windows)
 	
-	#pragma omp parallel for private(i,j,k,n,p,new,t,keep) schedule(guided) num_threads(nthreads)
+	#pragma omp parallel for private(i,j,k,n,p,new,t,keep) num_threads(nthreads)
 	for (i = 0; i < l; i++) {
 		int *Y = pY[i];
 		int *OY = pOY[i];
@@ -996,9 +996,13 @@ SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP wordSize, SEXP nThreads)
 				j++;
 				k++;
 			} else if (X[j] < Y[k]) {
-				j++;
+				do {
+					j++;
+				} while (j < lx && X[j] < Y[k]);
 			} else {
-				k++;
+				do {
+					k++;
+				} while (k < ly[i] && Y[k] < X[j]);
 			}
 		}
 		
@@ -1144,26 +1148,26 @@ SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP wordSize, SEXP nThreads)
 				k++;
 		SEXP ans;
 		PROTECT(ans = allocMatrix(INTSXP, 4, k));
-		int *res = INTEGER(ans);
+		int *rans = INTEGER(ans);
 		k = -1;
 		for (j = 0; j < n; j++) {
 			if (keep[j]) {
 				k++;
-				res[0 + 4*k] = t[0 + 3*j];
-				res[1 + 4*k] = t[0 + 3*j] + t[2 + 3*j] - 1;
-				res[2 + 4*k] = t[1 + 3*j];
-				res[3 + 4*k] = t[1 + 3*j] + t[2 + 3*j] - 1;
+				rans[0 + 4*k] = t[0 + 3*j];
+				rans[1 + 4*k] = t[0 + 3*j] + t[2 + 3*j] - 1;
+				rans[2 + 4*k] = t[1 + 3*j];
+				rans[3 + 4*k] = t[1 + 3*j] + t[2 + 3*j] - 1;
 				// remove overlap
 				if (k > 0) {
-					d = res[1 + 4*(k - 1)] - res[0 + 4*k];
+					d = rans[1 + 4*(k - 1)] - rans[0 + 4*k];
 					if (d >= 0) {
-						res[0 + 4*k] = res[0 + 4*k] + d + 1;
-						res[2 + 4*k] = res[2 + 4*k] + d + 1;
+						rans[0 + 4*k] = rans[0 + 4*k] + d + 1;
+						rans[2 + 4*k] = rans[2 + 4*k] + d + 1;
 					}
-					d = res[3 + 4*(k - 1)] - res[2 + 4*k];
+					d = rans[3 + 4*(k - 1)] - rans[2 + 4*k];
 					if (d >= 0) {
-						res[0 + 4*k] = res[0 + 4*k] + d + 1;
-						res[2 + 4*k] = res[2 + 4*k] + d + 1;
+						rans[0 + 4*k] = rans[0 + 4*k] + d + 1;
+						rans[2 + 4*k] = rans[2 + 4*k] + d + 1;
 					}
 				}
 			}
@@ -1183,7 +1187,7 @@ SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP wordSize, SEXP nThreads)
 	return ret_list;
 }
 
-// count of hits between indicies x (length == 1) and y (length >= 1)
+// count of hits between indicies x (length == 1) and y (length >= 1) of v
 SEXP countOverlap(SEXP x, SEXP y, SEXP v, SEXP nThreads)
 {
 	int i, j, k, lx, *I, *X;
@@ -1205,29 +1209,194 @@ SEXP countOverlap(SEXP x, SEXP y, SEXP v, SEXP nThreads)
 	
 	SEXP ans;
 	PROTECT(ans = allocVector(INTSXP, l));
-	int *res = INTEGER(ans);
+	int *rans = INTEGER(ans);
 	
-	#pragma omp parallel for private(i,j,k) schedule(guided) num_threads(nthreads)
+	#pragma omp parallel for private(i,j,k) num_threads(nthreads)
 	for (i = 0; i < l; i++) {
 		int *Y = pY[i];
 		
 		j = 0;
 		k = 0;
-		res[i] = 0;
+		rans[i] = 0;
 		while (j < lx && k < ly[i]) {
 			if (X[j] == Y[k]) {
-				res[i]++;
+				rans[i]++;
 				j++;
 				k++;
 			} else if (X[j] < Y[k]) {
-				j++;
+				do {
+					j++;
+				} while (j < lx && X[j] < Y[k]);
 			} else {
-				k++;
+				do {
+					k++;
+				} while (k < ly[i] && Y[k] < X[j]);
 			}
 		}
 	}
 	free(pY);
 	free(ly);
+	
+	UNPROTECT(1);
+	
+	return ans;
+}
+
+// count of hits between x (vector) and elements of v (list)
+SEXP countHits(SEXP x, SEXP v, SEXP nThreads)
+{
+	int i, j, k, lx, *X;
+	
+	X = INTEGER(x);
+	lx = length(x);
+	int l = length(v);
+	int nthreads = asInteger(nThreads);
+	
+	int **pY = (int **) malloc(l*sizeof(int *)); // thread-safe on Windows
+	int *ly = (int *) malloc(l*sizeof(int)); // thread-safe on Windows
+	
+	for (i = 0; i < l; i++) {
+		pY[i] = INTEGER(VECTOR_ELT(VECTOR_ELT(v, i), 0));
+		ly[i] = length(VECTOR_ELT(VECTOR_ELT(v, i), 0));
+	}
+	
+	SEXP ans;
+	PROTECT(ans = allocVector(INTSXP, l));
+	int *rans = INTEGER(ans);
+	
+	#pragma omp parallel for private(i,j,k) num_threads(nthreads)
+	for (i = 0; i < l; i++) {
+		int *Y = pY[i];
+		
+		j = 0;
+		k = 0;
+		rans[i] = 0;
+		while (j < lx && k < ly[i]) {
+			if (X[j] == Y[k]) {
+				rans[i]++;
+				j++;
+				k++;
+			} else if (Y[k] < X[j]) {
+				do {
+					k++;
+				} while (k < ly[i] && Y[k] < X[j]);
+			} else {
+				do {
+					j++;
+				} while (j < lx && X[j] < Y[k]);
+			}
+		}
+	}
+	free(pY);
+	free(ly);
+	
+	UNPROTECT(1);
+	
+	return ans;
+}
+
+// sum integers within bins normalized by their relative frequency
+SEXP sumBins(SEXP v, SEXP bins)
+{
+	int i, j;
+	int n = length(v);
+	int b = asInteger(bins);
+	
+	SEXP ans;
+	PROTECT(ans = allocVector(REALSXP, b));
+	double *rans = REAL(ans);
+	
+	for (i = 0; i < b; i++)
+		rans[i] = 0;
+	
+	for (i = 0; i < n; i++) {
+		int *V = INTEGER(VECTOR_ELT(v, i));
+		int l = length(VECTOR_ELT(v, i));
+		
+		double f = 1.0/(double)l;
+		for (j = 0; j < l; j++)
+			if (V[j] != NA_INTEGER)
+				rans[V[j]/b] += f;
+	}
+	
+	double s = 0;
+	for (i = 0; i < b; i++)
+		s += rans[i];
+	s /= b; // normalize to mean of 1
+	for (i = 0; i < b; i++)
+		rans[i] /= s;
+	
+	UNPROTECT(1);
+	
+	return ans;
+}
+
+// count the number of repeated (adjacent) values
+SEXP countRepeats(SEXP v)
+{
+	int i, j, k;
+	int n = length(v);
+	
+	SEXP ans;
+	PROTECT(ans = allocVector(INTSXP, n));
+	int *rans = INTEGER(ans);
+	
+	for (i = 0; i < n; i++) {
+		int *V = INTEGER(VECTOR_ELT(VECTOR_ELT(v, i), 0));
+		int l = length(VECTOR_ELT(VECTOR_ELT(v, i), 0));
+		
+		rans[i] = 0;
+		k = 0;
+		for (j = 1; j < l; j++) {
+			if (V[j] == V[k])
+				rans[i]++;
+			k = j;
+		}
+	}
+	
+	UNPROTECT(1);
+	
+	return ans;
+}
+
+// selects indices from an index vector
+SEXP selectIndices(SEXP P, SEXP select, SEXP initial, SEXP final, SEXP ordering, SEXP num)
+{
+	int i, k, j, g, c;
+	int p = asInteger(P);
+	int sel = asInteger(select);
+	int *ini = INTEGER(initial);
+	int *fin = INTEGER(final);
+	int *o = INTEGER(ordering);
+	int N = asInteger(num);
+	int M = 4096;
+	
+	int *groups = (int *) malloc(M*sizeof(int)); // thread-safe on Windows
+	
+	k = 0;
+	for (i = (p - 1)*sel; i < p*sel && k < N; i++) {
+		j = ini[i] - 1;
+		for (c = 0; c < fin[i]; c++) {
+			g = (o[j++] - 1)/sel + 1;
+			if (g == p)
+				break;
+			groups[k++] = g;
+			if (k == M) {
+				if (M >= N)
+					break;
+				M *= 2;
+				groups = (int *) realloc(groups, M*sizeof(int)); // thread-safe on Windows
+			}
+		}
+	}
+	
+	SEXP ans;
+	PROTECT(ans = allocVector(INTSXP, k));
+	int *rans = INTEGER(ans);
+	
+	for (i = 0; i < k; i++)
+		rans[i] = groups[i];
+	free(groups);
 	
 	UNPROTECT(1);
 	

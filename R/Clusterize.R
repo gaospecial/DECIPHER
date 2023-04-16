@@ -4,10 +4,15 @@ Clusterize <- function(myXStringSet,
 	includeTerminalGaps=FALSE,
 	penalizeGapLetterMatches=NA,
 	minCoverage=0.5,
-	maxReps=1000,
-	avgComparisons=5000,
+	maxPhase1=400,
+	maxPhase2=400,
+	maxPhase3=400,
 	maxAlignments=100,
+	rareKmers=50,
+	probability=0.999,
 	invertCenters=FALSE,
+	singleLinkage=FALSE,
+	alphabet=AA_REDUCED[[152]],
 	processors=1,
 	verbose=TRUE) {
 	
@@ -48,32 +53,54 @@ Clusterize <- function(myXStringSet,
 		stop("minCoverage must be at least zero.")
 	if (minCoverage > 1)
 		stop("minCoverage can be at most one.")
-	if (!is.numeric(maxReps))
-		stop("maxReps must be a numeric.")
-	if (length(maxReps) != 1)
-		stop("maxReps must only be a single number.")
-	if (maxReps < 1)
-		stop("maxReps must be at least 1.")
-	if (floor(maxReps) != maxReps)
-		stop("maxReps must be a whole number.")
-	if (!is.numeric(avgComparisons))
-		stop("avgComparisons must be a numeric.")
-	if (length(avgComparisons) != 1)
-		stop("avgComparisons must only be a single number.")
-	if (avgComparisons < 2)
-		stop("avgComparisons must be at least 2.")
-	if (floor(avgComparisons) != avgComparisons)
-		stop("avgComparisons must be a whole number.")
+	if (!is.numeric(maxPhase1))
+		stop("maxPhase1 must be a numeric.")
+	if (length(maxPhase1) != 1)
+		stop("maxPhase1 must only be a single number.")
+	if (maxPhase1 < 200)
+		stop("maxPhase1 must be at least 200.")
+	if (floor(maxPhase1) != maxPhase1)
+		stop("maxPhase1 must be a whole number.")
+	if (maxPhase1 %% 8 != 0)
+		stop("maxPhase1 must be evenly divisible by 8.")
+	if (maxPhase1 > 65536) # limit imposed by integer indices of graph Laplacian
+		stop("maxPhase1 can be at most 65536.")
+	if (!is.numeric(maxPhase2))
+		stop("maxPhase2 must be a numeric.")
+	if (length(maxPhase2) != 1)
+		stop("maxPhase2 must only be a single number.")
+	if (maxPhase2 < 1)
+		stop("maxPhase2 must be at least 1.")
+	if (floor(maxPhase2) != maxPhase2)
+		stop("maxPhase2 must be a whole number.")
+	if (!is.numeric(maxPhase3))
+		stop("maxPhase3 must be a numeric.")
+	if (length(maxPhase3) != 1)
+		stop("maxPhase3 must only be a single number.")
+	if (maxPhase3 < 2)
+		stop("maxPhase3 must be at least 2.")
+	if (floor(maxPhase3) != maxPhase3)
+		stop("maxPhase3 must be a whole number.")
 	if (!is.numeric(maxAlignments))
 		stop("maxAlignments must be a numeric.")
 	if (length(maxAlignments) != 1)
 		stop("maxAlignments must only be a single number.")
-	if (maxAlignments > avgComparisons)
-		stop("maxAlignments must be less than or equal to avgComparisons.")
+	if (maxAlignments > maxPhase3)
+		stop("maxAlignments must be less than or equal to maxPhase3.")
 	if (floor(maxAlignments) != maxAlignments)
 		stop("maxAlignments must be a whole number.")
+	if (!is.numeric(probability))
+		stop("probability must be a numeric.")
+	if (length(probability) != 1)
+		stop("probability must only be a single number.")
+	if (probability <= 0 || probability >= 1)
+		stop("probability must be between zero and one (exclusive).")
+	if (!is.logical(singleLinkage))
+		stop("singleLinkage must be a logical.")
 	if (!is.logical(invertCenters))
 		stop("invertCenters must be a logical.")
+	if (invertCenters && singleLinkage)
+		stop("invertCenters must be FALSE if singleLinkage is TRUE.")
 	if (!is.logical(verbose))
 		stop("verbose must be a logical.")
 	if (!is.null(processors) && !is.numeric(processors))
@@ -102,153 +129,143 @@ Clusterize <- function(myXStringSet,
 	a <- vcountPattern(".", myXStringSet)
 	if (any(a > 0))
 		stop("Unknown characters ('.') are not allowed in myXStringSet.")
+	rm(a)
 	widths <- width(myXStringSet)
+	L <- length(myXStringSet)
+	if (L == 0L)
+		stop("myXStringSet contains no sequences.")
+	if (L > 2147483647L)
+		stop("myXStringSet can have at most 2,147,483,647 sequences.")
 	if (all(widths == 0L))
 		stop("All sequences in myXStringSet are zero width.")
-	l <- length(myXStringSet)
-	if (l==0)
-		stop("myXStringSet contains no sequences.")
 	
 	# initialize parameters
-	alpha <- 0.01 # weight of exponential moving average
-	attempts <- 10L # comparison attempts before possibly skipping
-	minAttempts <- min(attempts, avgComparisons) # minimum number of comparison attempts
-	interval <- 0.999 # prediction interval for k-mer similarity limit (> 0 and < 1)
-	minSimilarities <- 1000L # minimum number of similarities to predict limit
-	buffer <- 0.01 # offset applied to k-mer simility limit at every cutoff
-	minAlignments <- 1L # minimum number of alignments (> 0)
-	minSize <- max(10*avgComparisons, 1e3L) # minimum size to continue splitting bins
-	maxVariance <- ifelse(typeX == 3L, 0.5, 0.2) # maximum tolerable variance to stop splitting bins
-	batchSize <- 50L # number of k-mer similarities to compute per batch (ideally >> processors)
-	maxComparisons <- 10*avgComparisons
-	totalAlignments <- 10/(1 - interval) # sufficient alignments for predicting similarity
+	quantile <- 0.99 # width quantile determining k-mer size (>> 0 and <= 1)
+	fracRandom <- 0.1 # expected fraction of random occurrences per rare k-mer (> 0 and << 1)
+	N <- 100L # approximate frequency of random k-mers (1 per every N on average)
+	pval <- 0.1 # probability of detectable shared homology for combining groups (> 0 and < 1)
+	percentile <- 0.95 # percentile for fitting entropy multiplier (>> 0 and < 1)
+	maxSample <- 100L # number of k-mers to sample in phase 1 (>> 1 and ideally <= cache size)
+	thresh <- -5 # log(p-value) for group inclusion in phase 1 (< 0)
+	cover <- thresh # log(p-value) to consider a sequence covered in phase 1 (<< 0)
+	minOccurrences <- 10L # number of expected occurrences per group to exit phase 1 (>> 0)
+	alpha1 <- 0.05 # weight of exponential moving average to smooth changes in variance of rank order (>= 0 and <= 1)
+	attempts <- 20L # alignment attempts before possibly skipping (>> 0)
+	binSize <- 0.05 # size of bins for distributing k-mer similarities (> 0 and << 1)
+	confInt <- 1.96 # number of standard deviations for confidence interval in logistic regression (>= 0)
+	minSimilarities <- 1000L # minimum similarities per cutoff to stop collecting data (>> 0)
+	needAlignments <- 10L # minimum alignments within binSize needed to set k-mer similarity limit (>= 0 and <= minSimilarities)
+	minAlignments <- 1L # minimum alignments to perform per sequence in phase 3 (> 0)
+	batchSize <- maxPhase3 # number of k-mer similarities to compute per batch (ideally >> processors)
+	boundComparisons <- 10 # fold-limit on variation beyond maxPhase3 (average comparisons per sequence)
+	numSelect <- 65536L # maximum number of k-mers to select per sequence in phase 3 (>= 4096 and ideally a power of 2)
+	numRandom <- numSelect/rareKmers*fracRandom # expected number of random occurrences of rare k-mers
+	minFraction <- 0.1 # minimum fraction of hits to consider further comparison in phase 3 (>= 0 and <= 1)
+	stdDevs <- 1.96 # standard deviations above the mean to continue looking for a cluster (> 0)
+	alpha2 <- 0.01 # weight of exponential moving average to smooth proportions in phase 3 (>= 0 and <= 1)
+	updateRate <- 100L # update subsetRate at least every updateRate iterations in phase 3 (>> 1)
+	if (maxAlignments < minAlignments)
+		stop("maxAlignments must be at least ", minAlignments, ".")
+	if (maxPhase2*maxAlignments < minSimilarities)
+		stop("maxPhase2 must be at least", ceiling(minSimilarities/maxAlignments), ".")
+	interval <- log((1 - probability)/probability) # logit(probability of error) when setting k-mer similarity limit
 	if (verbose)
 		time.1 <- Sys.time()
 	
 	if (typeX == 3L) { # AAStringSet
+		if (!is.character(alphabet))
+			stop("alphabet must be a character vector.")
+		if (any(alphabet==""))
+			stop("No elements of alphabet can be empty.")
+		r <- strsplit(alphabet, "", fixed=TRUE)
+		alphabet <- setNames(rep(0L, 20),
+			AA_STANDARD)
+		for (i in seq_along(r)) {
+			w <- which(!(r[[i]] %in% AA_STANDARD))
+			if (length(w) > 0)
+				stop("Unrecognized letter(s) found in alphabet:  ",
+					paste(r[[i]][w], collapse=", "),
+					".")
+			w <- which(alphabet[r[[i]]] != 0L)
+			if (length(w) > 0)
+				stop("Repeated amino acids found in alphabet:  ",
+					paste(r[[i]][w], collapse=", "),
+					".")
+			alphabet[r[[i]]] <- i
+		}
+		w <- which(alphabet==0L)
+		if (length(w) > 0)
+			stop("Standard amino acids missing from alphabet:  ",
+				paste(names(w), collapse=", "),
+				".")
+		alphabet <- alphabet - 1L
+		
 		# use rounded PFASUM
 		sM <- matrix(c(4L, -1L, -1L, -1L, 0L, -1L, -1L, 0L, -2L, -1L, -1L, -1L, -1L, -2L, -1L, 1L, 0L, -3L, -2L, 0L, -1L, 6L, 0L, -1L, -3L, 2L, 1L, -2L, 1L, -4L, -3L, 3L, -2L, -4L, -1L, 0L, -1L, -2L, -2L, -3L, -1L, 0L, 6L, 2L, -3L, 1L, 1L, 0L, 1L, -4L, -4L, 1L, -3L, -4L, -1L, 1L, 0L, -4L, -2L, -4L, -1L, -1L, 2L, 7L, -4L, 1L, 3L, -1L, 0L, -5L, -5L, 0L, -4L, -5L, -1L, 0L, -1L, -5L, -3L, -5L, 0L, -3L, -3L, -4L, 14L, -3L, -4L, -2L, -2L, -1L, -1L, -4L, -1L, -1L, -4L, 0L, -1L, -2L, -1L, 0L, -1L, 2L, 1L, 1L, -3L, 6L, 2L, -2L, 1L, -3L, -3L, 2L, -1L, -4L, -1L, 0L, 0L, -3L, -2L, -3L, -1L, 1L, 1L, 3L, -4L, 2L, 6L, -2L, 0L, -4L, -4L, 1L, -3L, -5L, -1L, 0L, 0L, -4L, -3L, -3L, 0L, -2L, 0L, -1L, -2L, -2L, -2L, 8L, -2L, -5L, -4L, -2L, -3L, -4L, -1L, 0L, -1L, -4L, -4L, -4L, -2L, 1L, 1L, 0L, -2L, 1L, 0L, -2L, 10L, -3L, -3L, 0L, -2L, -1L, -2L, 0L, -1L, -1L, 2L, -3L, -1L, -4L, -4L, -5L, -1L, -3L, -4L, -5L, -3L, 5L, 3L, -4L, 2L, 1L, -3L, -3L, -1L, -2L, -1L, 3L, -1L, -3L, -4L, -5L, -1L, -3L, -4L, -4L, -3L, 3L, 5L, -3L, 3L, 2L, -3L, -3L, -2L, -1L, -1L, 1L, -1L, 3L, 1L, 0L, -4L, 2L, 1L, -2L, 0L, -4L, -3L, 6L, -2L, -4L, -1L, 0L, 0L, -4L, -2L, -3L, -1L, -2L, -3L, -4L, -1L, -1L, -3L, -3L, -2L, 2L, 3L, -2L, 7L, 1L, -3L, -2L, -1L, -1L, 0L, 1L, -2L, -4L, -4L, -5L, -1L, -4L, -5L, -4L, -1L, 1L, 2L, -4L, 1L, 7L, -4L, -3L, -2L, 3L, 4L, 0L, -1L, -1L, -1L, -1L, -4L, -1L, -1L, -1L, -2L, -3L, -3L, -1L, -3L, -4L, 9L, 0L, -1L, -3L, -3L, -3L, 1L, 0L, 1L, 0L, 0L, 0L, 0L, 0L, 0L, -3L, -3L, 0L, -2L, -3L, 0L, 4L, 2L, -3L, -2L, -2L, 0L, -1L, 0L, -1L, -1L, 0L, 0L, -1L, -1L, -1L, -2L, 0L, -1L, -2L, -1L, 2L, 5L, -3L, -2L, 0L, -3L, -2L, -4L, -5L, -2L, -3L, -4L, -4L, -1L, -2L, -1L, -4L, -1L, 3L, -3L, -3L, -3L, 14L, 3L, -2L, -2L, -2L, -2L, -3L, -1L, -2L, -3L, -4L, 2L, -1L, -1L, -2L, 0L, 4L, -3L, -2L, -2L, 3L, 9L, -1L, 0L, -3L, -4L, -5L, 0L, -3L, -3L, -4L, -3L, 3L, 1L, -3L, 1L, 0L, -3L, -2L, 0L, -2L, -1L, 5L),
 			nrow=20,
 			ncol=20)
+		entropy <- .Call("alphabetSizeReducedAA",
+			myXStringSet,
+			alphabet,
+			PACKAGE="DECIPHER")
+		words <- max(alphabet) + 1L
+		if (words == 1L)
+			stop("More than one grouping of amino acids is required in the alphabet.")
+		maxK <- as.integer(log(2^31 - 1, words))
 	} else { # DNAStringSet or RNAStringSet
 		# penalize transitions less than transversions
 		sM <- matrix(c(3L, -3L, 0L, -3L, -3L, 3L, -3L, 0L, 0L, -3L, 3L, -3L, -3L, 0L, -3L, 3L),
 			nrow=4,
 			ncol=4)
+		entropy <- .Call("alphabetSize",
+			myXStringSet,
+			PACKAGE="DECIPHER")
+		words <- 4L
+		maxK <- 15L
 	}
+	wordSizeQuantile <- quantile(widths, quantile, names=FALSE)
+	wordSize <- ceiling(log(N*wordSizeQuantile, entropy))
+	if (wordSize < 1)
+		wordSize <- 1L
+	if (wordSize > maxK)
+		wordSize <- maxK
+	kmerSize <- ceiling(log(sum(widths)/numRandom, entropy))
+	if (kmerSize < 1)
+		kmerSize <- 1L
+	if (kmerSize > maxK)
+		kmerSize <- maxK
 	
-	if (typeX==3L) { # AAStringSet
-		wordSize <- ceiling(log(100*quantile(widths, 0.99),
-			.Call("alphabetSizeReducedAA",
-				myXStringSet,
-				0:19,
-				PACKAGE="DECIPHER")))
-		if (wordSize > 7)
-			wordSize <- 7
-		if (wordSize < 1)
-			wordSize <- 1
-		words <- 20^wordSize
-	} else { # DNAStringSet or RNAStringSet
-		wordSize <- ceiling(log(100*quantile(widths, 0.99),
-			.Call("alphabetSize",
-				myXStringSet,
-				PACKAGE="DECIPHER")))
-		if (wordSize > 15)
-			wordSize <- 15
-		if (wordSize < 1)
-			wordSize <- 1
-		words <- 4^wordSize
+	if (verbose) {
+		cat("Partitioning sequences by ",
+			wordSize,
+			"-mer similarity:\n",
+			sep="")
+		flush.console()
 	}
-	
-	lc <- length(cutoff)
-	if (is.null(names(myXStringSet))) {
-		dNames <- 1:l
-	} else {
-		dNames <- names(myXStringSet)
-		w <- which(duplicated(dNames))
-		if (length(w) > 0) {
-			warning("Duplicated names of myXStringSet appended with index.")
-			dNames[w] <- paste(dNames[w],
-				w,
-				sep="_")
-		}
-	}
-	if (lc > 1) {
-		cNames <- paste("cluster",
-			gsub(".", "_", prettyNum(cutoff), fixed=TRUE),
-			sep="_")
-	} else {
-		cNames <- "cluster"
-	}
-	c <- matrix(0L,
-		nrow=l,
-		ncol=lc,
-		dimnames=list(dNames,
-			cNames))
 	
 	# identify duplicated sequences
 	x <- selfmatch(myXStringSet)
 	u <- unique(x)
 	l <- length(u)
-	t <- tabulate(x, length(x))[u]
+	t <- tabulate(x, L)[u]
 	wu <- widths[u]
-	cutoff <- 1 - cutoff
 	
-	SPKM <- function(x, K, maxVariance, maxIterations=1e3, minSize=0, tol=1e-5) {
-		n <- ncol(x) # number of samples
-		d <- nrow(x) # number of dimensions
-		if (missing(K) && missing(maxVariance))
-			stop("Either K or maxVariance must be specified.")
-		if (!missing(K) && K > d)
-			stop("K can be at most ", d)
-		
-		# initialize clusters by partitioning variance
-		k <- 1L
-		y <- rep(1L, n)
-		keep <- seq_len(d)
-		repeat {
-			t <- tabulate(y, k)
-			o <- order(t, decreasing=TRUE)
-			for (j in seq_along(o)) {
-				if (t[o[j]] < minSize)
-					break
-				w <- which(y == o[j])
-				v <- numeric(length(d))
-				for (i in seq_len(d))
-					v[i] <- var(x[i, w])
-				if (missing(maxVariance) || mean(v) >= maxVariance)
-					break
-			}
-			if (t[o[j]] < minSize)
-				break
-			if (!missing(maxVariance) && mean(v) < maxVariance)
-				break
-			k <- k + 1L
-			y[w[kmeans(x[keep[which.max(v[keep])], w], 2L)$cluster == 2L]] <- k
-			keep <- keep[-which.max(v[keep])]
-			if ((!missing(K) && k == K) ||
-				length(keep) == 0L)
-				break
-		}
-		if (k == 1L)
-			return(y)
-		if (verbose)
-			cat("Binning sequences with spherical ", k, "-means:\n", sep="")
-		
-		# normalize vectors to unit length
-		for (j in seq_len(n))
-			x[, j] <- x[, j]/sqrt(sum(x[, j]^2))
-		
-		.Call("sphericalKmeans",
-			x,
-			y,
-			k,
-			tol,
-			maxIterations,
-			ifelse(verbose, ifelse(interactive(), TRUE, NA), verbose),
-			processors,
-			PACKAGE="DECIPHER")
+	lc <- length(cutoff)
+	C <- vector("list", lc) # cluster numbers
+	if (lc > 1) {
+		names(C) <- paste("cluster",
+			gsub(".", "_", prettyNum(cutoff), fixed=TRUE),
+			sep="_")
+	} else {
+		names(C) <- "cluster"
 	}
+	bins <- seq(0, 1, binSize) # similarity ranges
+	counts <- rep(1L, length(bins) - 1L)
+	incBins <- .bincode(c(cutoff - binSize, cutoff, cutoff + binSize),
+		bins,
+		include.lowest=TRUE)
+	incBins <- unique(which(tabulate(incBins, length(counts)) > 0))
+	cutoff <- 1 - cutoff
 	
 	overlap <- function(x, y, processors=1L) {
 		.Call("matchOverlap",
@@ -273,10 +290,9 @@ Clusterize <- function(myXStringSet,
 			PACKAGE="DECIPHER")
 	}
 	
-	countHits <- function(x, y, processors=1L) {
-		.Call("countOverlap",
+	countHits <- function(x, v, processors=1L) {
+		.Call("countHits",
 			x,
-			y,
 			v,
 			processors,
 			PACKAGE="DECIPHER")
@@ -299,9 +315,8 @@ Clusterize <- function(myXStringSet,
 			PACKAGE="DECIPHER")
 	}
 	
-	align <- function(pattern,
-		subject,
-		anchor=NULL,
+	align <- function(pair, # pair of indices in myXStringSet
+		anchor=NULL, # optional anchors
 		GO=-10, # gap opening
 		GE=-2, # gap extension
 		TG=0, # terminal gap
@@ -321,13 +336,13 @@ Clusterize <- function(myXStringSet,
 			l2 <- anchor[4L, i]
 		}
 		start1[n + 1L] <- l1 + 1L
-		end1[n + 1L] <- width(pattern)
+		end1[n + 1L] <- widths[pair[1L]]
 		start2[n + 1L] <- l2 + 1L
-		end2[n + 1L] <- width(subject)
+		end2[n + 1L] <- widths[pair[2L]]
 		
-		results <- .Call("alignPair",
-			pattern,
-			subject,
+		.Call("alignPair",
+			myXStringSet,
+			pair,
 			start1,
 			end1,
 			start2,
@@ -340,123 +355,337 @@ Clusterize <- function(myXStringSet,
 			sM,
 			processors,
 			PACKAGE="DECIPHER")
-		
-		if (length(results[[3]]) > 0)
-			pattern <- .Call("insertGaps",
-				pattern,
-				as.integer(results[[3]]),
-				as.integer(results[[4]]),
-				typeX,
-				processors,
-				PACKAGE="DECIPHER")
-		if (length(results[[1]]) > 0)
-			subject <- .Call("insertGaps",
-				subject,
-				as.integer(results[[1]]),
-				as.integer(results[[2]]),
-				typeX,
-				processors,
-				PACKAGE="DECIPHER")
-		
-		.append(pattern, subject)
 	}
 	
 	if (typeX == 3L) { # AAStringSet
-		a <- .Call("frequenciesReducedAA",
+		v <- .Call("enumerateSequenceReducedAA",
 			.subset(myXStringSet, u),
-			3L,
-			c(0L, 1L, 1L, 1L, 0L, 1L, 1L, 0L, 1L, 3L, 3L, 1L, 3L, 2L, 2L, 0L, 0L, 2L, 2L, 3L),
+			kmerSize,
+			alphabet,
+			TRUE, # mask repeats
 			PACKAGE="DECIPHER")
 	} else { # DNAStringSet or RNAStringSet
-		a <- .Call("frequencies",
+		v <- .Call("enumerateSequence",
 			.subset(myXStringSet, u),
-			3L,
-			PACKAGE="DECIPHER")
-	}
-	
-	# convert to log-odds
-	mode(a) <- "double"
-	for (j in seq_len(ncol(a))) {
-		w <- which(a[, j] == 0L)
-		if (length(w) > 0)
-			a[w, j] <- 1/length(w)
-		a[, j] <- a[, j]/sum(a[, j])
-	}
-	a <- log(a/rowMeans(a))
-	
-	C <- SPKM(a, maxVariance=maxVariance, minSize=minSize)
-	
-	rm(a)
-	gc(FALSE) # necessary for repeatable timing
-	G <- vector("list", max(C))
-	for (i in seq_along(G))
-		G[[i]] <- which(C == i)
-	ls <- lengths(G)
-	maxReps <- as.integer(min(maxReps, max(ls/2)))
-	if (maxReps < minSimilarities/maxAlignments)
-		maxReps <- 0L
-	
-	if (verbose) {
-		if (length(ls) > 1L) {
-			time.2 <- Sys.time()
-			print(round(difftime(time.2,
-				time.1,
-				units='secs'),
-				digits=2))
-			cat("\n")
-			time.1 <- time.2
-		}
-		
-		if (maxReps > 0L)
-			cat("Ordering sequences by ",
-				wordSize,
-				"-mer similarity:\n",
-				sep="")
-		flush.console()
-	}
-	
-	if (typeX==3L) { # AAStringSet
-		V <- v <- .Call("enumerateSequenceAA",
-			.subset(myXStringSet, u),
-			wordSize,
-			PACKAGE="DECIPHER")
-	} else { # DNAStringSet or RNAStringSet
-		V <- v <- .Call("enumerateSequence",
-			.subset(myXStringSet, u),
-			wordSize,
+			kmerSize,
 			TRUE, # mask repeats
 			PACKAGE="DECIPHER")
 	}
-	V <- v <- lapply(V,
+	sizes <- lengths(v)
+	kmers <- as.integer(words^kmerSize)
+	words <- as.integer(words^wordSize)
+	freqs <- .Call("sumBins",
+		v,
+		as.integer(ceiling(sqrt(kmers))),
+		PACKAGE="DECIPHER")
+	freqs <- as.integer(255/max(freqs)*freqs) # set max to 255 for sorting speed
+	lf <- length(freqs)
+	
+	# record groups sharing the rarest k-mers
+	select <- as.integer(min(rareKmers,
+		lf, # bounded by number of possible mapped k-mers
+		max(sizes), # bounded by number of possible k-mers
+		2147483647/l)) # bounded by positive integer addressing (2^31 - 1)
+	j <- 0L
+	z <- seq_len(select)
+	y <- rep(kmers, select) # use max k-mer + 1 as placeholder
+	kmers <- integer(l*select)
+	for (i in seq_len(l)) {
+		s <- v[[i]]
+		if (length(s) == 0) {
+			s <- y
+		} else {
+			s <- unique(s)
+			s <- s[!is.na(s)]
+			if (length(s) > select) {
+				o <- .Call("radixOrder", freqs[s %/% lf + 1L], 1L, 1L, PACKAGE="DECIPHER")
+				s <- s[o[z]]
+			} else if (length(s) < select) {
+				s <- c(s, rep(s[1L], select - length(s)))
+			} # else length(s) == select
+		}
+		kmers[j + z] <- s
+		j <- j + select
+	}
+	rm(y, z)
+	
+	if (wordSize != kmerSize) {
+		rm(v, sizes, freqs, lf)
+		if (typeX == 3L) { # AAStringSet
+			v <- .Call("enumerateSequenceReducedAA",
+				.subset(myXStringSet, u),
+				wordSize,
+				alphabet,
+				TRUE, # mask repeats
+				PACKAGE="DECIPHER")
+		} else { # DNAStringSet or RNAStringSet
+			v <- .Call("enumerateSequence",
+				.subset(myXStringSet, u),
+				wordSize,
+				TRUE, # mask repeats
+				PACKAGE="DECIPHER")
+		}
+		sizes <- lengths(v)
+		
+		# initialize probability of sampling based on relative k-mer frequencies
+		freqs <- .Call("sumBins",
+			v,
+			as.integer(ceiling(sqrt(words))),
+			PACKAGE="DECIPHER")
+		freqs <- as.integer(255/max(freqs)*freqs) # set max to 255 for sorting speed
+		lf <- length(freqs)
+	}
+	v <- lapply(v,
 		function(x) {
-			o <- order(x, na.last=NA)
+			o <- .Call("radixOrder", x, 1L, 0L, PACKAGE="DECIPHER")
 			list(x[o], seq_along(x)[o])
 		})
-	sizes <- sapply(v, function(x) length(x[[1L]]))
 	
-	# order sequences by approximate similarity
-	inPlay <- ls >= 2
-	ksims <- psims <- vector("list", maxReps)
+	# calibrate probability of detecting k-mers by chance
+	chance <- .Call("countRepeats", v, PACKAGE="DECIPHER") # number of repeated k-mers
+	fitMultiplier <- function(multiplier) {
+		pred <- sizes*(1 - (1 - (multiplier*entropy)^-wordSize)^sizes)
+		abs(percentile - mean(pred > chance)) # sum of absolute errors
+	}
+	entropyFactor <- optimize(fitMultiplier,
+		c(0.4, 1), # calibration factor
+		tol=0.001)$minimum
+	chance <- (entropyFactor*entropy)^-wordSize
+	chance <- 1 - (1 - chance)^sizes # probability of finding a k-mer by chance
+	
+	# Phase 1: Partition into groups
+	probs <- rep(1, l) # uniform prior probability of selection
+	vecs <- vector("list", maxPhase1/8L)
+	coverage <- numeric(maxPhase1)
+	partition <- integer(l)
+	topScore <- numeric(l)
+	resTime0 <- rep(NA_real_, processors)
+	count0 <- integer(processors)
+	for (i in seq_along(vecs)) {
+		vec <- raw(l)
+		for (k in seq_len(8L)) {
+			if (i == 1L && k == 1L) {
+				optProcessors0 <- processors
+			} else if (i == 1L && k == 2L) {
+				optProcessors0 <- 1L
+			} else {
+				w <- which(is.na(resTime0))
+				if (length(w) == 0L) {
+					optProcessors0 <- which.min(resTime0)
+				} else if (length(w) == 1L) {
+					optProcessors0 <- w
+				} else {
+					o <- order(resTime0)
+					optProcessors0 <- w[which.min(abs(mean(o[1:2]) - w))]
+				}
+			}
+			
+			rand <- which.max(probs)
+			probs[rand] <- 0 # prevent reselection
+			s <- unique(v[[rand]][[1L]])
+			if (length(s) > maxSample) { # select least frequent k-mers
+				o <- .Call("radixOrder", freqs[s %/% lf + 1L], 1L, 1L, PACKAGE="DECIPHER")
+				length(o) <- maxSample
+				s <- s[o]
+				o <- .Call("radixOrder", s, 1L, 1L, PACKAGE="DECIPHER")
+				s <- s[o]
+			}
+			
+			time.0 <- Sys.time()
+			m <- countHits(s, v, optProcessors0)
+			time.9 <- Sys.time()
+			
+			if (is.na(resTime0[optProcessors0])) {
+				resTime0[optProcessors0] <- difftime(time.9, time.0, units='secs')/length(s)
+			} else {
+				resTime0[optProcessors0] <- (count0[optProcessors0]*resTime0[optProcessors0] + difftime(time.9, time.0, units='secs')/length(s))/(count0[optProcessors0] + 1L)
+			}
+			count0[optProcessors0] <- count0[optProcessors0] + 1L
+			
+			p <- suppressWarnings(pbinom(m - 1L,
+				length(s),
+				chance,
+				lower.tail=FALSE,
+				log.p=TRUE))
+			
+			w <- which(p <= thresh)
+			if (k > 1L)
+				vec <- rawShift(vec, 1L)
+			vec[w] <- vec[w] | as.raw(1L)
+			
+			w <- which(p < topScore)
+			partition[w] <- (i - 1L)*8L + k
+			topScore[w] <- p[w]
+			
+			w <- which(p <= cover)
+			coverage[(i - 1L)*8L + k] <- length(w)/l
+			probs[w] <- probs[w]/exp(cover - p[w]) # divide by > 1
+			
+			prog <- sum(topScore <= cover)/l
+			if (verbose && interactive())
+				cat("\riteration ",
+					(i - 1L)*8L + k,
+					" of up to ",
+					maxPhase1,
+					" (",
+					formatC(100*prog, digits=1, format="f"),
+					"% coverage)",
+					sep="")
+		}
+		vecs[[i]] <- vec
+		if (prog >= 0.9995 || # rounds to 100%
+			median(coverage[seq_len(i*8L)])*i*8 >= minOccurrences || # iterations >> predicted groups
+			(prog < i*8L/maxPhase1 && # insufficient progress
+			prog > minSimilarities/l)) # sufficiently grouped to ensure enough alignments in phase 2
+			break
+	}
+	rm(vec, topScore, probs, chance) # free objects with length l
+	vecs <- vecs[seq_len(i)]
+	
+	i <- i*8L # number of iterations completed
+	if (verbose)
+		cat("\riteration ",
+			i,
+			" of up to ",
+			maxPhase1,
+			" (",
+			formatC(100*prog, digits=1, format="f"),
+			"% coverage)\n\n",
+			sep="")
+	if (prog < i/maxPhase1 && # exited early due to insufficient progress
+		prog < 0.9995) {
+		maxPhase1 <- i # use to limit iterations in phase 2
+	} else {
+		maxPhase1 <- Inf
+	}
+	
+	# compute the graph Laplacian
+	G <- .Call("graphLaplacian",
+		vecs,
+		sapply(7:0, rawShift, x=as.raw(1L)),
+		processors,
+		PACKAGE="DECIPHER")
+	rm(vecs) # free large object
+	D <- G[[2L]] # group sizes
+	G <- G[[1L]] # lower triangle of graph Laplacian
+	
+	# convert co-occurrences to statistical significance
+	thresh <- exp(thresh) # convert log(probability) to probability
+	count <- 0L
+	for (j in seq_len(length(D) - 1L)) {
+		i <- (count + 1L):(length(D) - j + count)
+		p <- suppressWarnings(pbinom(G[i] - 1,
+			pmin(D[(j + 1L):length(D)], D[j]), # use minimum group size
+			thresh, # probability of overlapping by chance
+			lower.tail=FALSE,
+			log.p=TRUE))
+		p[is.infinite(p)] <- -116e3 # replace overflow with lowest observed finite value
+		G[i] <- p
+		count <- count + length(i)
+	}
+	class(G) <- "dist"
+	attr(G, "Size") <- length(D)
+	rm(D, coverage) # free unneeded objects
+	
+	# assign each partition to a group
+	cluster <- TreeLine(myDistMatrix=G,
+		method="UPGMH", # harmonic mean linkage
+		type="both", # forces cluster numbers to be sorted by the dendrogram
+		cutoff=pval,
+		processors=processors,
+		verbose=FALSE)
+	cluster <- cluster[[1L]][[1L]] # clusters
+	
+	if (max(cluster) > 1L) { # assign sequences to a partition
+		w <- which(partition > 0)
+		partition[w] <- cluster[partition[w]]
+		partition <- match(partition, sort(unique(partition)))
+	} else {
+		partition <- rep(1L, l)
+	}
+	rm(G, cluster)
+	
+	G <- vector("list", max(partition))
+	for (i in seq_along(G))
+		G[[i]] <- which(partition == i)
+	
+	if (typeX == 3L && any(alphabet != 0:19)) {
+		rm(v, sizes, freqs, lf, words, alphabet, entropy, maxK, wordSize)
+		alphabet <- 0L:19L # switch to the standard alphabet
+		entropy <- .Call("alphabetSizeReducedAA",
+			myXStringSet,
+			alphabet,
+			PACKAGE="DECIPHER")
+		maxK <- 7L
+		wordSize <- ceiling(log(N*wordSizeQuantile, entropy))
+		if (wordSize < 1)
+			wordSize <- 1L
+		if (wordSize > maxK)
+			wordSize <- maxK
+		v <- .Call("enumerateSequenceReducedAA",
+			.subset(myXStringSet, u),
+			wordSize,
+			alphabet,
+			TRUE, # mask repeats
+			PACKAGE="DECIPHER")
+		sizes <- lengths(v)
+		words <- as.integer(20^wordSize)
+		freqs <- .Call("sumBins",
+			v,
+			as.integer(ceiling(sqrt(words))),
+			PACKAGE="DECIPHER")
+		freqs <- as.integer(255/max(freqs)*freqs) # set max to 255 for sorting speed
+		lf <- length(freqs)
+		v <- lapply(v,
+			function(x) {
+				o <- .Call("radixOrder", x, 1L, 0L, PACKAGE="DECIPHER")
+				list(x[o], seq_along(x)[o])
+			})
+	}
+	
+	# Phase 2: Relatedness sorting
+	ls <- lengths(G)
+	maxPhase2 <- as.integer(min(maxPhase2, max(ls/2)))
+	keep <- sizes > 0L
+	inPlay <- sapply(G, function(x) sum(keep[x]) >= 2L)
+	if (!any(inPlay))
+		maxPhase2 <- 0L
+	
+	if (verbose) {
+		time.2 <- Sys.time()
+		print(round(difftime(time.2,
+			time.1,
+			units='secs'),
+			digits=2))
+		cat("\n")
+		time.1 <- time.2
+		
+		if (maxPhase2 > 0L)
+			cat("Sorting by relatedness within",
+				length(G),
+				ifelse(length(G) == 1L, "group:\n", "groups:\n"))
+		flush.console()
+	}
+	
+	ksims <- psims <- vector("list", maxPhase2)
 	batches <- lapply(ls,
 		function(l) {
-			batches <- seq(0L, l, avgComparisons)
+			batches <- seq(0L, l, batchSize)
 			if (batches[length(batches)] < l)
 				batches <- c(batches, l)
 			batches
 		})
-	bins <- seq(0, 1, 0.01) # similarity ranges
-	counts <- rep(1L, length(bins))
-	var <- ls[C]/2 # doubles to avoid overflow
-	keep <- rep(TRUE, l)
-	avg_cor <- 0
+	var <- pmin(maxPhase3, ls[partition]/2) # doubles to avoid overflow
+	avg_cor <- sum(var < maxPhase3/2)/l # initialize to expected value by chance
 	resTime1 <- resTime2 <- rep(NA_real_, processors)
 	count1 <- count2 <- integer(processors)
-	for (i in seq_len(maxReps)) {
+	alignments <- integer(length(cutoff))
+	for (i in seq_len(maxPhase2)) {
 		if (verbose && interactive()) {
 			cat("\riteration ",
 				i,
 				" of up to ",
-				maxReps,
+				maxPhase2,
 				" (",
 				formatC(100*avg_cor, digits=1, format="f"),
 				"% stability) ",
@@ -470,7 +699,7 @@ Clusterize <- function(myXStringSet,
 		} else {
 			w <- which(is.na(resTime1))
 			if (length(w) == 0L) {
-				optProcessors1 <- sample(processors, 1L, prob=1/resTime1)
+				optProcessors1 <- which.min(resTime1)
 			} else if (length(w) == 1L) {
 				optProcessors1 <- w
 			} else {
@@ -479,11 +708,11 @@ Clusterize <- function(myXStringSet,
 			}
 		}
 		
-		m1 <- m2 <- numeric(l)
+		m1 <- m2 <- rep(NA_real_, l)
 		rand <- matrix(NA_integer_, length(ls), 2L)
 		time.3 <- Sys.time()
 		for (k in which(inPlay)) {
-			rand[k, 1L] <- G[[k]][sample(ls[k], 1L, prob=var[G[[k]]]*sizes[G[[k]]]*keep[G[[k]]])]
+			rand[k, 1L] <- G[[k]][sample(ls[k], 1L, replace=TRUE, prob=var[G[[k]]]*sizes[G[[k]]]*keep[G[[k]]])]
 			keep[rand[k, 1L]] <- FALSE
 			
 			# process sequences in batches to reduce memory
@@ -500,7 +729,7 @@ Clusterize <- function(myXStringSet,
 				m1[s] <- similarity(res1, wu[rand[k, 1L]], wu[s], optProcessors1)
 			}
 			
-			rand[k, 2L] <- G[[k]][sample(ls[k], 1L, prob=(1.001 - m1[G[[k]]])*keep[G[[k]]]/ov)] # maximize distance and overlap to other random sequence
+			rand[k, 2L] <- G[[k]][sample(ls[k], 1L, replace=TRUE, prob=(1.001 - m1[G[[k]]])*keep[G[[k]]]/ov)] # maximize distance and overlap to other random sequence
 			keep[rand[k, 2L]] <- FALSE
 			
 			# process sequences in batches to reduce memory
@@ -511,37 +740,38 @@ Clusterize <- function(myXStringSet,
 			}
 		}
 		time.4 <- Sys.time()
-		keep[rand] <- FALSE
 		if (is.na(resTime1[optProcessors1])) {
 			resTime1[optProcessors1] <- difftime(time.4, time.3, units='secs')/sum(ls[inPlay])
 		} else {
-			resTime1[optProcessors1] <- (count1[optProcessors1]*resTime1[optProcessors1] + difftime(time.4, time.3, units='secs'))/sum(ls[inPlay])/(count1[optProcessors1] + 1L)
+			resTime1[optProcessors1] <- (count1[optProcessors1]*resTime1[optProcessors1] + difftime(time.4, time.3, units='secs')/sum(ls[inPlay]))/(count1[optProcessors1] + 1L)
 		}
 		count1[optProcessors1] <- count1[optProcessors1] + 1L
 		optProcessors1 <- which.min(resTime1)
 		
-		if (sum(counts) - length(bins) < totalAlignments) {
+		if (any(alignments < minSimilarities)) {
 			b1 <- .bincode(m1, bins, include.lowest=TRUE)
-			w <- m1 > 0 & m1 < 1
-			n <- min(sum(w), maxAlignments)
+			w <- which(m1 < 1)
+			n <- min(length(w), minSimilarities/2)
 			if (n > 0) {
-				s1 <- sample(length(m1),
+				s1 <- sample(length(w),
 					n,
 					replace=TRUE, # for speed
-					prob=w/counts[b1])
-				s1 <- s1[!duplicated(b1[s1])]
+					prob=(counts/(1L + tabulate(b1, length(counts))))[b1[w]])
+				s1 <- w[s1]
+				s1 <- s1[!duplicated(s1)]
 			} else {
 				s1 <- integer()
 			}
 			b2 <- .bincode(m2, bins, include.lowest=TRUE)
-			w <- m2 > 0 & m2 < 1
-			n <- min(sum(w), maxAlignments)
+			w <- which(m2 < 1)
+			n <- min(length(w), minSimilarities/2)
 			if (n > 0) {
-				s2 <- sample(length(m2),
+				s2 <- sample(length(w),
 					n,
 					replace=TRUE, # for speed
-					prob=w/counts[b2])
-				s2 <- s2[!duplicated(b2[s2])]
+					prob=(counts/(1L + tabulate(b2, length(counts))))[b2[w]])
+				s2 <- w[s2]
+				s2 <- s2[!duplicated(s2)]
 			} else {
 				s2 <- integer()
 			}
@@ -553,7 +783,7 @@ Clusterize <- function(myXStringSet,
 			} else {
 				w <- which(is.na(resTime2))
 				if (length(w) == 0L) {
-					optProcessors2 <- sample(processors, 1L, prob=1/resTime2)
+					optProcessors2 <- which.min(resTime2)
 				} else if (length(w) == 1L) {
 					optProcessors2 <- w
 				} else {
@@ -565,9 +795,8 @@ Clusterize <- function(myXStringSet,
 			pdist1 <- numeric(length(s1))
 			time.5 <- Sys.time()
 			for (j in seq_along(s1)) {
-				res <- overlap(rand[C[s1[j]], 1L], s1[j], optProcessors1) # recompute
-				ali <- align(.subset(myXStringSet, u[rand[C[s1[j]], 1L]]),
-					.subset(myXStringSet, u[s1[j]]),
+				res <- overlap(rand[partition[s1[j]], 1L], s1[j], optProcessors1) # recompute
+				ali <- align(c(u[rand[partition[s1[j]], 1L]], u[s1[j]]),
 					anchor=res[[1L]],
 					processors=optProcessors2)
 				pdist1[j] <- dist(ali)
@@ -577,9 +806,8 @@ Clusterize <- function(myXStringSet,
 			pdist2 <- numeric(length(s2))
 			time.7 <- Sys.time()
 			for (j in seq_along(s2)) {
-				res <- overlap(rand[C[s2[j]], 2L], s2[j], optProcessors1) # recompute
-				ali <- align(.subset(myXStringSet, u[rand[C[s2[j]], 2L]]),
-					.subset(myXStringSet, u[s2[j]]),
+				res <- overlap(rand[partition[s2[j]], 2L], s2[j], optProcessors1) # recompute
+				ali <- align(c(u[rand[partition[s2[j]], 2L]], u[s2[j]]),
 					anchor=res[[1L]],
 					processors=optProcessors2)
 				pdist2[j] <- dist(ali)
@@ -592,10 +820,19 @@ Clusterize <- function(myXStringSet,
 			}
 			count2[optProcessors2] <- count2[optProcessors2] + 1L
 			
-			counts <- counts + tabulate(b1[s1], length(counts))
-			counts <- counts + tabulate(b2[s2], length(counts))
+			w <- .bincode(pdist1, bins, include.lowest=TRUE)
+			w <- which(w %in% incBins)
+			counts <- counts + (tabulate(b1[s1[w]], length(counts)) > 0)
+			w <- .bincode(pdist2, bins, include.lowest=TRUE)
+			w <- which(w %in% incBins)
+			counts <- counts + (tabulate(b2[s2[w]], length(counts)) > 0)
 			ksims[[i]] <- c(m1[s1], m2[s2])
 			psims[[i]] <- 1 - c(pdist1, pdist2)
+			
+			for (k in seq_along(cutoff)) {
+				w <- which(psims[[i]] >= cutoff[k] - binSize & psims[[i]] <= cutoff[k] + binSize)
+				alignments[k] <- alignments[k] + length(w)
+			}
 		}
 		
 		d <- m1 - m2
@@ -608,7 +845,7 @@ Clusterize <- function(myXStringSet,
 				}
 			}
 			
-			o <- order(C,
+			o <- order(partition,
 				rS,
 				wu,
 				t, # frequency
@@ -618,24 +855,16 @@ Clusterize <- function(myXStringSet,
 			r[r] <- seq_along(r) # rank
 			
 			w <- which(d != 0) # only update positions that could have moved
-			var[w] <- alpha*abs(R[w] - r[w]) + (1 - alpha)*var[w] # exponential moving average of change in rank order
-			avg_cor <- sum(var*keep < avgComparisons/2)/l # exponential moving average of fraction stabilized in rank order
+			var[w] <- alpha1*pmin(maxPhase3, abs(R[w] - r[w])) + (1 - alpha1)*var[w] # exponential moving average of change in rank order
+			avg_cor <- sum(var*keep < maxPhase3/2)/l # exponential moving average of fraction stabilized in rank order
 			
 			O <- o
 			R <- r
-			
-			for (k in which(inPlay)) {
-				if (all(var[G[[k]]] < avgComparisons/2)) {
-					inPlay[k] <- FALSE # 100% stability
-				} else if (sum(keep[G[[k]]]) < 2) {
-					inPlay[k] <- FALSE # no more pairs
-				}
-			}
 		} else {
 			rS <- d # relative similaity
 			
 			# initialize rank order
-			O <- order(C,
+			O <- order(partition,
 				rS,
 				wu,
 				t, # frequency
@@ -645,11 +874,22 @@ Clusterize <- function(myXStringSet,
 			R[R] <- seq_along(R) # rank
 		}
 		
+		for (k in which(inPlay)) {
+			if (all(alignments >= minSimilarities) &&
+				all(var[G[[k]]] < maxPhase3/2)) {
+				inPlay[k] <- FALSE # 100% stability
+			} else if (sum(keep[G[[k]]]) < 2) {
+				inPlay[k] <- FALSE # no more pairs
+			}
+		}
+		
 		if (!any(inPlay) ||
-			avg_cor >= 0.9995) # rounds to 100%
+			((avg_cor >= 0.9995 || # rounds to 100%
+			i >= maxPhase1) && # insufficient progress in phase 1
+			all(alignments >= minSimilarities)))
 			break # reached rank order stability
 	}
-	if (maxReps > 0L) {
+	if (maxPhase2 > 0L) {
 		optProcessors2 <- which.min(resTime2)
 	} else {
 		optProcessors1 <- optProcessors2 <- processors
@@ -657,44 +897,60 @@ Clusterize <- function(myXStringSet,
 		rS <- numeric(length(O))
 	}
 	
-	# fit conversion from approximate to actual similarity
+	# fit similarity limit based on k-mer similarity
 	ksims <- unlist(ksims)
-	psims <- unlist(psims)
-	w <- which(psims > 0) # potentially insufficiently overlapping
-	ksims <- ksims[w]
-	psims <- psims[w]
-	interval <- ceiling(interval*length(ksims))
-	if (interval < minSimilarities) {
-		limits <- numeric(length(cutoff)) # no limit
-	} else {
-		psims <- psims - 1
-		ksims <- ksims - 1
-		slope <- sum(psims*ksims)/sum(psims^2)
-		delta <- 10
-		while (delta > 0.0001) {
-			temp <- slope + delta
-			if (interval > sum(ksims >= temp*(psims - buffer))) {
-				slope <- temp
-			} else {
-				delta <- delta/2
+	limits <- rep(1e-6, length(cutoff)) # initialize above zero
+	if (length(ksims) > 1) {
+		psims <- unlist(psims)
+		psims[is.na(psims)] <- 0
+		z <- c(0, sqrt(ksims), 1) # perform logistic regression in sqrt-space
+		w <- .bincode(z, bins, include.lowest=TRUE)
+		w <- (1/tabulate(w, length(counts)))[w] # weight bins equally
+		fit <- function(ksim) {
+			p <- predict(g,
+				newdata=data.frame(z=ksim))
+			abs(p - interval)
+		}
+		for (j in which(alignments >= needAlignments)) {
+			y <- psims >= cutoff[j]
+			if (sum(y) >= 1) {
+				y <- c(FALSE, y, TRUE) # add fixed endpoints
+				
+				g <- suppressWarnings(glm(y ~ z,
+					binomial(link="logit"),
+					weights=w,
+					control=glm.control(1e-6)))
+				limits[j] <- optimize(fit, c(0, 1))$minimum # exclusive of bounds
+				limits[j] <- limits[j]^2
+			} else { # no data above above cutoff
+				limits[j] <- max(ksims)
 			}
 		}
-		limits <- slope*(cutoff - 1) + 1 - slope*buffer
+	}
+	if (lc > 1) {
+		if (ASC) {
+			limits <- rev(cummax(rev(limits)))
+		} else {
+			limits <- cummax(limits)
+		}
 	}
 	
+	maxComparisons <- boundComparisons*maxPhase3
+	minComparisons <- ceiling(maxPhase3/boundComparisons)
 	var[var > maxComparisons] <- maxComparisons
+	var[var < minComparisons] <- minComparisons
 	var <- var[O]/mean(var) # normalized variability
-	bL <- seq_len(l) - as.integer(var*(avgComparisons/2))
-	bR <- seq_len(l) + as.integer(var*(avgComparisons/2))
+	bL <- seq_len(l) - as.integer(var*(maxPhase3/2))
+	bR <- seq_len(l) + as.integer(var*(maxPhase3/2))
 	bL[bL < 1L] <- 1L
 	bR[bR > l] <- l
 	
 	if (verbose) {
-		if (maxReps > 0L) {
+		if (maxPhase2 > 0L) {
 			cat("\riteration ",
 				i,
 				" of up to ",
-				maxReps,
+				maxPhase2,
 				" (",
 				formatC(100*avg_cor, digits=1, format="f"),
 				"% stability) ",
@@ -711,7 +967,9 @@ Clusterize <- function(myXStringSet,
 			time.1 <- time.2
 		}
 		lastValue <- 0
-		cat("Clustering sequences by similarity:\n",
+		cat("Clustering sequences by ",
+			wordSize,
+			"-mer similarity:\n",
 			sep="")
 		flush.console()
 		pBar <- txtProgressBar(style=ifelse(interactive(), 3, 1))
@@ -723,31 +981,98 @@ Clusterize <- function(myXStringSet,
 		count <- 0L
 		for (i in rev(seq_along(ls))) { # groups reversed because sorted decreasing
 			s <- (count + 1L):(count + ls[i])
-			S <- smooth.spline(rS[s],
-				spar=0.5)
-			rS[s] <- predict(S,
-				x=seq_along(s),
-				deriv=1L)$y
+			if (length(s) > maxPhase3) {
+				rS[s] <- predict(smooth.spline(rS[s], spar=0.5),
+					x=seq_along(s),
+					deriv=1L)$y
+			}
 			count <- count + ls[i]
 		}
 	}
+	if (maxPhase2 > 0) {
+		rm(b1, b2, bins, d, inPlay, keep, ksims, psims, ls, m1, m2, ov, pdist1, pdist2, res1, res2, s1, s2, var, b)
+	} else {
+		rm(bins, inPlay, keep, ksims, psims, ls, var)
+	}
 	
-	P <- order(sizes[O],
-		t[O],
+	partition <- partition[O]
+	sizes <- sizes[O]
+	t <- t[O]
+	P <- order(partition,
+		sizes,
+		t,
 		rS,
 		decreasing=TRUE,
 		method="radix")
 	P <- O[P]
 	Q <- R[P]
 	
+	# order rare k-mers into groups
+	E <- seq_len(l)
+	E[P] <- E
+	E <- rep(E, each=select)
+	o <- order(kmers, E)
+	rm(E)
+	ini <- integer(length(kmers)) # index of initial k-mer
+	prev <- -1L
+	j <- 0L
+	for (i in seq_along(o)) {
+		curr <- kmers[o[i]]
+		if (curr != prev) {
+			prev <- curr
+			j <- i
+		}
+		ini[o[i]] <- j
+	}
+	prev <- -1L
+	for (i in seq_along(o)) {
+		curr <- ini[o[i]]
+		if (curr != prev) {
+			j <- 0L
+			prev <- curr
+		} else {
+			j <- j + 1L
+		}
+		kmers[o[i]] <- j
+	}
+	for (i in seq_len(l)) {
+		j <- seq((i - 1L)*select + 1L, length.out=select)
+		k <- j[.Call("radixOrder", kmers[j], 1L, 1L, PACKAGE="DECIPHER")]
+		ini[j] <- ini[k]
+		kmers[j] <- kmers[k]
+	}
+	
+	# Phase 3: Cluster sequences
+	for (i in seq_len(lc))
+		C[[i]] <- integer(L)
+	V <- v # original ordering of `v`
+	origin <- c(1, 1) # origin of existing clusters
+	subsetRate <- 0 # rate of subsetting
+	if (verbose) {
+		matches <- integer(maxPhase3) # relative location of cluster matches
+		totals <- integer(4L) # count of match origins
+	}
 	for (i in seq_len(lc)) {
+		c <- C[[i]]
+		C[[i]] <- list(NULL) # release memory
 		if (!ASC && i > 1) {
-			P <- order(c[u, i - 1][O],
-				sizes[O],
-				t[O],
-				rS,
-				decreasing=TRUE,
-				method="radix")
+			if (invertCenters) {
+				P <- order(abs(C[[i - 1L]][u][O]),
+					partition,
+					sizes,
+					t,
+					rS,
+					decreasing=TRUE,
+					method="radix")
+			} else {
+				P <- order(C[[i - 1L]][u][O],
+					partition,
+					sizes,
+					t,
+					rS,
+					decreasing=TRUE,
+					method="radix")
+			}
 			P <- O[P]
 			Q <- R[P]
 		}
@@ -758,17 +1083,18 @@ Clusterize <- function(myXStringSet,
 		cluster_num <- 1L
 		offset <- 0L
 		if (invertCenters) {
-			c[p[1L], i] <- -1L
+			c[p[1L]] <- -1L
 		} else {
-			c[p[1L], i] <- 1L
+			c[p[1L]] <- 1L
 		}
 		seeds.index <- integer(l)
 		seeds.index[Q[1L]] <- 1L
-		recent <- integer(avgComparisons)
+		recent <- integer(maxPhase3)
 		count <- 1L
 		recent[count] <- 1L
 		
-		for (j in seq_along(P)[-1L]) {
+		j <- 1L
+		while (j < l) {
 			if (verbose) {
 				value <- round(((i - 1)*l + j)/lc/l, 2)
 				if (value > lastValue) {
@@ -776,93 +1102,123 @@ Clusterize <- function(myXStringSet,
 					setTxtProgressBar(pBar, value)
 				}
 			}
+			j <- j + 1L
 			
 			if (!ASC && i > 1L) {
-				if (c[p[j], i - 1L] != c[p[j - 1L], i - 1L]) {
+				if ((invertCenters &&
+					abs(C[[i - 1L]][p[j]]) != abs(C[[i - 1L]][p[j - 1L]])) ||
+					(!invertCenters &&
+					C[[i - 1L]][p[j]] != C[[i - 1L]][p[j - 1L]])) {
 					# different clusters in last cutoff
 					offset <- offset + cluster_num
 					cluster_num <- 1L
-					c[p[j], i] <- cluster_num + offset
+					c[p[j]] <- cluster_num + offset
 					if (invertCenters)
-						c[p[j], i] <- -c[p[j], i]
-					seeds.index[Q[j]] <- j
-					recent <- integer(avgComparisons)
+						c[p[j]] <- -c[p[j]]
+					recent <- integer(maxPhase3)
 					count <- 1L
 					recent[count] <- j
+					seeds.index[Q[j]] <- j
 					next
-				} else if (c[p[j], i] > 0L) { # cluster pre-assigned
-					if (invertCenters) {
-						c[p[j], i] <- abs(c[c[p[j], i], i])
+				} else if (c[p[j]] > 0L) { # cluster pre-assigned
+					if (singleLinkage) {
+						seeds.index[Q[j]] <- j
 					} else {
-						c[p[j], i] <- c[c[p[j], i], i]
+						seeds.index[Q[j]] <- seeds.index[R[c[p[j]]]]
+					}
+					if (invertCenters) {
+						c[p[j]] <- abs(c[u[c[p[j]]]])
+					} else {
+						c[p[j]] <- c[u[c[p[j]]]]
 					}
 					next
 				}
 			}
 			
-			compare <- Q[recent] # most recent centers
-			compare <- compare[.Call("radixOrder", abs(Q[j] - compare), 1L, PACKAGE="DECIPHER")] # order by proximity
-			compare <- c(bL[Q[j]]:bR[Q[j]], # surrounding centers
-				compare)
-			compare <- compare[seeds.index[compare] != 0L]
+			compare <-  c(bL[Q[j]]:bR[Q[j]], # surrounding centers
+				Q[recent]) # most recent centers
+			compare <- compare[.Call("radixOrder", abs(Q[j] - compare), 1L, 1L, PACKAGE="DECIPHER")] # order by proximity
+			compare <- seeds.index[compare]
+			compare <- compare[compare != 0L] # remove unvisited seeds
+			compare <- compare[!duplicated(compare)]
+			
+			# choose the most frequent sequences sharing rare k-mers
+			groups <- .Call("selectIndices",
+				P[j], # focal sequence
+				select, # number of k-mers possible
+				ini, # initial index of each k-mer group
+				kmers, # number of k-mers to record in each group
+				o, # ordering of k-mers
+				numSelect, # maximum number of sequences to select
+				PACKAGE="DECIPHER")
+			d <- .Call("radixOrder", groups, 1L, 1L, PACKAGE="DECIPHER")
+			d <- .Call("dereplicate", groups, d, PACKAGE="DECIPHER")
+			d <- d[[1L]][.Call("radixOrder", d[[2L]], 0L, 1L, PACKAGE="DECIPHER")]
+			if (length(d) > maxPhase3)
+				length(d) <- maxPhase3
+			groups <- groups[d]
+			groups <- seeds.index[R[groups]]
+			groups <- groups[!duplicated(groups)]
+			
 			if (!ASC && i > 1) { # check bounds
+				groups <- groups[groups != 0L]
 				if (invertCenters) {
-					compare <- compare[abs(c[p[seeds.index[compare]], i - 1L]) == abs(c[p[j], i - 1L])]
+					compare <- compare[abs(C[[i - 1L]][p[compare]]) == abs(C[[i - 1L]][p[j]])]
+					groups <- groups[abs(C[[i - 1L]][p[groups]]) == abs(C[[i - 1L]][p[j]])]
 				} else {
-					compare <- compare[c[p[seeds.index[compare]], i - 1L] == c[p[j], i - 1L]]
+					compare <- compare[C[[i - 1L]][p[compare]] == C[[i - 1L]][p[j]]]
+					groups <- groups[C[[i - 1L]][p[groups]] == C[[i - 1L]][p[j]]]
 				}
 			}
-			if (length(compare) == 0L) {
+			if (length(compare) == 0L && length(groups) == 0L) {
 				cluster_num <- cluster_num + 1L
-				c[p[j], i] <- cluster_num + offset
+				c[p[j]] <- cluster_num + offset
 				if (invertCenters)
-					c[p[j], i] <- -c[p[j], i]
+					c[p[j]] <- -c[p[j]]
 				seeds.index[Q[j]] <- j
 				count <- count + 1L
-				if (count > avgComparisons)
+				if (count > maxPhase3)
 					count <- 1L
 				recent[count] <- j
 				next
 			}
-			compare <- head(compare, bR[Q[j]] - bL[Q[j]] + 1L)
-			compare <- compare[!duplicated(seeds.index[compare])]
 			
-			counts <- countHits(j, seeds.index[compare], optProcessors1)
-			s <- .Call("radixOrder", counts, 0L, PACKAGE="DECIPHER")
-			m <- numeric(length(s))
-			res <- vector("list", length(s))
-			batches <- seq.int(0L, length(s), batchSize)
-			if (batches[length(batches)] < length(s))
-				batches <- c(batches, length(s))
-			for (k in seq_len(length(batches) - 1L)) {
-				b <- (batches[k] + 1L):batches[k + 1L]
-				r <- overlap(j, seeds.index[compare[s[b]]], optProcessors1)
-				M <- similarity(r, wu[P[j]], wu[P[seeds.index[compare[s[b]]]]], optProcessors1)
-				res[s[b]] <- r
-				m[s[b]] <- M
-				if (any(M >= cutoff[i])) # met similarity threshold
-					break
-				if (k < length(batches) - 1L) {
-					# check for plausibility of reaching limit
-					upper <- max(M)
-					if (upper < limits[i] &&
-						length(M) == batchSize &&
-						upper + 2*sd(M) < limits[i])
-						break # unlikely to reach limit
-					# check for shift to lower similarities
-					if (k == 1L) {
-						lower <- min(M)
-					} else {
-						if (lower > upper)
-							break # unlikely to exceed previous
-					}
+			num <- bR[Q[j]] - bL[Q[j]] + 1L # total sequences to consider
+			prop <- origin/sum(origin)
+			num <- as.integer(ceiling(num*prop))
+			if (num[2L] > length(groups)) {
+				num[1L] <- num[1L] + num[2L] - length(groups)
+			} else if (num[1L] > length(compare)) {
+				num[2L] <- num[2L] + num[1L] - length(compare)
+			}
+			compare <- head(compare, num[1L])
+			groups <- head(groups, num[2L])
+			combined <- c(compare, groups)
+			combined <- combined[!duplicated(combined)]
+			
+			# narrow to comparisons with most hits
+			s <- unique(v[[j]][[1L]])
+			if (length(s) > maxSample/(1 - subsetRate) || # worthwhile
+				(j %% updateRate == 0 && length(s) > maxSample)) { # need to update
+				m <- .Call("radixOrder", freqs[s %/% lf + 1L], 1L, 1L, PACKAGE="DECIPHER")
+				length(m) <- maxSample
+				s <- s[m]
+				s <- s[.Call("radixOrder", s, 1L, 1L, PACKAGE="DECIPHER")]
+				counts <- countHits(s, v[combined], optProcessors0)
+				counts <- counts/sizes[Q[combined]]
+				w <- which(!is.na(counts))
+				if (length(w) > 0) {
+					w <- which(counts >= max(counts[w])*minFraction)
+					subsetRate <- (1 - alpha2)*subsetRate + alpha2*length(w)/length(combined)
+					combined <- combined[w]
 				}
 			}
 			
-			b <- seq_len(batches[k + 1L])
-			w <- s[sort.list(m[s[b]], method="radix", decreasing=TRUE)]
+			res <- overlap(j, combined, optProcessors1)
+			m <- similarity(res, wu[P[j]], wu[P[combined]], optProcessors1)
+			w <- sort.list(m, method="radix", decreasing=TRUE)
 			if (length(w) > maxAlignments)
-				w <- w[seq_len(maxAlignments)]
+				length(w) <- maxAlignments
 			W <- which(m[w] >= limits[i])
 			if (length(W) >= minAlignments) {
 				w <- w[W]
@@ -874,13 +1230,12 @@ Clusterize <- function(myXStringSet,
 				for (k in seq_along(w)) {
 					if (k > attempts) {
 						s <- seq(to=k - 1L, length.out=attempts)
-						if (max(m[w[s]]) + sd(m[w[s]]) < cutoff[i]) {
+						if (max(m[w[s]]) + stdDevs*sd(m[w[s]]) < cutoff[i]) {
 							w <- w[seq_len(k - 1L)] # prevent matching clusters without alignment
 							break
 						}
 					}
-					ali <- align(.subset(myXStringSet, p[j]),
-						.subset(myXStringSet, p[seeds.index[compare[w[k]]]]),
+					ali <- align(c(p[j], p[combined[w[k]]]),
 						anchor=res[[w[k]]],
 						processors=optProcessors2)
 					m[w[k]] <- dist(ali)
@@ -900,38 +1255,128 @@ Clusterize <- function(myXStringSet,
 			if (length(w) == 0L ||
 				m[w] < cutoff[i]) { # form a new group
 				cluster_num <- cluster_num + 1L
-				c[p[j], i] <- cluster_num + offset
+				c[p[j]] <- cluster_num + offset
 				if (invertCenters)
-					c[p[j], i] <- -c[p[j], i]
-				seeds.index[Q[j]] <- j
+					c[p[j]] <- -c[p[j]]
 				count <- count + 1L
-				if (count > avgComparisons)
+				if (count > maxPhase3)
 					count <- 1L
 				recent[count] <- j
+				seeds.index[Q[j]] <- j
 			} else { # part of an existing group
+				num <- c(match(combined[w], compare),
+					match(combined[w], groups))
+				isna <- is.na(num)
+				if (verbose) {
+					if (!isna[1L]) {
+						totals[1L] <- totals[1L] + 1L
+						if (isna[2L])
+							totals[3L] <- totals[3L] + 1L
+						if (num[1L] <= maxPhase3 &&
+							(num[1L] < num[2L] || isna[2L]))
+							matches[num[1L]] <- matches[num[1L]] + 1L
+					}
+					if (!isna[2L]) {
+						totals[2L] <- totals[2L] + 1L
+						if (isna[1L])
+							totals[4L] <- totals[4L] + 1L
+						if (num[2L] <= maxPhase3 &&
+							(num[2L] <= num[1L] || isna[1L]))
+							matches[num[2L]] <- matches[num[2L]] + 1L
+					}
+				}
+				if (isna[1L] || num[1L] > maxPhase3)
+					num[1L] <- maxPhase3
+				if (isna[2L] || num[2L] > maxPhase3)
+					num[2L] <- maxPhase3
+				origin <- (1 - alpha2)*origin + alpha2/num
 				if (invertCenters) {
-					c[p[j], i] <- -c[p[seeds.index[compare[w]]], i]
+					c[p[j]] <- -c[p[combined[w]]]
 				} else {
-					c[p[j], i] <- c[p[seeds.index[compare[w]]], i]
+					c[p[j]] <- c[p[combined[w]]]
 				}
 				if (!ASC && i < lc) {
 					cols <- (i + 1):lc
 					cols <- cols[which(m[w] >= cutoff[cols])]
-					if (length(cols) > 0L) # assign forward
-						c[p[j], cols] <- p[seeds.index[compare[w]]]
+					for (k in cols) # assign forward
+						C[[k]][p[j]] <- P[combined[w]]
+				}
+				if (singleLinkage) {
+					seeds.index[Q[j]] <- j
+				} else {
+					seeds.index[Q[j]] <- combined[w]
 				}
 			}
 		}
 		
-		c[, i] <- c[x, i]
+		C[[i]] <- c[x]
 	}
-	myClusters <- as.data.frame(c)
+	rm(P, O, R, Q, ini, kmers)
+	
+	C <- as.data.frame(C)
+	if (!is.null(names(myXStringSet))) {
+		dNames <- names(myXStringSet)
+		w <- which(duplicated(dNames))
+		if (length(w) > 0) {
+			warning("Duplicated names of myXStringSet appended with index.")
+			dNames[w] <- paste(dNames[w],
+				w,
+				sep="_")
+		}
+		rownames(C) <- dNames
+	}
 	
 	if (verbose) {
 		setTxtProgressBar(pBar, 1)
 		close(pBar)
+		num <- totals[1L] + totals[4L]
+		if (num > 0 && l > maxPhase3) {
+			cat("\nClusters via relatedness sorting: ",
+				100*round(totals[1L]/num, 3),
+				"% (",
+				100*round(totals[3L]/num, 3),
+				"% exclusively)",
+				sep="")
+			cat("\nClusters via rare ",
+				kmerSize,
+				"-mers: ",
+				100*round(totals[2L]/num, 3),
+				"% (",
+				100*round(totals[4L]/num, 3),
+				"% exclusively)",
+				sep="")
+			
+			X <- seq_along(matches)
+			Y <- cumsum(matches)
+			Y <- Y/Y[length(Y)]
+			Zipf <- function(s) {
+				H <- cumsum(X^s)
+				y <- H/H[length(H)]
+				sum(X^3*abs(Y - y)) # up weight tail
+			}
+			s <- optimize(Zipf, c(-10, 0))$minimum
+			
+			Hy <- 0
+			for (i in seq_len(maxPhase3))
+				Hy <- Hy + i^s
+			Hl <- Hy
+			for (i in seq(maxPhase3 + 1L, l))
+				Hl <- Hl + i^s
+			
+			cat("\nEstimated clustering effectiveness: ",
+				round(100*Hy/Hl, 1),
+				"%\n\n",
+				sep="")
+		} else {
+			cat("\nClusters via relatedness sorting: 100% (0% exclusively)",
+				"\nClusters via rare ",
+				kmerSize,
+				"-mers: 100% (0% exclusively)",
+				"\nEstimated clustering effectiveness: 100%\n",
+				sep="")
+		}
+		
 		time.2 <- Sys.time()
-		cat("\n")
 		print(round(difftime(time.2,
 			time.1,
 			units='secs'),
@@ -939,5 +1384,5 @@ Clusterize <- function(myXStringSet,
 		cat("\n")
 	}
 	
-	return(myClusters)
+	return(C)
 }

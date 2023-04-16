@@ -42,7 +42,7 @@ CalculateEfficiencyArray <- function(probe,
 	} else {
 		if (!is.numeric(deltaGrules))
 			stop("deltaGrules must be numeric.")
-		if (length(deltaGrules)!=390625)
+		if (length(deltaGrules) != 390625L)
 			stop("deltaGrules must be of dimensions 5 x 5 x 5 x 5 x 5 x 5 x 5 x 5.")
 	}
 	

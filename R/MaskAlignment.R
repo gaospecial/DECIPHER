@@ -85,7 +85,7 @@ MaskAlignment <- function(myXStringSet,
 			correction,
 			randomBackground)
 		if (showPlot)
-			MAX <- max(4.321928, # log(20, 2)
+			MAX <- max(4.321928094887362625798, # log2(20)
 				a)
 	} else {
 		pwm <- .Call("consensusProfile",
@@ -106,7 +106,7 @@ MaskAlignment <- function(myXStringSet,
 			correction,
 			randomBackground)
 		if (showPlot)
-			MAX <- max(2, # log(4, 2)
+			MAX <- max(2, # log2(4)
 				a)
 	}
 	

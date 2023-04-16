@@ -11,7 +11,7 @@ MapCharacters(x,
               refPositions = seq_len(nchar(attr(x, "state")[1])),
               labelEdges = FALSE,
               type = "dendrogram",
-              ignoreAmbiguity = TRUE,
+              chars = LETTERS,
               ignoreIndels = TRUE)
 }
 \arguments{
@@ -27,8 +27,8 @@ Logical determining whether to label edges with the number of changes along each
   \item{type}{
 Character string indicating the type of output desired.  This should be (an abbreviation of) one of \code{"dendrogram"}, \code{"table"}, or \code{"both"}.  (See value section below.)
 }
-  \item{ignoreAmbiguity}{
-Logical specifying whether to report changes involving ambiguities.  If \code{TRUE} (the default), changes involving \code{"N"} and other ambiguity codes are ignored.
+  \item{chars}{
+Character vector specifying the characters to consider in state changes at each site.  The default (\code{LETTERS}) is to consider any upper case letter. Alternatively, \code{chars} could be \code{AA_STANDARD}, \code{DNA_BASES}, or \code{RNA_BASES}.
 }
   \item{ignoreIndels}{
 Logical specifying whether to report insertions and deletions (indels).  If \code{TRUE} (the default), only substitutions of one state with another are reported.
@@ -62,7 +62,10 @@ tree <- TreeLine(myDistMatrix=d,
                  myXStringSet=rna,
                  reconstruct=TRUE)
 
-out <- MapCharacters(tree, labelEdges=TRUE, type="both")
+out <- MapCharacters(tree,
+                     labelEdges=TRUE,
+                     type="both",
+                     chars=RNA_BASES)
 
 # plot the tree with defaults
 tree <- out[[1]]

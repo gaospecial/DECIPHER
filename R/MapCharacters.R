@@ -2,7 +2,7 @@ MapCharacters <- function(x,
 	refPositions=seq_len(nchar(attr(x, "state")[1])),
 	labelEdges=FALSE,
 	type="dendrogram",
-	ignoreAmbiguity=TRUE,
+	chars=LETTERS,
 	ignoreIndels=TRUE) {
 	
 	# error checking
@@ -17,8 +17,15 @@ MapCharacters <- function(x,
 		stop("refPositions out of bounds.")
 	if (is.unsorted(refPositions))
 		stop("refPositions must be in ascending order.")
-	if (!is.logical(ignoreAmbiguity))
-		stop("ignoreAmbiguity must be a logical.")
+	if (length(chars) <= 1)
+		stop("At least two chars must be specified.")
+	if (any(is.na(chars)))
+		stop("Chars cannot contain NA values.")
+	if (any(nchar(chars) != 1))
+		stop("All chars must be a single character.")
+	gaps <- "-"
+	if (any(chars %in% gaps))
+		stop("Gap ('-') characters cannot be in chars.")
 	if (!is.logical(ignoreIndels))
 		stop("ignoreIndels must be a logical.")
 	TYPES <- c("dendrogram", "table", "both")
@@ -60,17 +67,16 @@ MapCharacters <- function(x,
 						stop("Inconsistent 'state' attributes in x.")
 					
 					if (ignoreIndels) {
-						nongaps <- which(s1 != "-" & s2 != "-")
+						nongaps <- which(!(s1 %in% gaps) &
+							!(s2 %in% gaps))
 					} else {
-						nongaps <- which(s1 != "-" | s2 != "-")
+						nongaps <- which(!(s1 %in% gaps) |
+							!(s2 %in% gaps))
 					}
-					if (ignoreAmbiguity) {
-						w <- which(s1[nongaps] != s2[nongaps] &
-							s1[nongaps] %in% bases &
-							s2[nongaps] %in% bases)
-					} else {
-						w <- which(s1[nongaps] != s2[nongaps])
-					}
+					w <- which(s1[nongaps] != s2[nongaps] &
+						s1[nongaps] %in% chars &
+						s2[nongaps] %in% chars)
+					
 					if (length(w) > 0) {
 						ini <- s1[nongaps[w]]
 						fin <- s2[nongaps[w]]
@@ -191,8 +197,8 @@ MapCharacters <- function(x,
 			2*l - 2)
 		num <- 1L
 	}
-	bases <- c("-", "A", "C", "G", "T", "U")
 	out <- .map(x)
+	attr(out, "change") <- character() # empty set at root node
 	if(type > 1L) {
 		res <- table(unlist(res))
 		res <- sort(res, decreasing=TRUE)

@@ -283,7 +283,7 @@ AlignSeqs <- function(myXStringSet,
 					any(!(AAs %in% dimnames(sM)[[2]])))
 					stop("substitutionMatrix is incomplete.")
 			} else {
-				sM <- eval(parse(text=data(list=sM, envir=environment(), package=ifelse(substitutionMatrix=="MIQS", "DECIPHER", "Biostrings"))))
+				sM <- eval(parse(text=data(list=sM, envir=environment(), package=ifelse(sM == "MIQS", "DECIPHER", "Biostrings"))))
 			}
 			sM <- sM[AAs, AAs]
 			sM <- sM + 0 # convert to numeric matrix

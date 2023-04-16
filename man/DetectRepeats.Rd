@@ -15,6 +15,7 @@ DetectRepeats(myXStringSet,
               maxFailures = 2,
               maxShifts = 5,
               alphabet = AA_REDUCED[[125]],
+              useEmpirical = TRUE,
               processors = 1,
               verbose = TRUE,
               \dots)
@@ -43,6 +44,9 @@ Numeric determining the maximum number of failing attempts to shift a repeat lef
 }
   \item{alphabet}{
 Character vector of amino acid groupings used to reduce the 20 standard amino acids into smaller groups.  Alphabet reduction helps to find more distant homologies between sequences.  A non-reduced amino acid alphabet can be used by setting \code{alphabet} equal to \code{AA_STANDARD}.  Only applicable if \code{myXStringSet} is an \code{AAStringSet}.
+}
+  \item{useEmpirical}{
+Logical specifying whether to use empirical signals of structurally-determined tandem repeats when scoring. Empirical signals include the number of repeats, their periodicity, and their amino acid composition when \code{myXStringSet} is an \code{AAStringSet}.
 }
   \item{processors}{
 The number of processors to use, or \code{NULL} to automatically detect and use all available processors.

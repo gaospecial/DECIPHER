@@ -1,7 +1,7 @@
 \name{Clusterize}
 \alias{Clusterize}
 \title{
-Cluster Sequences By Similarity
+Cluster Sequences By Distance
 }
 \description{
 Groups the sequences into approximate clusters of similarity.
@@ -13,16 +13,21 @@ Clusterize(myXStringSet,
            includeTerminalGaps = FALSE,
            penalizeGapLetterMatches = NA,
            minCoverage = 0.5,
-           maxReps = 1000,
-           avgComparisons = 5000,
+           maxPhase1 = 400,
+           maxPhase2 = 400,
+           maxPhase3 = 400,
            maxAlignments = 100,
+           rareKmers = 50,
+           probability = 0.999,
            invertCenters = FALSE,
+           singleLinkage = FALSE,
+           alphabet = AA_REDUCED[[152]],
            processors = 1,
            verbose = TRUE)
 }
 \arguments{
   \item{myXStringSet}{
-The \code{DNAStringSet}, \code{RNAStringSet}, or \code{AAStringSet} to cluster.
+The (unaligned) \code{DNAStringSet}, \code{RNAStringSet}, or \code{AAStringSet} to cluster.
 }
   \item{cutoff}{
 A vector of maximum distances (approximately) separating sequences in the same cluster (i.e., 1 - similarities).  Multiple cutoffs may be provided in ascending or descending order.  (See details section below.)
@@ -39,17 +44,32 @@ Logical specifying whether or not to consider gap-to-letter matches as mismatche
   \item{minCoverage}{
 Numeric between zero and one giving the minimum fraction of sequence positions (not gap or mask) in the shortest sequence that must be overlapping with the longer sequence for the sequences to be clustered.
 }
-  \item{maxReps}{
-An integer specifying the maximum number of replicates to perform when ordering sequences based on their k-mer similarity.
+  \item{maxPhase1}{
+An integer specifying the maximum number of passes through the sequences to perform in the initial partitioning of the sequences.
 }
-  \item{avgComparisons}{
-An integer determining the average number of comparisons per sequence to perform when attempting to find cluster centers.
+  \item{maxPhase2}{
+An integer giving the maximum number of replicates to perform when ordering sequences based on their k-mer similarity.
+}
+  \item{maxPhase3}{
+An integer determining the number of comparisons per sequence to perform when attempting to find cluster centers.
 }
   \item{maxAlignments}{
-An integer giving the maximum number of alignments to perform when attempting to assign a sequence to an existing cluster.
+An integer designating the maximum number of alignments to perform when attempting to assign a sequence to an existing cluster.
+}
+  \item{rareKmers}{
+An integer setting the number of rare k-mers to record per sequence. Larger values require more memory but may improve accuracy with diminishing returns.
+}
+  \item{probability}{
+Numeric between 0 and 1 (exclusive) defining the approximate probability of clustering sequences that are exactly \code{cutoff} distant. Typically near, but always less than, \code{1}. Lower values result in faster clustering at the expense of effectiveness.
 }
   \item{invertCenters}{
 Logical controlling whether the cluster center is inverted (i.e., multiplied by \code{-1}), which allows the centers to be determined from the results.  The default (\code{FALSE}) only returns positive cluster numbers.  If \code{TRUE}, the center sequence(s) of each cluster are negative.
+}
+  \item{singleLinkage}{
+Logical specifying whether to perform single-linkage clustering. The default (\code{FALSE}) only establishes linkage to the cluster center. Single-linkage clustering creates broader clusters that may better correspond to natural groups depending on the application.
+}
+  \item{alphabet}{
+Character vector of amino acid groupings used to reduce the 20 standard amino acids into smaller groups.  Alphabet reduction helps to find more distant homologies between sequences in phase 1.
 }
   \item{processors}{
 The number of processors to use, or \code{NULL} to automatically detect and use all available processors.
@@ -59,17 +79,17 @@ Logical indicating whether to display progress.
 }
 }
 \details{
-\code{Clusterize} groups the input sequences into approximate clusters using a heuristic algorithm.  First, the sequences are grouped (if needed) using spherical k-means of their 3-mer frequencies.  Second, the sequences are ordered by k-mer similarity with a stochastic partitioning approach.  Third, the sequences are iteratively clustered in this order by their similarity in a pairwise alignment.  That is, the first sequence becomes the representative of cluster #1.  If the second sequence is within \code{cutoff} distance then it is added to the cluster, otherwise it becomes a new cluster representative.  The remaining sequences are matched to cluster representatives in a similar fashion until all sequences belong to a cluster.  In the majority of cases, this process results in clusters with members separated by less than \code{cutoff} distance, and all cluster members must be within \code{cutoff} distance of their cluster representative.
+\code{Clusterize} groups the input sequences into approximate clusters using a heuristic algorithm with linear time and memory complexity.  In phase 1, the sequences are partitioned into groups of similarity.  In phase 2, the sequences are ordered by k-mer similarity by relatedness sorting.  In phase 3, the sequences are iteratively clustered in this order by their similarity to surrounding sequences.  That is, the first sequence becomes the representative of cluster #1.  If the second sequence is within \code{cutoff} distance then it is added to the cluster, otherwise it becomes a new cluster representative.  The remaining sequences are matched to cluster representatives in a similar fashion until all sequences belong to a cluster.  In the majority of cases, this process results in clusters with members separated by less than \code{cutoff} distance, and all cluster members must be within \code{cutoff} distance of their cluster representative.
 
 The calculation of distance can be controlled in multiple ways, with each parameterization of distance having advantages and disadvantages.  By default, distance is the fraction of positions that are different, including gaps, within the overlapping region in a pairwise alignment.  The defaults will handle partial-length sequences well, but also cluster sequences with high similarity between their opposite ends.  For this reason, it is important to set \code{minimumCoverage} (by default \code{0.5}) such that distances are based off of considerable overlap between sequences in the pairwise alignment.  This distance parameterization works well, but there are reasonable alternatives.
 
 If \code{penalizeGapLetterMatches} is \code{FALSE}, the distance will exclude gap regions.  If \code{includeTerminalGaps} is \code{TRUE}, the calculation of distance will use the entire (global) alignment.  If \code{method} is \code{"shortest"} and \code{includeTerminalGaps} is set to \code{TRUE}, then the distance is calculated for the region encompassed by the shorter sequence in each pair, which is the common definition of distance used by other clustering programs.  This common definition of distance will more sometimes separate partly overlapping sequences, which is why it is not the default.
 
-The algorithm requires time proportional to the number of input sequences in \code{myXStringSet}.  The first step, spherical k-means requires linear time.   Next, the sequences are compared with up to \code{maxReps} passes that each take linear time.  Ordering of the sequences is performed in linear time using radix sorting.  Finally, each sequence is compared with up to \code{maxComparisons} previous cluster representatives.  This is possible because the sequences are in an order that is related to their similarity, such that nearby sequences are more similar.  Hence, the complete algorithm scales in linear time asymptotically and returns clusters of sequences within \code{cutoff} distance of their center sequence.
+The algorithm requires time proportional to the number of input sequences in \code{myXStringSet}.  The phase 1, up to \code{maxPhase1} passes through the sequences are needed.  In phase 2, the sequences are compared with up to \code{maxPhase2} passes that each take linear time.  Ordering of the sequences is performed in linear time using radix sorting.  In phase 3, each sequence is compared with up to \code{maxPhase3} previous cluster representatives of sequences sharing \code{rareKmers} or nearby sequences in the relatedness ordering.  This is possible because the sequences are sorted by relatedness, such that more recent cluster representatives are more similar.  Hence, the complete algorithm scales in linear time asymptotically and returns clusters of sequences within \code{cutoff} distance of their center sequence.
 
-Multiple cutoffs can be provided in sorted order.  If the \code{cutoff}s are provided in \emph{descending} order then clustering at each new value of \code{cutoff} is continued within the prior \code{cutoff}'s clusters.  In this way clusters at lower values of \code{cutoff} are completely contained within their ``umbrella'' clusters at higher values of \code{cutoff}.  This slightly accelerates the clustering process, because each subsequent group is only clustered within the previous group.  If multiple cutoffs are provided in \emph{ascending} order then clustering at each level of \code{cutoff} is independent of the prior level.
+Multiple cutoffs can be provided in sorted order, which saves time because phases 1 and 2 only need to be performed once.  If the \code{cutoff}s are provided in \emph{descending} order then clustering at each new value of \code{cutoff} is continued within the prior \code{cutoff}'s clusters.  In this way clusters at lower values of \code{cutoff} are completely contained within their ``umbrella'' clusters at higher values of \code{cutoff}.  This slightly accelerates the clustering process, because each subsequent group is only clustered within the previous group.  If multiple cutoffs are provided in \emph{ascending} order then clustering at each level of \code{cutoff} is independent of the prior level.
 
-Note, the algorithm stochastically selects partitions for ordering the sequences.  Hence, clusters can vary from run-to-run unless the random number seed is set for repeatability (i.e., with \code{set.seed}).  Also, \code{invertCenters} can be used to determine the center sequence of each cluster from the output.  Since identical sequences will always be assigned the same cluster numbers, it is possible for more than one input sequence in \code{myXStringSet} to be assigned as the center of a cluster.
+Note, all three phases of the algorithm are stochastic.  Hence, clusters can vary from run-to-run unless the random number seed is set for repeatability (i.e., with \code{set.seed}).  Also, \code{invertCenters} can be used to determine the center sequence of each cluster from the output.  Since identical sequences will always be assigned the same cluster numbers, it is possible for more than one input sequence in \code{myXStringSet} to be assigned as the center of a cluster if they are identical.
 }
 \value{
 A data.frame is returned with dimensions \eqn{N*M}, where each one of \eqn{N} sequences is assigned to a cluster at the \eqn{M}-level of cutoff.  The row.names of the data.frame correspond to the \emph{names} of \code{myXStingSet}.
@@ -85,12 +105,20 @@ fas <- system.file("extdata", "50S_ribosomal_protein_L2.fas", package="DECIPHER"
 dna <- readDNAStringSet(fas)
 aa <- translate(dna)
 
-# cluster each cutoff within the previous cluster (faster)
+# typical usage (e.g., clustering at >= 90 percent similarity)
+clusters <- Clusterize(aa, cutoff=0.1) # set processors = NULL for max speed
+head(clusters)
+
+# typical usage (e.g., obtaining cluster representatives)
+clusters <- Clusterize(aa, cutoff=0.1, invertCenters=TRUE)
+aa[clusters[[1]] < 0]
+
+# cluster each cutoff within the previous cluster (slightly faster)
 clusters <- Clusterize(aa, cutoff=seq(0.7, 0, -0.1))
 head(clusters)
 apply(clusters, 2, max) # number of clusters per cutoff
 
-# cluster each cutoff independently (fewer clusters per cutoff)
+# cluster each cutoff independently (possibly fewer clusters per cutoff)
 clusters <- Clusterize(aa, cutoff=seq(0, 0.7, 0.1))
 head(clusters)
 apply(clusters, 2, max) # number of clusters per cutoff

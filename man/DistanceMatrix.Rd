@@ -25,7 +25,7 @@ A \code{DNAStringSet}, \code{RNAStringSet}, or \code{AAStringSet} object of alig
 Character string indicating the type of output desired.  This should be either \code{"matrix"} or \code{"dist"}.  (See value section below.)
 }
   \item{method}{
-Character string determining the region in which distance is calculated.  This should be (an unambiguous abbreviation of) one of \code{"overlap"}, \code{"shortest"}, or \code{"longest"}.  The default \code{method} (\code{"overlap"}) calculates distance from the overlapping region between terminal gaps when \code{includeTerminalGaps} is \code{FALSE} and the entire alignment otherwise.  Setting \code{method} to \code{"shortest"} or \code{"longest"} will use the region between the start and end of the shortest or longest sequence, respectively, for each pairwise distance.  The \code{method} is only applicable when \code{includeTerminalGaps} is \code{TRUE}.
+Character string determining the region in which distance is calculated.  This should be (an unambiguous abbreviation of) one of \code{"overlap"}, \code{"shortest"}, or \code{"longest"}.  The default \code{method} (\code{"overlap"}) calculates distance in the overlapping region between terminal gaps when \code{includeTerminalGaps} is \code{FALSE} and the entire alignment otherwise.  Setting \code{method} to \code{"shortest"} or \code{"longest"} will use the region between the start and end of the shortest or longest sequence, respectively, for each pairwise distance.  The \code{method} is only relevant when \code{includeTerminalGaps} is \code{TRUE}.
 }
   \item{includeTerminalGaps}{
 Logical specifying whether or not to include terminal gaps ("-" or "." characters on each end of the sequence) into the calculation of distance.
@@ -51,7 +51,7 @@ The uncorrected (\code{correction = "none"}) distance matrix represents the hamm
 
 If \code{includeTerminalGaps = FALSE} then terminal gaps ("-" or "." characters) are not included in sequence length.  This can be faster since only the positions common to each pair of sequences are compared.  Sequences with no overlapping region in the alignment are given a value of \code{NA}, unless \code{includeTerminalGaps = TRUE}, in which case distance is 100\%.  Masked characters (\code{"+"}) in either sequence are not considered in distance.
 
-Penalizing gap-to-gap and gap-to-letter mismatches specifies whether to penalize these special mismatch types and include them in the total length when calculating distance.  Both "-" and "." characters are interpreted as gaps.  The default behavior is to calculate distance as the fraction of positions that differ across the region of the alignment shared by both sequences (not including gap-to-gap matches).
+Penalizing gap-to-letter mismatches specifies whether to penalize these special mismatch types and include them in the total length when calculating distance.  Both "-" and "." characters are interpreted as gaps.  The default behavior is to calculate distance as the fraction of positions that differ across the region of the alignment shared by both sequences (not including gap-to-gap matches).
 
 Two correction factors are available, \code{"JC69"} and \code{"F81"}, which are described in \code{\link{MODELS}}.  Both transform raw distance (\eqn{d}) by \deqn{-E * \log \left( 1 - d / E \right)}, where \deqn{E = 1 - \sum_{i \in sym} f_i^2} and (\eqn{f}) is the relative frequency of each symbol (\eqn{sym}).  In the \code{"JC69"} model symbols are assumed to have equal frequency, whereas in the \code{"F81"} model the symbol frequencies are empirically derived from the input \code{myXStringSet}.  Note that gaps are treated as an additional symbol when \code{penalizeGapLetterMatches} is \code{TRUE}.
 
@@ -127,4 +127,14 @@ DistanceMatrix(dna, method="longest",
 DistanceMatrix(dna, method="longest",
                includeTerminalGaps=TRUE,
                penalizeGapLetterMatches=FALSE) # 1/3
+
+# neither internal nor external gap/gap matches are considered:
+dna <- DNAStringSet(c("--A-CTA", "-AG-C--"))
+dna
+DistanceMatrix(dna) # 1/2
+DistanceMatrix(dna, includeTerminalGaps=TRUE) # 4/5
+DistanceMatrix(dna, includeTerminalGaps=TRUE,
+               method="shortest") # 2/3
+DistanceMatrix(dna, includeTerminalGaps=TRUE,
+               method="longest") # 3/4
 }

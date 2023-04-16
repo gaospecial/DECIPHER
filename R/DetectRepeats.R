@@ -6,6 +6,7 @@ DetectRepeats <- function(myXStringSet,
 	maxFailures=2,
 	maxShifts=5,
 	alphabet=AA_REDUCED[[125]],
+	useEmpirical=TRUE,
 	processors=1,
 	verbose=TRUE,
 	...) {
@@ -32,6 +33,8 @@ DetectRepeats <- function(myXStringSet,
 			stop("type must be 'tandem' when myXStringSet is an AAStringSet.")
 		xtype <- 3L
 		
+		if (!is.character(alphabet))
+			stop("alphabet must be a character vector.")
 		if (any(alphabet==""))
 			stop("No elements of alphabet can be empty.")
 		r <- strsplit(alphabet, "", fixed=TRUE)
@@ -88,6 +91,8 @@ DetectRepeats <- function(myXStringSet,
 		stop("maxShifts must be at least zero.")
 	if (maxPeriod < 1)
 		stop("maxPeriod must be at least one.")
+	if (!is.logical(useEmpirical))
+		stop("useEmpirical must be a logical.")
 	if (!is.logical(verbose))
 		stop("verbose must be a logical.")
 	a <- vcountPattern("-", myXStringSet)
@@ -141,13 +146,18 @@ DetectRepeats <- function(myXStringSet,
 				POSL,
 				POSR,
 				SIMPLIFY=FALSE)
-			AAs <- colSums(alphabetFrequency(x)[, 1:20])
-			addScore <- sum(residues*AAs) # score for amino acid enrichment
+			if (useEmpirical) {
+				AAs <- colSums(alphabetFrequency(x)[, 1:20])
+				addScore <- sum(residues*AAs) # score for amino acid enrichment
+			} else {
+				addScore <- 0
+			}
 		} else {
 			addScore <- 0
 		}
 		
-		if (length(POSL) > 1L) { # not NA
+		if (useEmpirical &&
+			length(POSL) > 1L) { # not NA
 			# score periodicity of repeats relative to random background
 			addScore <- addScore + periods[1] + (periods[2] - periods[1])/(periods[3] + periods[4]*exp(periods[5]*mean(POSR - POSL + 1L, na.rm=TRUE)))^(1/periods[6])
 			

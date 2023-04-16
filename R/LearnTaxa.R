@@ -35,6 +35,8 @@ LearnTaxa <- function(train,
 	if (any(!grepl("Root;", taxonomy, fixed=TRUE)))
 		stop("All elements of taxonomy must contain 'Root;'.")
 	if (is(train, "AAStringSet")) {
+		if (!is.character(alphabet))
+			stop("alphabet must be a character vector.")
 		if (any(alphabet==""))
 			stop("No elements of alphabet can be empty.")
 		r <- strsplit(alphabet, "", fixed=TRUE)
@@ -73,8 +75,6 @@ LearnTaxa <- function(train,
 		if (N <= 1)
 			stop("N must be greater than one.")
 		quant <- quantile(width(train), 0.99)
-		if (max(width(train)) > N/50*quant)
-			warning("Extra long sequences in train may negatively affect accuracy.")
 		if (is(train, "AAStringSet")) {
 			K <- floor(log(N*quant,
 				.Call("alphabetSizeReducedAA",

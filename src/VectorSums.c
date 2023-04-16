@@ -69,16 +69,16 @@ SEXP vectorSum(SEXP x, SEXP y, SEXP z, SEXP b)
 
 // First, temp = x %in% y for ordered integer vectors
 // Second, summation of temp[z]*a in b blocks by rows
-SEXP parallelMatch(SEXP x, SEXP y, SEXP indices, SEXP z, SEXP a, SEXP b, SEXP nThreads)
+SEXP parallelMatch(SEXP x, SEXP y, SEXP indices, SEXP a, SEXP b, SEXP pos, SEXP rng, SEXP nThreads)
 {
 	int *v = INTEGER(x);
 	int size_x = length(x);
-	int *m = INTEGER(z); // vector of indices in x
 	double *weights = REAL(a);
 	int size = asInteger(b); // block count
-	int l = length(z);
 	int *u = INTEGER(indices);
 	int n = length(indices);
+	int *p = INTEGER(pos);
+	int *r = INTEGER(rng);
 	int nthreads = asInteger(nThreads);
 	int i, j, k;
 	
@@ -104,40 +104,34 @@ SEXP parallelMatch(SEXP x, SEXP y, SEXP indices, SEXP z, SEXP a, SEXP b, SEXP nT
 	for (i = 0; i < n; i++)
 		cS[i] = 0;
 	
-	#pragma omp parallel for private(i, j, k) schedule(guided) num_threads(nthreads)
-	for (k = 0; k < n; k++) {
-		int *w = ptrs[k];
+	#pragma omp parallel num_threads(nthreads)
+	{
+		int *temp = (int *) malloc(size_x*sizeof(int)); // initialized to zero (thread-safe on Windows)
 		
-		// temp = x %in% y
-		int *temp = (int *) calloc(size_x, sizeof(int)); // initialized to zero (thread-safe on Windows)
-		int s = 0;
-		int c = 0;
-		for (i = 0; i < size_x; i++) {
-			for (j = s; j < size_y[k]; j++) {
-				if (v[i] == w[j]) {
-					temp[i] = 1;
-					c = 1;
-					break;
-				} else if (v[i] < w[j]) {
-					break;
+		#pragma omp for private(i, j, k) schedule(guided)
+		for (k = 0; k < n; k++) {
+			int *w = ptrs[k];
+			
+			// temp = x %in% y
+			int c = 0; // count of k-mer matches
+			j = 0;
+			for (i = 0; i < size_x; i++) {
+				for (; j < size_y[k]; j++) {
+					if (v[i] <= w[j]) {
+						if (v[i] == w[j])
+							temp[c++] = i;
+						break;
+					}
 				}
 			}
-			s = j;
-		}
-		
-		if (c > 0) { // at least one match
-			// sum temp[m]*weights by rows
-			j = 0;
-			for (i = 0; i < l; i++) {
-				if (temp[m[i] - 1] > 0)
-					rans[k*size + j] += weights[i];
-				
-				j++;
-				if (j==size)
-					j = 0;
+			
+			// insert k-mer weights into hits matrix
+			for (i = 0; i < c; i++) {
+				for (j = r[temp[i]]; j < r[temp[i] + 1]; j++)
+					rans[k*size + p[j]] += weights[temp[i]];
 			}
 			
-			// compute the row sum
+			// sum temp[m]*weights by rows
 			for (i = 0; i < size; i++)
 				cS[k] += rans[k*size + i];
 		}

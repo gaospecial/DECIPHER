@@ -9,15 +9,16 @@ Predicts a consensus RNA secondary structure from a multiple sequence alignment 
 \usage{
 PredictDBN(myXStringSet,
            type = "states",
-           minOccupancy = 0.5,
+           minOccupancy = 0.4,
            impact = c(1, 1.2, 0.4, -1),
            avgProdCorr = 1,
            slope = 2,
            shift = 1.3,
-           threshold = 0.3,
+           threshold = 0.4,
            pseudoknots = 1,
            weight = NA,
            useFreeEnergy = TRUE,
+           deltaGrules = NULL,
            processors = 1,
            verbose = TRUE)
 }
@@ -55,6 +56,9 @@ Either a numeric vector of weights for each sequence, a single number implying e
   \item{useFreeEnergy}{
 Logical determining whether RNA free energy predictions should be incorporated along with mutual information into the secondary structure prediction.
 }
+  \item{deltaGrules}{
+Free energy rules for all possible base pairings in quadruplets.  If NULL, defaults to pseudoenergies (\code{\link{deltaGrulesRNA}}).  Only applicable if \code{useFreeEnergies} is \code{TRUE}.
+}
   \item{processors}{
 The number of processors to use, or \code{NULL} to automatically detect and use all available processors.
 }
@@ -82,6 +86,8 @@ The mutual information values are then rescaled between \code{0} and \code{1} by
 \deqn{H_{final}(i,j) = \left( 1 + \exp \left( slope \cdot log_e \left( \frac{H_{APC}(i,j)}{shift \cdot H_{APC}[n]} \right) \right) \right)^{-1}}
 
 where, \eqn{n} is the number of positions having \code{minOccupancy} divided by two (i.e., the maximum possible number of paired positions) and \eqn{H_{APC}[n]} denotes the \eqn{n^{th}} highest value in the matrix \eqn{H_{APC}}.
+
+If \code{useFreeEnergies} is \code{TRUE}, mutual information is supplemented with a probabalistic model of folding based on \code{deltaGrules}.  That is, palindromes in each sequence are ranked by their free energy, and converted to probabilities of base pairing by assuming an exponential distribution of free energies.  This tends to improve predictive accuracy when the aligned sequences are insufficiently diverse for considerable evidence of compensatory mutations.
 
 If \code{type} is \code{"states"} or \code{"pairs"}, the secondary structure is determined using a variant of the Nussinov algorithm similar to that described by Venkatachalam et al. (2014).  Pairings with a score below \code{threshold} are not considered during the traceback.  If \code{psuedoknots} is greater than \code{0}, paired positions are removed from consideration and the method is applied again to find pseudoknots.
 

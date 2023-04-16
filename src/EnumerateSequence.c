@@ -632,7 +632,6 @@ static void alphabetFrequencyReducedAA(const Chars_holder *P, int *bits, int pos
 	}
 }
 
-//ans_start <- .Call("enumerateReducedSequenceAA", myDNAStringSet, wordSize, alphabet, PACKAGE="DECIPHER")
 SEXP enumerateSequenceReducedAA(SEXP x, SEXP wordSize, SEXP alphabet, SEXP mask)
 {
 	XStringSet_holder x_set;
@@ -758,7 +757,7 @@ SEXP alphabetSizeReducedAA(SEXP x, SEXP alphabet)
 {
 	XStringSet_holder x_set;
 	Chars_holder x_i;
-	int x_length, i, j, letter, sum = 0;
+	int x_length, i, j, letter;
 	int *alpha = INTEGER(alphabet);
 	
 	// initialize the XStringSet
@@ -777,7 +776,7 @@ SEXP alphabetSizeReducedAA(SEXP x, SEXP alphabet)
 	}
 	m++; // start at 1
 	
-	int dist[m]; // distribution
+	double dist[m]; // distribution
 	for (i = 0; i < m; i++)
 		dist[i] = 0;
 	
@@ -791,12 +790,13 @@ SEXP alphabetSizeReducedAA(SEXP x, SEXP alphabet)
 		}
 	}
 	
+	double sum = 0;
 	for (i = 0; i < m; i++)
 		sum += dist[i];
 	
 	double p; // proportion of each letter
 	for (i = 0; i < m; i++) {
-		p = (double)dist[i]/sum;
+		p = dist[i]/sum;
 		if (p > 0)
 			rans[0] -= p*log(p); // negative entropy
 	}

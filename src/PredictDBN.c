@@ -1091,14 +1091,14 @@ SEXP allZero(SEXP vec1, SEXP vec2, SEXP start1, SEXP start2, SEXP end1, SEXP end
 	int *rans = INTEGER(ans);
 	rans[0] = 1;
 	
-	for (i = s1; i < s2; i++) {
+	for (i = s1; i <= s2; i++) {
 		if (v1[i] || v2[i]) {
 			rans[0] = 0;
 			break;
 		}
 	}
 	if (rans[0]) {
-		for (i = e1; i < e2; i++) {
+		for (i = e1; i <= e2; i++) {
 			if (v1[i] || v2[i]) {
 				rans[0] = 0;
 				break;

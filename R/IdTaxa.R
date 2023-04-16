@@ -355,19 +355,19 @@ IdTaxa <- function(test,
 		
 		# only match unique k-mers to improve speed
 		uSampling <- sort(unique(as.vector(sampling)))
-		m <- match(sampling, uSampling)
-		
-		# lookup IDF weights for sampled k-mers
-		myweights <- matrix(counts[sampling], B[I[i]], s)
+		# record indices of sampled k-mers in hits matrix
+		m <- split(seq(0L, length(sampling) - 1L) %% B[I[i]], # row number
+			match(sampling, uSampling))
 		
 		# record the matches to each group
 		hits <- .Call("parallelMatch",
 			uSampling,
 			kmers,
 			keep,
-			m,
-			myweights,
+			counts[uSampling], # weights of k-mers
 			B[I[i]],
+			unlist(m), # positions of k-mers in hits matrix
+			c(0L, cumsum(lengths(m))), # range of positions per k-mer
 			processors,
 			PACKAGE="DECIPHER")
 		
@@ -386,7 +386,7 @@ IdTaxa <- function(test,
 		
 		# compute confidence from the number of hits per group
 		totHits <- numeric(length(topHits))
-		davg <- mean(rowSums(myweights))
+		davg <- mean(rowSums(matrix(counts[sampling], B[I[i]], s)))
 		maxes <- max.col(hits)
 		for (j in seq_len(B[I[i]])) # each bootstrap replicate
 			totHits[maxes[j]] <- totHits[maxes[j]] + hits[j, maxes[j]]/davg

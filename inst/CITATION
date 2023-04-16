@@ -5,5 +5,9 @@ bibentry(bibtype = "Article",
          year = "2016",
          volume = "8",
          number = "1",
-         pages = "352-359"
+         pages = "352-359",
+         mheader="To cite DECIPHER in publications use:",
+         mfooter=paste("To cite individual functions within DECIPHER,",
+                       "please refer to the reference section in the",
+                       "function's manual (help) page where available.")
 )

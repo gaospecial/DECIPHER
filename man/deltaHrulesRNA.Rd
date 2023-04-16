@@ -5,7 +5,7 @@
 Change in Enthalpy of Hybridization of RNA/RNA Quadruplets in Solution
 }
 \description{
-An 8D array with four adjacent base pairs of the RNA duplex.  Each dimension has five elements defining the residue at that position ("A", "C", "G", "U", or "-").  The array contains the standard enthalpy change of probe binding (dH, [kcal/mol]) for every quadruple base pairing.
+An 8D array with four adjacent base pairs of the RNA duplex.  Each dimension has five elements defining the nucleotide at that position ("A", "C", "G", "U", or "-").  The array contains the standard enthalpy change of probe binding (dH, [kcal/mol]) for every quadruple base pairing.
 }
 \usage{data(deltaHrulesRNA)}
 \format{

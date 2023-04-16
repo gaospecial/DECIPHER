@@ -36,7 +36,7 @@ SEXP similarities(SEXP res, SEXP widths1, SEXP widths2, SEXP terminalGaps, SEXP 
 
 SEXP overlap(SEXP res, SEXP widths1, SEXP widths2);
 
-SEXP cophenetic(SEXP Index1, SEXP Index2, SEXP N, SEXP D, SEXP H);
+SEXP cophenetic(SEXP Index1, SEXP N, SEXP D, SEXP H);
 
 // Cluster.c
 
@@ -98,6 +98,12 @@ SEXP matchOverlap(SEXP x, SEXP y, SEXP v, SEXP wordSize, SEXP nThreads);
 
 SEXP countOverlap(SEXP x, SEXP y, SEXP v, SEXP nThreads);
 
+SEXP countHits(SEXP x, SEXP v, SEXP nThreads);
+
+SEXP sumBins(SEXP v, SEXP bins);
+
+SEXP countRepeats(SEXP v);
+
 // ReplaceChars.c
 
 SEXP replaceChars(SEXP x, SEXP r, SEXP t);
@@ -105,6 +111,8 @@ SEXP replaceChars(SEXP x, SEXP r, SEXP t);
 SEXP replaceChar(SEXP x, SEXP c, SEXP r);
 
 SEXP replaceGaps(SEXP x, SEXP y, SEXP start, SEXP type);
+
+SEXP selectIndices(SEXP P, SEXP select, SEXP initial, SEXP final, SEXP ordering, SEXP num);
 
 // TerminalMismatch.c
 
@@ -206,7 +214,9 @@ SEXP findFrameshifts(SEXP t, SEXP l, SEXP f, SEXP index, SEXP oindex, SEXP maxCo
 
 // Order.c
 
-SEXP radixOrder(SEXP x, SEXP ascending);
+SEXP radixOrder(SEXP x, SEXP ascending, SEXP keepNAs);
+
+SEXP dereplicate(SEXP x, SEXP o);
 
 // ChainSegments.c
 
@@ -264,7 +274,7 @@ SEXP informationContentAA(SEXP p, SEXP nS, SEXP correction, SEXP randomBackgroun
 
 SEXP vectorSum(SEXP x, SEXP y, SEXP z, SEXP b);
 
-SEXP parallelMatch(SEXP x, SEXP y, SEXP indices, SEXP z, SEXP a, SEXP b, SEXP nThreads);
+SEXP parallelMatch(SEXP x, SEXP y, SEXP indices, SEXP a, SEXP b, SEXP pos, SEXP rng, SEXP nThreads);
 
 // GeneFinding.c
 
@@ -353,3 +363,9 @@ SEXP alignPair(SEXP x, SEXP y, SEXP s1, SEXP e1, SEXP s2, SEXP e2, SEXP go, SEXP
 // SphericalKmeans.c
 
 SEXP sphericalKmeans(SEXP X, SEXP Y, SEXP Kmeans, SEXP tolerance, SEXP maxIterations, SEXP verbose, SEXP nThreads);
+
+// RawVectors.c
+
+SEXP graphLaplacian(SEXP vecs, SEXP bitMask, SEXP nThreads);
+
+SEXP assignClusters(SEXP vecs, SEXP bitMask, SEXP clusters, SEXP nThreads);

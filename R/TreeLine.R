@@ -1106,7 +1106,7 @@ MODELS <- list(Nucleotide=c("JC69",
 	}
 }
 
-.colEdge <- function(dend, dim, labels, r, c) {
+.colEdge <- function(dend, dim, r, c) {
 	# color edges by cluster
 	
 	# initialize a stack of maximum length (dim)
@@ -1122,8 +1122,7 @@ MODELS <- list(Nucleotide=c("JC69",
 			
 			for (i in seq_along(stack[[pos]])) {
 				if (is.leaf(stack[[pos]][[i]])) {
-					a <- attributes(stack[[pos]][[i]])
-					num <- c$cluster[which(labels==as.character(a$label))]
+					num <- c[[1L]][stack[[pos]][[i]][1L]]
 					attr(stack[[pos]][[i]], "edgePar") <- list(col=r[num %% 15 + 1])
 				}
 			}
@@ -1621,7 +1620,7 @@ MODELS <- list(Nucleotide=c("JC69",
 	x[, W] <- coefs1 %*% x[, W, drop=FALSE]
 	W <- w[, 3L] < 0
 	x[, W] <- coefs2 %*% x[, W, drop=FALSE]
-	# impose reasonable stating conditions
+	# impose reasonable starting conditions
 	x[x < 0.001] <- 0.001
 	x[x > 1] <- 1
 	x <- X <- log(x) # enforce positive lengths during optimization
@@ -1664,7 +1663,7 @@ MODELS <- list(Nucleotide=c("JC69",
 		f <- LnL[-1L][c(TRUE, rep(FALSE, 10))]
 		change <- res[W] - f
 		
-		# only record likeihood improvements
+		# only record likelihood improvements
 		keep <- f <= res[W] # minimum observed
 		res[W[keep]] <- f[keep]
 		X[, W[keep]] <- x[, W[keep]]
@@ -1891,7 +1890,7 @@ TreeLine <- function(myXStringSet=NULL,
 	# error checking
 	if (length(method) != 1)
 		stop("Only one method can be specified.")
-	METHODS <- c("NJ","UPGMA", "ML", "complete", "single", "WPGMA", "MP")
+	METHODS <- c("NJ","UPGMA", "ML", "complete", "single", "WPGMA", "MP", "UPGMH")
 	method <- pmatch(method, METHODS)
 	if (is.na(method))
 		stop("Invalid method.")
@@ -1921,7 +1920,7 @@ TreeLine <- function(myXStringSet=NULL,
 	if (!is.logical(showPlot))
 		stop("showPlot must be a logical.")
 	if (length(cutoff) > 1 && type > 1)
-		warning("Multiple cutoffs can only be supplied when type is 'clusters'.")
+		warning("Only the first cutoff is considered when type is 'dendrogram'.")
 	ASC <- TRUE
 	if (is.unsorted(cutoff)) {
 		if (is.unsorted(rev(cutoff))) {
@@ -1982,8 +1981,8 @@ TreeLine <- function(myXStringSet=NULL,
 		}
 		if (dim < 2)
 			stop("myDistMatrix is too small.")
-		if (typeof(myDistMatrix)=="integer")
-			myDistMatrix[] <- as.numeric(myDistMatrix)
+		if (typeof(myDistMatrix) == "integer")
+			mode(myDistMatrix) <- "numeric"
 	} else {
 		dim <- length(myXStringSet)
 	}
@@ -3854,7 +3853,7 @@ TreeLine <- function(myXStringSet=NULL,
 			v1 <- c(117,254,73,69,152,51,26,450,503,596,652,610,563,552,97)
 			r <- cl[v1]
 			
-			d <- .colEdge(d, dim, myClustersList$labels, r, c)
+			d <- .colEdge(d, dim, r, c)
 			d <- .reorder(d, dim, c)
 		}
 		

@@ -29,19 +29,32 @@
 #include "DECIPHER.h"
 
 // order x (positive integers only)
-SEXP radixOrder(SEXP x, SEXP ascending)
-{	
+SEXP radixOrder(SEXP x, SEXP ascending, SEXP keepNAs)
+{
 	int i, k, o;
 	int l = length(x);
 	int *v = INTEGER(x);
+	int keep = asInteger(keepNAs); // whether to keep NAs when ordering
 	int s = asInteger(ascending); // start of index
 	
 	int *order = (int *) malloc(l*sizeof(int)); // thread-safe on Windows
 	int m = 1;
-	for (i = 0; i < l; i++) {
-		order[i] = i;
-		if (v[i] > m)
-			m = v[i];
+	int NAs = 0;
+	if (keep) {
+		for (i = 0; i < l; i++) {
+			order[i] = i;
+			if (v[i] > m)
+				m = v[i];
+		}
+	} else {
+		for (i = 0; i < l; i++) {
+			order[i] = i;
+			if (v[i] == NA_INTEGER) {
+				NAs++;
+			} else if (v[i] > m) {
+				m = v[i];
+			}
+		}
 	}
 	m = (int)ceil(log2((double)(m + 1)));
 	
@@ -88,18 +101,90 @@ SEXP radixOrder(SEXP x, SEXP ascending)
 	}
 	
 	SEXP ans;
-	PROTECT(ans = allocVector(INTSXP, l));
+	PROTECT(ans = allocVector(INTSXP, l - NAs));
 	int *rans = INTEGER(ans);
-	if (s) {
-		for (i = 0; i < l; i++)
-			rans[i] = order[i] + 1;
+	if (keep) {
+		if (s) {
+			for (i = 0; i < l; i++)
+				rans[i] = order[i] + 1;
+		} else {
+			for (i = 0; i < l; i++)
+				rans[i] = order[l - i - 1] + 1;
+		}
 	} else {
-		for (i = 0; i < l; i++)
-			rans[i] = order[l - i - 1] + 1;
+		k = 0;
+		if (s) {
+			for (i = 0; i < l; i++)
+				if (v[order[i]] != NA_INTEGER)
+					rans[k++] = order[i] + 1;
+		} else {
+			for (i = 0; i < l; i++)
+				if (v[order[l - i - 1]] != NA_INTEGER)
+					rans[k++] = order[l - i - 1] + 1;
+		}
 	}
 	free(order);
 	
 	UNPROTECT(1);
 	
 	return ans;
+}
+
+// dereplicate x using its ordering
+SEXP dereplicate(SEXP x, SEXP o)
+{
+	int *X = INTEGER(x);
+	int *O = INTEGER(o);
+	int l = length(x);
+	
+	int *numbers = (int *) malloc(l*sizeof(int)); // thread-safe on Windows
+	int *counts = (int *) calloc(l, sizeof(int)); // initialized to zero (thread-safe on Windows)
+	
+	int count = 1;
+	int i = 0;
+	int j = 0;
+	int k = 1;
+	while (k < l) {
+		if (X[O[k] - 1] == X[O[j] - 1]) {
+			count++;
+		} else {
+			numbers[O[j] - 1] = O[j];
+			counts[O[j] - 1] = count;
+			i++;
+			count = 1;
+			j = k;
+		}
+		k++;
+	}
+	if (l > 0) {
+		numbers[O[j] - 1] = O[j];
+		counts[O[j] - 1] = count;
+		i++;
+	}
+	
+	SEXP ans1, ans2;
+	PROTECT(ans1 = allocVector(INTSXP, i));
+	PROTECT(ans2 = allocVector(INTSXP, i));
+	int *rans1 = INTEGER(ans1);
+	int *rans2 = INTEGER(ans2);
+	
+	k = i;
+	for (j = 0; j < l; j++) {
+		if (counts[j] > 0) {
+			k--;
+			rans1[k] = numbers[j];
+			rans2[k] = counts[j];
+		}
+	}
+	free(numbers);
+	free(counts);
+	
+	SEXP ret_list;
+	PROTECT(ret_list = allocVector(VECSXP, 2));
+	SET_VECTOR_ELT(ret_list, 0, ans1);
+	SET_VECTOR_ELT(ret_list, 1, ans2);
+	
+	UNPROTECT(3);
+	
+	return ret_list;
 }
