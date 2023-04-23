@@ -1,4 +1,4 @@
-%\VignetteIndexEntry{Upsize your clustering with Clusterize}
+%\VignetteIndexEntry{Upsize Your Clustering with Clusterize}
 %\VignettePackage{DECIPHER}
 
 \documentclass[10pt]{article}
@@ -197,7 +197,7 @@ max(abs(c1)) # center-linkage
 max(c2) # single-linkage (fewer clusters, but broader clusters)
 @
 
-It is possible to synthes\emph{ize} a plot showing a cross tabulation of taxonomy and cluster number. We may ideal\emph{ize} the clustering as matching taxonomic labels, but this is not exactly the case.
+It is possible to synthes\emph{ize} a plot showing a cross tabulation of taxonomy and cluster number. We may ideal\emph{ize} the clustering as matching taxonomic labels (\ref{f2}), but this is not exactly the case.
 
 \begin{centerfig}
 <<expr9,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6>>=

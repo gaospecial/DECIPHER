@@ -1,4 +1,4 @@
-%\VignetteIndexEntry{Detecting obscure tandem repeats in sequences}
+%\VignetteIndexEntry{Detecting Obscure Tandem Repeats in Sequences}
 %\VignettePackage{DECIPHER}
 
 \documentclass[10pt]{article}

@@ -1,4 +1,4 @@
-%\VignetteIndexEntry{Growing phylogenetic trees with TreeLine}
+%\VignetteIndexEntry{Growing Phylogenetic Trees with TreeLine}
 %\VignettePackage{DECIPHER}
 
 \documentclass[10pt]{article}

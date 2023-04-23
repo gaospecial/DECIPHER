@@ -101,6 +101,7 @@ BrowseSeqs(dna, colorPatterns=c(100, 200, 250, 500))
 # example of calling attention to letters by coloring gaps black
 BrowseSeqs(dna, patterns="-", colors="black")
 
+\dontrun{
 # color according to base-pairing by supplying the fraction RGB for every position
 dbn <- PredictDBN(dna, type="structures") # calculate the secondary structures
 # dbn now contains the scores for whether a base is paired (left/right) or unpaired
@@ -109,6 +110,7 @@ dbn[[2]][, 10] # the scores for the tenth position in the second sequence
 # these positional scores can be used as shades of red, green, and blue:
 BrowseSeqs(dna, patterns=dbn) # red = unpaired, green = left-pairing, blue = right
 # positions in black are not part of the consensus secondary structure
+}
 
 # color all restriction sites
 data(RESTRICTION_ENZYMES) # load dataset containing restriction enzyme sequences

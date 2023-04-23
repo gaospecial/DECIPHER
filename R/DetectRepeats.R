@@ -494,12 +494,7 @@ DetectRepeats <- function(myXStringSet,
 				
 				# calculate the likelihood
 				LnL <- .score(x, gapCost, posL, posR)
-#				out <- shift(x, LnL, posL, posR, min(values[w[i]], maxShifts))
-#				x <- out[[1L]]
-#				LnL <- out[[2L]]
-#				posL <- out[[3L]]
-#				posR <- out[[4L]]
-				if (posR[length(posR)] < posL[length(posL)] || LnL < minScore/2) {
+				if (posR[length(posR)] < posL[length(posL)] || LnL < 0) {
 					res[[i]] <- list(posL, posR, LnL, k)
 					if (verbose)
 						setTxtProgressBar(pBar,
@@ -535,12 +530,6 @@ DetectRepeats <- function(myXStringSet,
 					POSR <- c(POSL[1L] - 1L, POSR)
 					POSL <- c(start, POSL)
 					temp <- .score(y, gapCost, POSL, POSR)
-					
-#					out <- shift(y, temp, POSL, POSR, min(values[w[i]], maxShifts))
-#					y <- out[[1L]]
-#					temp <- out[[2L]]
-#					POSL <- out[[3L]]
-#					POSR <- out[[4L]]
 					
 					X <- y
 					if (temp > LnL) {
@@ -583,12 +572,6 @@ DetectRepeats <- function(myXStringSet,
 					POSL <- c(POSL, POSR[length(POSR)] + 1L)
 					POSR <- c(POSR, end)
 					temp <- .score(y, gapCost, POSL, POSR)
-					
-#					out <- shift(y, temp, POSL, POSR, min(values[w[i]], maxShifts))
-#					y <- out[[1L]]
-#					temp <- out[[2L]]
-#					POSL <- out[[3L]]
-#					POSR <- out[[4L]]
 					
 					X <- y
 					if (temp > LnL) {
