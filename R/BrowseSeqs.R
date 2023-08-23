@@ -276,7 +276,7 @@ BrowseSeqs <- function(myXStringSet,
 			L <- min(length(html[[highlight]]), length(html[[i]]))
 			w <- which(html[[i]][1:L]==html[[highlight]][1:L])
 			if (length(w) > 0)
-				html[[i]][w] <- "\u00B7"
+				html[[i]][w] <- "."
 		}
 		html <- sapply(html, paste, collapse="")
 	}
