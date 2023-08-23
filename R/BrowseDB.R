@@ -1,3 +1,46 @@
+#' View a Database Table in a Web Browser
+#' 
+#' Opens an html file in a web browser to show the contents of a table in a
+#' database.
+#' 
+#' 
+#' @name BrowseDB
+#' @param dbFile A SQLite connection object or a character string specifying
+#' the path to the database file.
+#' @param htmlFile Character string giving the location where the html file
+#' should be written.
+#' @param openURL Logical indicating whether the \code{htmlFile} should be
+#' opened in a web browser.
+#' @param tblName Character string specifying the table to view.
+#' @param identifier Optional character string used to narrow the search
+#' results to those matching a specific identifier.  If "" then all identifiers
+#' are selected.
+#' @param limit Number of results to display.  The default (\code{-1}) does not
+#' limit the number of results.
+#' @param orderBy Character string giving the column name for sorting the
+#' results.  Defaults to the order of entries in the database.  Optionally can
+#' be followed by \code{" ASC"} or \code{" DESC"} to specify ascending (the
+#' default) or descending order.
+#' @param maxChars Maximum number of characters to display in each column.
+#' @param clause An optional character string to append to the query as part of
+#' a ``where clause''.
+#' @return Creates an html table containing all the fields of the database
+#' table and (if \code{openURL} is \code{TRUE}) opens it in the web browser for
+#' viewing.
+#' 
+#' Returns \code{htmlFile} if the html file was written successfully.
+#' @note If viewing a table containing sequences, the sequences are
+#' purposefully not shown in the output.
+#' @author Erik Wright \email{eswright@@pitt.edu}
+#' @seealso \code{\link{BrowseSeqs}}
+#' @references ES Wright (2016) "Using DECIPHER v2.0 to Analyze Big Biological
+#' Sequence Data in R". The R Journal, \bold{8(1)}, 352-359.
+#' @examples
+#' 
+#' db <- system.file("extdata", "Bacteria_175seqs.sqlite", package="DECIPHER")
+#' BrowseDB(db)
+#' 
+#' @export BrowseDB
 BrowseDB <- function(dbFile,
 	htmlFile=paste(tempdir(),"/db.html",sep=""),
 	openURL=interactive(),

@@ -22,6 +22,81 @@
 			"TEXT"))
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#' Add Data to a Database
+#' 
+#' Adds a \code{data.frame} to a database table by its \code{row.names}.
+#' 
+#' Data contained in \code{myData} will be added to the \code{tblName} by its
+#' respective \code{row.names}.
+#' 
+#' @name Add2DB
+#' @param myData Data frame containing information to be added to the
+#' \code{dbFile}.
+#' @param dbFile A SQLite connection object or a character string specifying
+#' the path to the database file.
+#' @param tblName Character string specifying the table in which to add the
+#' data.
+#' @param clause An optional character string to append to the query as part of
+#' a ``where clause''.
+#' @param verbose Logical indicating whether to display each query as it is
+#' sent to the database.
+#' @return Returns \code{TRUE} if the data was added successfully, or
+#' \code{FALSE} otherwise.
+#' @author Erik Wright \email{eswright@@pitt.edu}
+#' @seealso \code{\link{Seqs2DB}}, \code{\link{SearchDB}},
+#' \code{\link{BrowseDB}}
+#' @references ES Wright (2016) "Using DECIPHER v2.0 to Analyze Big Biological
+#' Sequence Data in R". The R Journal, \bold{8(1)}, 352-359.
+#' @examples
+#' 
+#' \dontrun{
+#' # Create a sequence database
+#' gen <- system.file("extdata", "Bacteria_175seqs.gen", package="DECIPHER")
+#' dbConn <- dbConnect(SQLite(), ":memory:")
+#' Seqs2DB(gen, "GenBank", dbConn, "Bacteria")
+#' 
+#' # Identify the sequence lengths
+#' l <- IdLengths(dbConn)
+#' 
+#' # Add lengths to the database
+#' Add2DB(l, dbConn)
+#' 
+#' # View the added lengths
+#' BrowseDB(dbConn)
+#' 
+#' # Change the value of existing columns
+#' ids <- data.frame(identifier=rep("Bacteroidetes", 18), stringsAsFactors=FALSE)
+#' rownames(ids) <- 10:27
+#' Add2DB(ids, dbConn)
+#' BrowseDB(dbConn)
+#' 
+#' # Add data to a subset of rows using a clause
+#' ids[[1]][] <- "Changed"
+#' nrow(ids) # 18 rows
+#' Add2DB(ids, dbConn, clause="accession like 'EU808318%'")
+#' BrowseDB(dbConn) # only 1 row effected
+#' 
+#' dbDisconnect(dbConn)
+#' }
+#' @export Add2DB
 Add2DB <- function(myData,
 	dbFile,
 	tblName="Seqs",

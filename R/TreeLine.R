@@ -663,6 +663,205 @@ to.dendrogram <- function(object, states=NULL, p=NULL, s=NULL) {
 	return(myClusters)
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#' Available Models of Sequence Evolution
+#' 
+#' The \code{MODELS} contains the models of sequence evolution that can be used
+#' by \code{TreeLine}.
+#' 
+#' \code{MODELS} is a list of two elements: a character vector of (eight)
+#' nucleotide models and a character vector of (37) protein models.  All
+#' \code{MODELS} are time reversible.
+#' 
+#' Nucleotide models are described in order of increasing number of parameters
+#' as follows:
+#' 
+#' \bold{JC69 (Jukes and Cantor, 1969)} The simplest substitution model that
+#' assumes equal base frequencies (1/4) and equal mutation rates.
+#' 
+#' \bold{K80 (Kimura, 1980)} Assumes equal base frequencies, but distinguishes
+#' between the rate of transitions and transversions.
+#' 
+#' \bold{T92 (Tamura, 1992)} In addition to distinguishing between transitions
+#' and transversions, a parameter is added to represent G+C content bias.
+#' 
+#' \bold{F81 (Felsenstein, 1981)} Assumes equal mutation rates, but allows all
+#' bases to have different frequencies.
+#' 
+#' \bold{HKY85 (Hasegawa, Kishino and Yano, 1985)} Distinguishes transitions
+#' from transversions and allows bases to have different frequencies.
+#' 
+#' \bold{TN93 (Tamura and Nei, 1993)} Allows for unequal base frequencies and
+#' distinguishes between transversions and the two possible types of
+#' transitions (i.e., A <-> G & C <-> T).
+#' 
+#' \bold{SYM (Zharkikh, 1994)} Equal base frequencies but all substitution
+#' rates are free parameters.
+#' 
+#' \bold{GTR (Tavare, 1986)} The general time reversible model allowing for
+#' unequal base frequencies and substitution rates.
+#' 
+#' Protein models are described in the following publications:
+#' 
+#' AB (Mirsky, 2015), BLOSUM62 (Henikoff, 1992), cpREV (Adachi, 2000), cpREV64
+#' (Zhong, 2010), Dayhoff (Dayhoff, 1978), DCMut-Dayhoff (Kosiol, 2005),
+#' DCMut-JTT (Kosiol, 2005), DEN (Le, 2018), FLAVI (Le, 2020), FLU (Dang,
+#' 2010), gcpREV (Cox, 2013), HIVb (Nickle, 2007), HIVw (Nickle, 2007), JTT
+#' (Jones, 1992), LG (Le, 2008), MtArt (Abascal, 2007), mtDeu (Le, 2017), mtInv
+#' (Le, 2017), mtMam (Yang, 1998), mtMet (Le, 2017), mtOrt (Chang, 2020), mtREV
+#' (Adachi, 1996), mtVer (Le, 2017), MtZoa (Rota-Stabelli, 2009), PMB
+#' (Veerassamy, 2003), Q.bird (Minh, 2021), Q.insect (Minh, 2021), Q.LG (Minh,
+#' 2021), Q.mammal (Minh, 2021), Q.pfam (Minh, 2021), Q.plant (Minh, 2021),
+#' Q.yeast (Minh, 2021), rtREV (Dimmic, 2002), stmtREV (Liu, 2014), VT (Muller,
+#' 2000), WAG (Whelan, 2001), WAGstar (Whelan, 2001).
+#' 
+#' \bold{+G (Yang, 1993)} Specifying any model+G4 adds a single parameter to
+#' any of the above models to relax the assumption of equal rates among sites
+#' in the sequence.  The single parameter specifies the shape of the Gamma
+#' Distribution.  The continuous distribution is represented with 2-10 discrete
+#' rates and their respective probabilities as determined by equal bins or the
+#' Laguerre Quadrature method (Felsenstein, 2001).  For example, specifying a
+#' model+G8 would represent the continuous Gamma Distribution with eight rates
+#' and their associated probabilities.
+#' 
+#' \bold{+F} Specifying any model+F uses empirical frequencies rather than
+#' optimized state frequencies.  This is only applicable for models having
+#' state frequencies with free parameters.
+#' 
+#' @name MODELS
+#' @seealso \code{\link{TreeLine}}
+#' @references Abascal, F., Posada, D., and Zardoya, R. (2007) Molecular
+#' Biology and Evolution, \bold{24}, 1-5.
+#' 
+#' Adachi, J. and Hasegawa, M. (1996) Journal of Molecular Evolution,
+#' \bold{42}, 459-468.
+#' 
+#' Adachi, J., Waddell, P., Martin, W., and Hasegawa, M. (2000) Journal of
+#' Molecular Evolution, \bold{50}, 348-358.
+#' 
+#' Chang, H., Nie, Y., Zhang, N., Zhang, X., Sun, H., Mao, Y., Qiu, Z., and
+#' Huang, Y. (2020) BMC Ecology and Evolution, \bold{20}, 57.
+#' 
+#' Cox, C. and Foster, P. (2013) Molecular Phylogenetics and Evolution,
+#' \bold{68}, 218-220.
+#' 
+#' Dang, C., Le, S., Gascuel, O., and Le, V. (2010) BMC Evolutionary Biology,
+#' \bold{10}, 99.
+#' 
+#' Dayhoff, M., Schwartz, R., and Orcutt, B. (1978) Atlas of Protein Sequence
+#' and Structure, National Biomedical Research Foundation, Washington DC,
+#' \bold{5}, 345-352.
+#' 
+#' Dimmic, M., Rest, J., Mindell, D., and Goldstein, R. (2002) Journal of
+#' Molecular Evolution, \bold{55}, 65-73.
+#' 
+#' Felsenstein, J. (1981) Evolutionary trees from DNA sequences: a maximum
+#' likelihood approach. Journal of Molecular Evolution, \bold{17(6)}, 368-376.
+#' 
+#' Felsenstein, J. (2001) Taking Variation of Evolutionary Rates Between Sites
+#' into Account in Inferring Phylogenies. Journal of molecular evolution,
+#' \bold{53(4-5)}, 447-455.
+#' 
+#' Hasegawa, M., Kishino H., Yano T. (1985) Dating of human-ape splitting by a
+#' molecular clock of mitochondrial DNA. Journal of Molecular Evolution,
+#' \bold{22(2)}, 160-174.
+#' 
+#' Henikoff, S. and Henikoff, J. (1992) Proceedings of the National Academy of
+#' Sciences of the USA, \bold{89}, 10915-10919.
+#' 
+#' Jones, D., Taylor, W., and Thornton, J. (1992) Computer Applications in the
+#' Biosciences, \bold{8}, 275-282.
+#' 
+#' Jukes, T. and Cantor C. (1969) Evolution of Protein Molecules. New York:
+#' Academic Press. pp. 21-132.
+#' 
+#' Kimura, M. (1980) A simple method for estimating evolutionary rates of base
+#' substitutions through comparative studies of nucleotide sequences. Journal
+#' of Molecular Evolution, \bold{16(2)}, 111-120.
+#' 
+#' Kosiol, C. and Goldman, N. (2005) Molecular Biology and Evolution,
+#' \bold{22}, 193-199.
+#' 
+#' Le, S. and Gascuel, O. (2008) Molecular Biology and Evolution, \bold{25},
+#' 1307-1320.
+#' 
+#' Le, T., Dang, C., and Le, S. (2018) Proceedings of 10th International
+#' Conference on Knowledge and Systems Engineering (KSE 2018), Ho Chi Minh
+#' City, Vietnam, 242-246.
+#' 
+#' Le, T., and Vinh, L. (2020) Journal of Molecular Evolution, \bold{88},
+#' 445-452.
+#' 
+#' Le, V., Dang, C., and Le, S. (2017) BMC Evolutionary Biology, \bold{17},
+#' 136.
+#' 
+#' Liu, Y., Cox, C., Wang, W., and Goffinet, B. (2014) Systematic Biology,
+#' \bold{63}, 862-878.
+#' 
+#' Minh, B., Dang, C., Le, S., and Lanfear, R. (2021) Systematic Biology,
+#' syab010.
+#' 
+#' Mirsky, A., Kazandjian, L., and Anisimova, M. (2015) Molecular Biology and
+#' Evolution, \bold{32}, 806-819.
+#' 
+#' Muller, T. and Vingron, M. (2000) Journal of Computational Biology,
+#' \bold{7}, 761-776.
+#' 
+#' Nickle, D., Heath, L., Jensen, M., Gilbert P., and Mullins, J., Kosakovsky
+#' Pond SL (2007) PLoS ONE, \bold{2}, e503.
+#' 
+#' Rota-Stabelli, O., Yang, Z., and Telford, M. (2009) Molecular Phylogenetics
+#' and Evolution, \bold{52}, 268-272.
+#' 
+#' Tamura, K. (1992) Estimation of the number of nucleotide substitutions when
+#' there are strong transition-transversion and G+C content biases. Molecular
+#' Biology and Evolution, \bold{9(4)}, 678-687.
+#' 
+#' Tamura, K. and Nei M. (1993) Estimation of the number of nucleotide
+#' substitutions in the control region of mitochondrial DNA in humans and
+#' chimpanzees. Molecular Biology and Evolution, \bold{10(3)}, 512-526.
+#' 
+#' Tavare, S. (1986) ``Some Probabilistic and Statistical Problems in the
+#' Analysis of DNA Sequences.'' Lectures on Mathematics in the Life Sciences,
+#' \bold{17}: 57-86.
+#' 
+#' Veerassamy, S., Smith, A., and Tillier, E. (2003) Journal of Computational
+#' Biology, \bold{10}, 997-1010.
+#' 
+#' Whelan, S. and Goldman, N. (2001) Molecular Biology and Evolution,
+#' \bold{18}, 691-699.
+#' 
+#' Yang, Z., Nielsen, R., and Hasegawa, M. (1998) Molecular Biology and
+#' Evolution, \bold{15}, 1600-1611.
+#' 
+#' Yang, Z. (1993) Maximum-likelihood estimation of phylogeny from DNA
+#' sequences when substitution rates differ over sites. Molecular Biology and
+#' Evolution, \bold{10(6)}, 1396-1401.
+#' 
+#' Zharkikh, A. (1994) Estimation of evolutionary distances between nucleotide
+#' sequences. Journal of Molecular Evolution, \bold{39}, 315-329.
+#' 
+#' Zhong, B., Yonezawa, T., Zhong, Y., and Hasegawa, M. (2010) Molecular
+#' Biology and Evolution, \bold{27}, 2855-2863.
+#' @keywords data
+#' @examples
+#' 
+#' str(MODELS)
+#' 
+#' @export MODELS
 MODELS <- list(Nucleotide=c("JC69",
 		"JC69+G4",
 		"K80",
@@ -1866,6 +2065,277 @@ MODELS <- list(Nucleotide=c("JC69",
 	k
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#' Construct a Phylogenetic Tree
+#' 
+#' Builds a phylogenetic tree from a set of sequences or distance matrix.
+#' 
+#' \code{TreeLine} builds a phylogenetic tree using either \code{myDistMatrix}
+#' and/or \code{myXStringSet}.  The output is either a \code{dendrogram} and/or
+#' \code{data.frame} containing cluster numbers.
+#' 
+#' Typical use cases include: (1) Provide an \code{XStringSet} and obtain a
+#' maximum likelihood or maximum parsimony tree, optionally with ancestral
+#' states. (2) Provide a \code{matrix} or \code{dist} object (e.g., from
+#' \code{DistanceMatrix}) and obtain a neighbor-joining or ultrametric tree,
+#' optionally with clusters of similarity defined by distance \code{cutoff}s.
+#' 
+#' Multiple \code{method}s of tree building are supported: (1) Maximum
+#' likelihood: \code{ML} iteratively maximizes the likelihood of the tree and
+#' \code{model} parameters given aligned sequences (\code{myXStringSet}).  One
+#' or more \code{MODELS} of sequence evolution must be specified, of which the
+#' best \code{model} is automatically selected. (2) Maximum parsimony:
+#' \code{MP} iterative maximizes the parsimony of a tree given aligned
+#' sequences (\code{myXStringSet}) and a \code{costMatrix}.  The default cost
+#' matrix is binary, corresponding to Fitch (1971) parsimony. (3)
+#' Neighbor-joining: \code{NJ} uses the Neighbor-Joining method proposed by
+#' Saitou and Nei, which creates a reasonable minimum evolution tree from a
+#' distance matrix (\code{myDistMatrix}). (4) Ultrametric: The method
+#' \code{complete} assigns clusters using complete-linkage so that sequences in
+#' the same cluster are no more than \code{cutoff} distance apart.  The method
+#' \code{single} assigns clusters using single-linkage so that sequences in the
+#' same cluster are within \code{cutoff} of at least one other sequence in the
+#' same cluster.  \code{UPGMA} and \code{WPGMA} assign clusters using
+#' average-linkage which is a compromise between the sensitivity of
+#' complete-linkage clustering to outliers and the tendency of single-linkage
+#' clustering to connect distant relatives that do not appear to be closely
+#' related.  \code{UPGMA} produces an unweighted tree, where each leaf
+#' contributes equally to the average edge lengths, whereas \code{WPGMA}
+#' produces a weighted result.
+#' 
+#' The returned dendrogram has information stored in its attributes, which can
+#' be accessed with the \code{attributes} or \code{attr} functions.  When
+#' \code{method} is \code{"ML"} or \code{"MP"}, edges of the tree have branch
+#' support values included in their attributes.  These \code{"support"} values
+#' represent the fraction of computed trees with that partition separating the
+#' sequences to either side, which is a proxy for confidence.  For maximum
+#' likelihood trees, the edges also have a \code{"probability"} representing
+#' the aBayes support probability (Anisimova, 2011).  If \code{reconstruct} is
+#' not \code{FALSE}, each edge of the tree will have a \code{"state"} attribute
+#' representing the (marginal) likelihood at that node or most parsimonious
+#' state when \code{method} is \code{"MP"}.  Maximum likelihood trees will also
+#' provide the likelihoods at each site when \code{reconstruct} is not
+#' \code{FALSE}.
+#' 
+#' When non-negative \code{cutoff}(s) are supplied, \code{TreeLine} will assign
+#' clusters based on edge lengths in the tree.  Multiple cutoffs may be
+#' provided in sorted order.  If the \code{cutoff}s are provided in
+#' \emph{descending} order then clustering at each new value of \code{cutoff}
+#' is continued within the prior \code{cutoff}'s clusters.  In this way
+#' clusters at lower values of \code{cutoff} are completely contained within
+#' their umbrella clusters at higher values of \code{cutoff}.  This is useful
+#' for defining taxonomy, where groups need to be hierarchically nested.  If
+#' multiple cutoffs are provided in \emph{ascending} order then clustering at
+#' each level of \code{cutoff} is independent of the prior level.
+#' 
+#' @name TreeLine
+#' @param myXStringSet A \code{AAStringSet}, \code{DNAStringSet}, or
+#' \code{RNAStringSet} if \code{method} is \code{"ML"}, \code{method} is
+#' \code{"MP"}, or \code{reconstruct} is not \code{FALSE}.
+#' @param myDistMatrix A symmetric \eqn{N} x \eqn{N} distance matrix with the
+#' values of dissimilarity between \eqn{N} sequences or an object of class
+#' \code{'dist'}.  If the \code{method} is \code{"ML"} or \code{"MP"} then
+#' \code{myDistMatrix} is optional.  Missing values (i.e., \code{NA}) in
+#' \code{myDistMatrix} are imputed using the ultrametric method described by
+#' Makarenkov and Lapointe (2004).
+#' @param method The phylogenetic method to be used.  This should be (an
+#' abbreviation of) one of \code{"ML"} (the default), \code{"MP"}, \code{"NJ"},
+#' \code{"complete"}, \code{"single"}, \code{"UPGMA"}, or \code{"WPGMA"}.  (See
+#' details section below.)
+#' @param type Character string indicating the type of output desired.  This
+#' should be (an abbreviation of) one of \code{"dendrogram"} (the default),
+#' \code{"clusters"}, or \code{"both"}.  (See value section below.)
+#' @param model One or more of the available \code{MODELS} of evolution
+#' provided as a character vector or list with components `Protein' and/or
+#' `Nucleotide'.  Only applicable if \code{method} is \code{"ML"} or
+#' \code{reconstruct} is not \code{FALSE}.  Automatic model selection will be
+#' performed if more than one \code{model} is provided.
+#' @param cutoff A vector with the maximum edge length separating the sequences
+#' in the same cluster.  A negative value (the default) will prevent
+#' clustering.  Multiple cutoffs may be provided in ascending or descending
+#' order.  (See details section below.)
+#' @param showPlot Logical specifying whether or not to plot the resulting
+#' dendrogram.
+#' @param collapse Numeric controlling which internal edges of the tree are
+#' removed by collapsing their nodes.  If \code{collapse} is zero then nodes at
+#' the same height will be collapsed to a single node, resulting in a
+#' multifurcating tree.  When \code{collapse} is greater than zero, nodes that
+#' are within \code{collapse} difference in height are made into a single node.
+#' A value of \code{collapse} less than zero (the default) will ensure that the
+#' \code{dendrogram} is purely bifurcating.  Note that \code{collapse} has no
+#' effect on cluster numbers or \code{cutoff}.
+#' @param reconstruct Logical or numeric determining whether to perform
+#' ancestral state reconstruction when \code{myXStringSet} is specified. If
+#' \code{TRUE}, maximum likelihood character states are determined at internal
+#' nodes of the \code{dendrogram} and provided as the \code{"state"} attribute,
+#' unless \code{method} is \code{"MP"}, in which case the most parsimonious
+#' state is given at each node.  A numeric value between zero and one
+#' (exclusive) can be provided when \code{method} is not \code{MP}, in which
+#' case that fraction of the (marginal) likelihood for a state must be greater
+#' than the likelihood of all alternative states, otherwise a more ambiguous
+#' degeneracy code is used.  Only applicable if \code{type} is
+#' \code{"dendrogram"} (the default) or \code{"both"}.
+#' @param root Integer specifying the index of the outgroup or \code{0} (the
+#' default) to midpoint root the dendrogram.
+#' @param informationCriterion Character string specifying which information
+#' criterion to use in automatic model selection.  Must be (an abbreviation of)
+#' either \code{"AICc"} or \code{"BIC"}.  The best \code{model} is
+#' automatically chosen based on the \code{informationCriterion} calculated
+#' from the likelihood and the sample size (defined as the number of variable
+#' sites in \code{myXStringSet}).  Only applicable if \code{method} is
+#' \code{"ML"}.
+#' @param maxGenerations Integer indicating the maximum number of generations
+#' of optimization to perform.  More generations will potentially better search
+#' tree space at the expense of added runtime.  Only applicable if
+#' \code{method} is \code{"ML"} or \code{"MP"}.
+#' @param maxTime Numeric giving the maximum number of hours the algorithm is
+#' allowed to run before returning a result.  Once \code{maxTime} is reached,
+#' the algorithm will proceed at the next available opportunity.  Therefore,
+#' the \code{maxTime} is a soft maximum and does not guarantee results will be
+#' returned at exactly the allotted time.  Only applicable if \code{method} is
+#' \code{"ML"} or \code{"MP"}.
+#' @param quadrature Logical determining whether to use the Laguerre quadrature
+#' or equal-sized bins when discretizing the rate distribution across sites.
+#' The default is to use equal-sized bins for direct comparison among
+#' likelihoods computed by other programs, although the Laguerre quadrature
+#' theoretically offers an improvement in accuracy for the same number of rates
+#' (Felsenstein, 2001).
+#' @param costMatrix Either \code{NULL} (the default) or a symmetric matrix
+#' setting the penalties used in Sankoff parsimony.  The default (\code{NULL})
+#' will apply a cost of \code{1} for state changes and \code{0} otherwise
+#' (i.e., equivalent to Fitch parsimony).  If a \code{matrix} then the states
+#' are taken from its row or column names.  Only applicable if \code{method} is
+#' \code{"MP"}.
+#' @param processors The number of processors to use, or \code{NULL} to
+#' automatically detect and use all available processors.  Note, the number of
+#' processors in some steps is automatically selected between one and
+#' \code{processors} to optimize performance.
+#' @param verbose Logical indicating whether to display progress.
+#' @return If \code{type} is \code{"dendrogram"} (the default), then a tree of
+#' class \code{dendrogram} is returned with attributes including pertinent
+#' information. If \code{type} is \code{"clusters"}, then a \code{data.frame}
+#' is returned with a column for each cutoff specified.  This data.frame has
+#' dimensions \eqn{N*M}, where each one of \eqn{N} sequences is assigned to a
+#' cluster at the \eqn{M}-level of cutoff. If \code{type} is \code{"both"} then
+#' a list is returned containing both the \code{"clusters"} and
+#' \code{"dendrogram"} outputs.
+#' @note Note that the cophenetic distance between leaves of the
+#' \code{dendrogram} is equal to the sum of branch lengths separating the
+#' leaves.  This is the typical phylogenetic interpretation but different than
+#' trees produced by \code{hclust} where leaves are merged at a height equal to
+#' their cophenetic distance.  Hence, always use \code{Cophenetic} (rather than
+#' \code{cophenetic}) to compute correct cophenetic distances.
+#' @author Erik Wright \email{eswright@@pitt.edu}
+#' @seealso \code{\link{Cophenetic}}, \code{\link{DistanceMatrix}},
+#' \code{\link{MapCharacters}}, \code{\link{MODELS}},
+#' \code{\link{WriteDendrogram}}
+#' @references Anisimova M., Gil, M., Dufayard, J., Dessimoz, C., and Gascuel,
+#' O. (2011) Survey of branch support methods demonstrates accuracy, power, and
+#' robustness of fast likelihood-based approximation schemes. \emph{Syst
+#' Biol.}, \bold{60(5)}, 685-99.
+#' 
+#' Felsenstein, J. (1981) Evolutionary trees from DNA sequences: a maximum
+#' likelihood approach. \emph{Journal of Molecular Evolution}, \bold{17(6)},
+#' 368-376.
+#' 
+#' Felsenstein J. (2001) Taking variation of evolutionary rates between sites
+#' into account in inferring phylogenies. \emph{Journal of molecular
+#' evolution}, \bold{53}, 447-455.
+#' 
+#' Fitch, W. M. (1971) Toward defining the course of evolution: minimum change
+#' for a specified tree topology. \emph{Systematic Zoology}, \bold{20}:406-416.
+#' 
+#' Makarenkov V., and Lapointe, F. (2004) A weighted least-squares approach for
+#' inferring phylogenies from incomplete distance matrices.
+#' \emph{Bioinformatics}, \bold{20(13)}, 2113-2121.
+#' 
+#' Saitou, N. and Nei, M. (1987) The neighbor-joining method: a new method for
+#' reconstructing phylogenetic trees. \emph{Molecular Biology and Evolution},
+#' \bold{4(4)}, 406-425.
+#' 
+#' Sankoff, D. (1975) Minimal mutation trees of sequences. \emph{SIAM Journal
+#' of Applied Math}, \bold{28}.
+#' @examples
+#' 
+#' # using the matrix from the original paper by Saitou and Nei
+#' m <- matrix(0,8,8) # only the lower triangle is used
+#' m[2:8,1] <- c(7, 8, 11, 13, 16, 13, 17)
+#' m[3:8,2] <- c(5, 8, 10, 13, 10, 14)
+#' m[4:8,3] <- c(5, 7, 10, 7, 11)
+#' m[5:8,4] <- c(8, 11, 8, 12)
+#' m[6:8,5] <- c(5, 6, 10)
+#' m[7:8,6] <- c(9, 13)
+#' m[8,7] <- c(8)
+#' 
+#' # returns an object of class "dendrogram"
+#' tree <- TreeLine(myDistMatrix=m, cutoff=10, method="NJ", showPlot=TRUE)
+#' 
+#' # example of specifying multiple cutoffs
+#' clusters <- TreeLine(myDistMatrix=m, method="UPGMA", type="clusters", cutoff=c(2,6,10,20))
+#' head(clusters)
+#' 
+#' # example of creating a complete-linkage tree from an alignment
+#' fas <- system.file("extdata", "50S_ribosomal_protein_L2.fas", package="DECIPHER")
+#' dna <- readDNAStringSet(fas)
+#' dna <- AlignTranslation(dna, verbose=FALSE)
+#' dna # input alignment
+#' d <- DistanceMatrix(dna, type="dist") # returns an object of class 'dist'
+#' complete <- TreeLine(myDistMatrix=d, method="complete", cutoff=0.05, showPlot=TRUE)
+#' 
+#' \dontrun{
+#' # example of maximum likelihood tree building
+#' tree <- TreeLine(myXStringSet=head(dna, 10), reconstruct=TRUE)
+#' plot(tree)
+#' 
+#' # displaying ancestral states on each edge
+#' start <- 50
+#' end <- 52
+#' tree <- dendrapply(tree,
+#' 	function(x) {
+#' 		attr(x, "edgetext") <- substring(attr(x, "state"),
+#' 			start,
+#' 			end)
+#' 		x
+#' 	})
+#' plot(tree,
+#' 	edgePar=list(p.lwd=1e-5,
+#' 		p.col="#00000000",
+#' 		t.col=c("#AA3355", "#33FFFF")),
+#' 	edge.root=FALSE)
+#' }
+#' 
+#' # example of maximum parsimony tree building
+#' costs <- matrix(c(0, 2, 1, 2, 2, 0, 2, 1, 1, 2, 0, 2, 2, 1, 2, 0), 4)
+#' dimnames(costs) <- list(DNA_BASES, DNA_BASES)
+#' costs
+#' tree <- TreeLine(myXStringSet=head(dna, 10), method="MP", costMatrix=costs)
+#' 
+#' # example of accessing and using the attributes
+#' attributes(tree)
+#' plot(dendrapply(tree,
+#' 	function(x) {
+#' 		s <- attr(x, "support")
+#' 		if (!is.null(s))
+#' 			attr(x, "edgetext") <- formatC(as.numeric(s), digits=2, format="f")
+#' 		attr(x, "edgePar") <- list(p.col=NA, p.lwd=1e-5, t.col="#CC55AA", t.cex=0.7)
+#' 		x
+#' 	}),
+#' 	horiz=TRUE)
+#' 
+#' @export TreeLine
 TreeLine <- function(myXStringSet=NULL,
 	myDistMatrix=NULL,
 	method="ML",

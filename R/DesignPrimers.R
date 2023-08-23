@@ -103,6 +103,168 @@
 	return(eff_hyb*eff_taq)
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#' Design PCR Primers Targeting a Specific Group of Sequences
+#' 
+#' Assists in the design of primer sets targeting a specific group of sequences
+#' while minimizing the potential to cross-amplify other groups of sequences.
+#' 
+#' Primers are designed for use with \emph{Taq} DNA Polymerase to maximize
+#' sensitivity and specificity for the target group of sequences.  The design
+#' makes use of \emph{Taq}'s bias against certain 3' terminal mismatch types in
+#' order to increase specificity further than can be achieve with hybridization
+#' efficiency alone.
+#' 
+#' Primers are designed from a set of tiles to target each \code{identifier}
+#' while minimizing affinity for all other tiled groups.  Arguments provide
+#' constraints that ensure the designed primer sets meet the specified criteria
+#' as well as being optimized for the particular experimental conditions.  A
+#' search is conducted through all tiles in the same alignment position to
+#' estimate the chance of cross-amplification with a non-target group.
+#' 
+#' If \code{numPrimers} is greater than or equal to one then the set of forward
+#' and reverse primers that minimizes potential false positive overlap is
+#' returned.  This will also initiate a thorough search through all target
+#' sites upstream and downstream of the expected binding sites to ensure that
+#' the primers do not bind to nearby positions.  Lowering the
+#' \code{maxSearchSize} will speed up the thorough search at the expense of
+#' potentially missing an unexpected target site.  The number of possible
+#' primer sets assessed is increased with the size of \code{numPrimers}.
+#' 
+#' @name DesignPrimers
+#' @param tiles A set of tiles representing each group of sequences, as in the
+#' format created by the function \code{TileSeqs}.
+#' @param identifier Optional character string used to narrow the search
+#' results to those matching a specific identifier.  Determines the target
+#' group(s) for which primers will be designed.  If "" then all identifiers are
+#' selected.
+#' @param start Integer specifying the starting position in the alignment where
+#' potential forward primer target sites begin.  Preferably a position that is
+#' included in most sequences in the alignment.
+#' @param end Integer specifying the ending position in the alignment where
+#' potential reverse primer target sites end.  Preferably a position that is
+#' included in most sequences in the alignment.
+#' @param minLength Integer providing the minimum length of primers to consider
+#' in the design.
+#' @param maxLength Integer providing the maximum length of primers to consider
+#' in the design, which must be less than or equal to the \code{maxLength} of
+#' tiles.
+#' @param maxPermutations Integer providing the maximum number of permutations
+#' considered as part of a forward or reverse primer set.
+#' @param minCoverage Numeric giving the minimum fraction of the target group's
+#' sequences that must be covered with the primer set.
+#' @param minGroupCoverage Numeric giving the minimum fraction of the target
+#' group that must have sequence information (not terminal gaps) in the region
+#' covered by the primer set.
+#' @param annealingTemp Numeric indicating the desired annealing temperature
+#' that will be used in the PCR experiment.
+#' @param P Numeric giving the molar concentration of primers in the reaction.
+#' @param monovalent The molar concentration of monovalent ([Na] and [K]) ions
+#' in solution that will be used to determine a sodium equivalent
+#' concentration.
+#' @param divalent The molar concentration of divalent ([Mg]) ions in solution
+#' that will be used to determine a sodium equivalent concentration.
+#' @param dNTPs Numeric giving the molar concentration of free nucleotides
+#' added to the solution that will be used to determine a sodium equivalent
+#' concentration.
+#' @param minEfficiency Numeric giving the minimum efficiency of hybridization
+#' desired for the primer set.  Note that an efficiency of 99\% (0.99) will
+#' greatly lower predicted specificity of the primer set, however an efficiency
+#' of 50\% (0.5) may be too low in actuality to amplify the target group due to
+#' error in melt temperature predictions.
+#' @param worstScore Numeric specifying the score cutoff to remove target sites
+#' from consideration.  For example, a \code{worstScore} of -5 will remove all
+#' primer sets scoring below -5, although this may eventually result in no
+#' primer sets meeting the design criteria.
+#' @param numPrimerSets Integer giving the optimal number of primer sets
+#' (forward and reverse primer sets) to design.  If set to zero then all
+#' possible forward and reverse primers are returned, but the primer sets
+#' minimizing potential cross-amplifications are not chosen.
+#' @param minProductSize Integer giving the minimum number of nucleotides
+#' desired in the PCR product.
+#' @param maxProductSize Integer giving the maximum number of nucleotides
+#' desired in the PCR product.
+#' @param maxSearchSize Integer giving the maximum number of nucleotides to
+#' search for false priming upstream and downstream of the expected binding
+#' site.
+#' @param batchSize Integer specifying the number of primers to simulate
+#' hybridization per batch that is passed to \code{CalculateEfficiencyPCR}.
+#' @param maxDistance Numeric specifying the maximal fraction of mismatched
+#' base pairings on a rolling basis beginning from the 3' end of the primer.
+#' @param primerDimer Numeric giving the maximum amplification efficiency of
+#' potential primer-dimer products.
+#' @param ragged5Prime Logical specifying whether the 5' end or 3' end of
+#' primer permutations targeting the same site should be varying lengths.
+#' @param taqEfficiency Logical determining whether to make use of elongation
+#' efficiency and maxDistance to increase predictive accuracy for \emph{Taq}
+#' DNA Polymerase amplifying primers with mismatches near the 3' terminus.
+#' Note that this should be set to FALSE if using a high-fidelity polymerase
+#' with 3' to 5' exonuclease activity.
+#' @param induceMismatch Logical or integer specifying whether to induce a
+#' mismatch in the primer with the template DNA.  If \code{TRUE} then a
+#' mismatch is induced at the 6th primer position.  If an integer value is
+#' provided between 2 and 6 then a mismatch is induced in that primer position,
+#' where the 3'-end is defined as position 1.
+#' @param processors The number of processors to use, or \code{NULL} to
+#' automatically detect and use all available processors.
+#' @param verbose Logical indicating whether to display progress.
+#' @return A different \code{data.frame} will be returned depending on number
+#' of primer sets requested.  If no primer sets are required then columns
+#' contain the forward and reverse primers for every possible position scored
+#' by their potential to amplify other identified groups.  If one or more
+#' primer sets are requested then columns contain information for the optimal
+#' set of forward and reverse primers that could be used in combination to give
+#' the fewest potential cross-amplifications.
+#' @note The program OligoArrayAux
+#' (\url{http://www.unafold.org/Dinamelt/software/oligoarrayaux.php}) must be
+#' installed in a location accessible by the system.  For example, the
+#' following code should print the installed OligoArrayAux version when
+#' executed from the R console:
+#' 
+#' \code{system("hybrid-min -V")}
+#' 
+#' To install OligoArrayAux from the downloaded source folder on Unix-like
+#' platforms, open the shell (or Terminal on Mac OS) and type:
+#' 
+#' \code{cd oligoarrayaux # change directory to the correct folder name}
+#' 
+#' \code{./configure}
+#' 
+#' \code{make}
+#' 
+#' \code{sudo make install}
+#' @author Erik Wright \email{eswright@@pitt.edu}
+#' @seealso \code{\link{AmplifyDNA}}, \code{\link{CalculateEfficiencyPCR}},
+#' \code{\link{DesignSignatures}}, \code{\link{TileSeqs}}
+#' @references ES Wright et al. (2013) "Exploiting Extension Bias in PCR to
+#' Improve Primer Specificity in Ensembles of Nearly Identical DNA Templates."
+#' Environmental Microbiology, doi:10.1111/1462-2920.12259.
+#' @examples
+#' 
+#' db <- system.file("extdata", "Bacteria_175seqs.sqlite", package="DECIPHER")
+#' # not run (must have OligoArrayAux installed first):
+#' \dontrun{tiles <- TileSeqs(db, identifier=c("Enterobacteriales","Pseudomonadales"))}
+#' \dontrun{primers <- DesignPrimers(tiles, identifier="Enterobacteriales", start=280, end=420,
+#'            minProductSize=50, numPrimerSets=1)}
+#' 
+#' @export DesignPrimers
 DesignPrimers <- function(tiles,
 	identifier="",
 	start=1,

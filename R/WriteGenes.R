@@ -1,3 +1,39 @@
+#' Write Genes to a File
+#' 
+#' Writes predicted genes to a file in GenBank (gbk) or general feature format
+#' (gff).
+#' 
+#' \code{WriteGenes} will write a \code{"Genes"} object to a GenBank (if
+#' \code{format} is \code{"gbk"}) or general feature format (if \code{format}
+#' is \code{"gff"}) file.
+#' 
+#' @name WriteGenes
+#' @param x An object of class \code{Genes}.
+#' @param file A connection or a character string naming the file path where
+#' the tree should be exported.  If "" (the default), the tree is printed to
+#' the standard output connection, the console unless redirected by sink.
+#' @param format Character specifying \code{"gbk"} or \code{"gff"} output
+#' format.
+#' @param append Logical indicating whether to append to an existing
+#' \code{file}.  Only applicable if \code{file} is a character string.  If
+#' \code{FALSE} (the default), then the file is overwritten.
+#' @return \code{NULL}.
+#' @author Erik Wright \email{eswright@@pitt.edu}
+#' @seealso \code{\link{ExtractGenes}}, \code{\link{FindGenes}},
+#' \code{\link{Genes-class}}
+#' @examples
+#' 
+#' # import a test genome
+#' fas <- system.file("extdata",
+#' 	"Chlamydia_trachomatis_NC_000117.fas.gz",
+#' 	package="DECIPHER")
+#' genome <- readDNAStringSet(fas)
+#' 
+#' x <- FindGenes(genome)
+#' WriteGenes(x[1:10,], format="gbk")
+#' WriteGenes(x[1:10,], format="gff")
+#' 
+#' @export WriteGenes
 WriteGenes <- function(x,
 	file="",
 	format="gbk",

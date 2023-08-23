@@ -1,3 +1,35 @@
+#' Extract Predicted Genes from a Genome
+#' 
+#' Extracts predicted genes from the genome used for prediction.
+#' 
+#' Extracts a set of gene predictions as either DNA, mRNA, or proteins.
+#' 
+#' @name ExtractGenes
+#' @param x An object of class \code{Genes}.
+#' @param myDNAStringSet The \code{DNAStringSet} object used in generating
+#' \code{x}.
+#' @param type The class of sequences to return.  This should be (an
+#' unambiguous abbreviation of) one of \code{"AAStringSet"},
+#' \code{"DNAStringSet"} (the default), or \code{"RNAStringSet"}.
+#' @param \dots Other parameters passed directly to \code{translate}.
+#' @return An \code{"AAStringSet"}, \code{"DNAStringSet"}, or
+#' \code{"RNAStringSet"} determined by \code{type}.
+#' @author Erik Wright \email{eswright@@pitt.edu}
+#' @seealso \code{\link{FindGenes}}, \code{\link{Genes-class}},
+#' \code{\link{WriteGenes}}
+#' @examples
+#' 
+#' # import a test genome
+#' fas <- system.file("extdata",
+#' 	"Chlamydia_trachomatis_NC_000117.fas.gz",
+#' 	package="DECIPHER")
+#' genome <- readDNAStringSet(fas)
+#' 
+#' x <- FindGenes(genome)
+#' genes <- ExtractGenes(x, genome)
+#' proteins <- ExtractGenes(x, genome, type="AAStringSet")
+#' 
+#' @export ExtractGenes
 ExtractGenes <- function(x,
 	myDNAStringSet,
 	type="DNAStringSet",
