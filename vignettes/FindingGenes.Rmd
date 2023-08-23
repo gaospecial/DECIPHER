@@ -1,0 +1,389 @@
+---
+title: "The Magic of Gene Finding"
+author: "Erik S. Wright"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+---
+
+# Introduction
+
+This vignette reveals the tricks behind the magic that is *ab initio* gene finding.  Cells all have the magical ability to transcribe and translate portions of their genome, somehow decoding key signals from a sea of possibilities.  The `FindGenes` function attempts to decipher these signals in order to accurately predict an organism's set of genes.  Cells do much of this magic using only information upstream of the gene, whereas `FindGenes` uses both the content of the gene and its upstream information to predict gene boundaries.  As a case study, this tutorial focuses on finding genes in the genome of *Chlamydia trachomatis*, an intracellular bacterial pathogen known for causing chlamydia.  This genome was chosen because it is relatively small (only ~1 Mbp) so the examples run quickly.  Nevertheless, `FindGenes` is designed to work with any genome that lacks introns, making it well-suited for prokaryotic gene finding.
+
+# Getting Started
+
+## Startup
+
+To get started we need to load the **DECIPHER** package, which automatically loads a few other required packages.
+
+```{r startup}
+library(DECIPHER)
+```
+
+Gene finding is performed with the function `FindGenes`.  Help can be accessed via:
+
+
+```
+> ? FindGenes
+```
+
+Once **DECIPHER** is installed, the code in this tutorial can be obtained via:
+
+
+```
+> browseVignettes("DECIPHER")
+```
+
+# Finding Genes in a Genome
+
+*Ab initio* gene finding begins from a genome and locates genes without prior knowledge about the specific organism.
+
+## Importing the genome
+
+The first step is to set filepaths to the genome sequence (in FASTA format).  Be sure to change the path names to those on your system by replacing all of the text inside quotes labeled "$<<$path to ...$>>$" with the actual path on your system.
+
+```{r expr1,eval=TRUE}
+# specify the path to your genome:
+genome_path <- "<<path to genome FASTA file>>"
+# OR use the example genome:
+genome_path <- system.file("extdata",
+	"Chlamydia_trachomatis_NC_000117.fas.gz",
+	package="DECIPHER")
+
+# read the sequences into memory
+genome <- readDNAStringSet(genome_path)
+genome
+```
+
+## Finding genes
+
+The next step is to find genes in the genome using `FindGenes`, which does all the magic.  There are fairly few choices to make at this step.  By default, the bacterial and archaeal genetic code is used for translation, including the initiation codons "ATG", "GTG", "TTG", "CTG", "ATA", "ATT", and "ATC".  The default `minGeneLength` is `60`, although we could set this lower (e.g., `30`) to locate very short genes or higher (e.g., `90`) for (only slightly) better accuracy.  The argument `allowEdges` (default `TRUE`) controls whether genes are allowed to run off the ends of the genome, as would be expected for circular or incomplete chromosomes.  Here, we will only set `showPlot` to `TRUE` to display a summary of the gene finding process and `allScores` to `TRUE` to see the scores of all open reading frames (including predicted genes).
+
+\begin{centerfig}
+```{r expr2,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6}
+par(mar=c(4.1, 4.1, 0.3, 0.1))
+orfs <- FindGenes(genome, showPlot=TRUE, allScores=TRUE)
+```
+\caption{ {#f1} Plot summarizing the gene finding process of `FindGenes`.  See `?plot.Genes` for details.}
+\end{centerfig}
+
+## Inspecting the output
+
+And presto! With a wave of our magic wand we now have our gene predictions in the form of an object belonging to class *Genes*.  Now that we have our genes in hand, let's take a look at them:
+
+```{r expr3,eval=TRUE}
+orfs
+```
+
+Open reading frames are defined by their `Begin` and `End` position, as well as whether they are on the top (i.e., `Strand` is `0`) or bottom strand.  Here, genes are flagged by having a non-zero value in the `Gene` column.  We see all the open reading frames in the output because `allScores` was set to `TRUE`.  If we only want to look at the subset of open reading frames that are predicted as genes, we can subset the object:
+
+```{r expr4,eval=TRUE}
+genes <- orfs[orfs[, "Gene"]==1,]
+```
+
+The `"Gene"` column is one of several describing the open reading frames.  Objects of class *Genes* are stored as matrices with many columns:
+
+```{r expr5,eval=TRUE}
+colnames(genes)
+```
+
+
+# Analyzing the Output
+
+## Extracting genes from the genome
+
+Predictions in hand, the first thing we can do is extract the genes from the genome.  This can be easily done using `ExtractGenes`.
+
+```{r expr6,eval=TRUE}
+dna <- ExtractGenes(genes, genome)
+dna
+```
+
+We see that the first gene has no start codon and the last gene has no stop codon.  This implies that the genes likely connect to each other because the genome is circular and the genome end splits one gene into two.  Therefore, the first predicted gene's first codon is not a true start codon and we need to drop this first sequence from our analysis of start codons.  We can look at the distribution of predicted start codons with:
+
+```{r expr7,eval=TRUE}
+table(subseq(dna[-1], 1, 3))
+```
+
+There are the typical three bacterial initiation codons, "ATG", "GTG", and "TTG", and one predicted non-canonical initiation codon: "CTG".  Let's take a closer look at genes with non-canonical initiation codons:
+
+```{r expr8,eval=TRUE}
+w <- which(!subseq(dna, 1, 3)  %in% c("ATG", "GTG", "TTG"))
+w
+w <- w[-1] # drop the first sequence because it is a fragment
+w
+dna[w]
+genes[w]
+```
+
+That worked like a charm, so let's look at the predicted protein sequences by translating the genes:
+
+```{r expr9,eval=TRUE}
+aa <- ExtractGenes(genes, genome, type="AAStringSet")
+aa
+```
+
+All of the genes start with a methionine ("M") residue and end with a stop ("*") except the first and last gene because they wrap around the end of the genome.  If so inclined, we could easily remove the first and last positions with:
+
+```{r expr10,eval=TRUE}
+subseq(aa, 2, -2)
+```
+
+## Removing genes with too many ambiguities
+
+
+Genomes sometimes contain ambiguous positions (e.g., "N") within open reading frames.  These ambiguities can make an open reading frame look longer than it actually is, giving the illusion of a single gene when none (or more than one) is present.  We can easily remove those with more than some magic number (let's say 20 or 5%) of ambiguous positions:
+
+```{r expr11,eval=TRUE}
+a <- alphabetFrequency(dna, baseOnly=TRUE)
+w <- which(a[, "other"] <= 20 & a[, "other"]/width(dna) <= 5)
+genes <- genes[w]
+```
+
+Abracadabra! The genes with many ambiguities have magically disappeared from our gene set.
+
+## Taking a look at the shortest genes
+
+
+You might think finding short genes (< 90 nucleotides) would require black magic, but `FindGenes` can do it quite well.  We can select the subset of short genes and take a look at how repeatedly they were called genes during iteration:
+
+```{r expr12,eval=TRUE}
+w <- which(width(dna) < 90)
+dna[w]
+aa[w]
+genes[w]
+genes[w, "End"] - genes[w, "Begin"] + 1 # lengths
+genes[w, "FractionReps"]
+```
+
+We can see from the *FractionReps* column always being 100% that these short genes were repeatedly identified during iteration, suggesting they weren't pulled out of a hat.  That's impressive given how short they are!
+
+## Revealing the secrets of gene finding
+
+
+All of this might seem like hocus pocus, but the predictions made by `FindGenes` are supported by many scores.  Some scores are related because they make use of information from the same region relative to the gene boundaries.  We can take a look at score correlations with:
+
+\begin{centerfig}
+```{r expr13,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6}
+pairs(genes[, 5:16], pch=46, col="#00000033", panel=panel.smooth)
+```
+\caption{ {#f2} Scatterplot matrix of scores used by `FindGenes` to make gene predictions.}
+\end{centerfig}
+
+\clearpage
+
+Certainly some of the magic of gene finding is having a lot of scores!  We can see that the ribosome binding site score and upstream nucleotide score are the most correlated.  This isn't just magical thinking, both scores rely on the same nucleotides immediately upstream of the start codon.  The different scores are defined as follows:
+
+
+1. Upstream signals
+
+    a. *Ribosome Binding Site Score* - Binding strength and position of the Shine-Delgarno sequence, as well as other motifs in the first bases upstream of the start codon.
+    b. *Upstream Nucleotide Score* - Nucleotides in each position immediately upstream of the start codon.
+    c. *Upstream Motif Score* - K-mer motifs further upstream of the start codon.
+
+4. Start site signals
+
+    a. *Start Score* - Choice of start codon relative to the background distribution of open reading frames.
+    b. *Folding Score* - Free energy of RNA-RNA folding around the start codon and relative to locations upstream and downstream of the start.
+    c. *Initial Codon Score* - Choice of codons in the first few positions after the start codon.
+
+4. Gene content signals
+
+    a. *Coding Score* - Usage of codons or pairs of codons within the open reading frame.
+    b. *Codon Model* - Number of the codon model that best fit each open reading frame.
+    c. *Length Score* - Length of the open reading frame relative to the background of lengths expected by chance.
+    d. *Autocorrelation Score* - The degree to which the same or different codons are used sequentially to code for an amino acid.
+    e. *Coupling Score* - Likelihood of observing neighboring amino acids in real proteins.
+
+6. Termination signals
+
+    a. *Termination Codon Score* - Codon bias immediately before the stop codon.
+    b. *Stop Score* - Choice of stop codon relative to the observed distribution of possible stop codons.
+
+
+
+## Taking a closer look at the output
+
+
+If we have a particular gene of interest, it can sometimes be useful to plot the output of `FindGenes` as the set of all possible open reading frames with the predicted genes highlighted.  The `plot` function for a *Genes* object is interactive, so it is possible to pan left and right by setting the `interact` argument equal to `TRUE`.  For now we will only look at the beginning of the genome:
+
+\begin{centerfig}
+```{r expr14,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6}
+plot(orfs, interact=FALSE)
+```
+\caption{ {#f3} All possible open reading frames (red and blue) with predicted genes highlighted in green.}
+\end{centerfig}
+
+\clearpage
+
+
+# Incorporating non-coding RNAs
+
+## Examining the intergenic spaces
+
+The space between genes sometimes contains promoter sequences, pseudogenes, or non-coding RNA genes that are of interest.  We can conjure up the intergenic sequences longer than a given width (e.g., 30 nucleotides) with the commands:
+
+```{r expr15,eval=TRUE}
+s <- c(1, genes[, "End"] + 1)
+e <- c(genes[, "Begin"] - 1, width(genome))
+w <- which(e - s >= 30)
+intergenic <- unlist(extractAt(genome, IRanges(s[w], e[w])))
+intergenic
+```
+
+Some of these intergenic regions might be similar to each other.  We can find related intergenic sequences by clustering those within a certain distance (e.g., 20
+
+```{r expr16,eval=TRUE}
+intergenic <- c(intergenic, reverseComplement(intergenic))
+names(intergenic) <- c(w, paste(w, "rc", sep="_"))
+clusts <- Clusterize(myXStringSet=intergenic, cutoff=0.3)
+```
+
+Since we used `inexact` clustering, the clusters containing the longest sequences will be first.  We can look at sequences belonging to the first cluster:
+
+```{r expr17,eval=TRUE}
+t <- sort(table(clusts$cluster), decreasing=TRUE)
+head(t) # the biggest clusters
+AlignSeqs(intergenic[clusts$cluster == names(t)[1]], verbose=FALSE)
+```
+
+These two long intergenic regions probably contain copies of the ribosomal RNA operon.  A signature of non-coding RNAs is that they tend to have higher GC content than expected.  We can create a plot of GC content in intergenic regions versus size.  Since our genome averages 41% GC content, we can use statistics to add a line for the 95% confidence interval.  Only a few intergenic regions have unexpectedly high GC content.
+
+\begin{centerfig}
+```{r expr18,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6}
+gc <- alphabetFrequency(intergenic, as.prob=TRUE, baseOnly=TRUE)
+gc <- gc[, "G"] + gc[, "C"]
+plot(width(intergenic),
+	100*gc,
+	xlab="Length (nucleotides)",
+	ylab="GC content (%)",
+	main="Intergenic regions",
+	log="x")
+size <- 10^seq(1, 4, 0.1)
+expected <- 0.413*size
+lines(size, 100*(expected + 1.96*sqrt(expected))/size)
+```
+\caption{ {#f4} Non-coding RNAs are often found in intergenic regions with unexpectedly high GC content.}
+\end{centerfig}
+
+\clearpage
+
+## Finding and including non-coding RNAs
+
+
+The **DECIPHER** has a separate function, `FindNonCoding`, to find non-coding RNAs in a genome.  It searches for predefined models created from multiple sequence alignments of non-coding RNAs.  Thankfully **DECIPHER** includes pre-built models of non-coding RNAs commonly found in bacteria, archaea, and eukarya.  Since *C. trachomatis* is a bacterium, we will load the bacterial models.  For genomes belonging to organisms from other domains of life, simply replace "Bacteria" with "Archaea" or "Eukarya".
+
+```{r expr19,eval=TRUE}
+data(NonCodingRNA_Bacteria)
+x <- NonCodingRNA_Bacteria
+names(x)
+```
+
+We need to search for these models in our genome before we can incorporate them into our gene calls.
+
+```{r expr20,eval=TRUE}
+rnas <- FindNonCoding(x, genome)
+rnas
+```
+
+Tada!  `FindNonCoding` outputs an object of class *Genes* just like `FindGenes`.  However, non-coding RNAs are denoted with negative numbers in the `Gene` column.  Each number corresponds to the model that was identified.  We can look at the set of non-coding RNAs that were found in the *C. trachomatis* genome:
+
+```{r expr21,eval=TRUE}
+annotations <- attr(rnas, "annotations")
+m <- match(rnas[, "Gene"], annotations)
+sort(table(names(annotations)[m]))
+```
+
+There was at least one tRNA gene found for each amino acid, as well as two copies of each ribosomal RNA gene, and the RNaseP and tmRNA genes.  Now, we can easily include these non-coding RNAs into our gene calls.
+
+```{r expr22,eval=TRUE}
+genes <- FindGenes(genome, includeGenes=rnas)
+genes
+```
+
+That worked like magic!  Now the *Genes* object contains both protein coding genes and non-coding RNAs.
+
+
+# Annotating the protein coding genes
+
+The magic doesn't have to end there.  We can annotate our protein coding genes just like we did with the non-coding RNAs.  To master this sleight of hand, we first need a training set of labeled protein sequences.  We have exactly that included in **DECIPHER** for *Chlamydia*.
+
+```{r expr23,eval=TRUE}
+fas <- system.file("extdata",
+	"PlanctobacteriaNamedGenes.fas.gz",
+	package="DECIPHER")
+prot <- readAAStringSet(fas)
+prot
+head(names(prot))
+```
+
+The training sequences are named by their enzyme commission (EC) number and three or four-letter gene name.  The process of training a classifier is described elsewhere.  For now, let's jump straight to the solution:
+
+```{r expr24,eval=TRUE}
+trainingSet <- LearnTaxa(train=prot,
+	taxonomy=names(prot),
+	maxChildren=1)
+trainingSet
+```
+
+Now we need to take the proteins we just found with `FindGenes` and classify them using our classifier.
+
+\begin{centerfig}
+```{r expr25,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6}
+w <- which(genes[, "Gene"] > 0)
+aa <- ExtractGenes(genes[w], genome, type="AAStringSet")
+ids <- IdTaxa(aa,
+	trainingSet,
+	fullLength=0.99,
+	threshold=50,
+	processors=1)
+ids
+plot(trainingSet, ids[grep("unclassified", ids, invert=TRUE)])
+```
+\caption{ {#f5} Annotations of protein coding sequences in *C. trachomatis* and their distribution on the taxonomy of functions.}
+\end{centerfig}
+
+Finally, we can assign each of our protein coding sequences to a classification in the *Genes* object:
+
+```{r expr26,eval=TRUE}
+annotations <- sapply(ids, function(x) paste(x$taxon[-1], collapse="; "))
+u_annotations <- unique(annotations)
+genes[w, "Gene"] <- match(annotations, u_annotations) + 1L
+attr(genes, "annotations") <- c(attr(genes, "annotations"),
+	setNames(seq_along(u_annotations) + 1L,
+		u_annotations))
+genes
+```
+
+With a little wizardry, we can now look at the top annotations in the genome.
+
+```{r expr27,eval=TRUE}
+annotations <- attr(genes, "annotations")
+m <- match(genes[, "Gene"], annotations)
+head(sort(table(names(annotations)[m]), decreasing=TRUE))
+```
+
+
+# Guaranteeing repeatability
+
+
+
+`FindGenes` sometimes uses random sampling to increase speed of the algorithm.  For this reason, gene predictions may change slightly if the prediction process is repeated with the same inputs.  For some applications this randomness is undesirable, and it can easily be avoided by setting the random seed before using `FindGenes`.  The process of setting and then unsetting the seed in \R{} is straightforward:
+
+```{r expr28,eval=FALSE}
+set.seed(123) # choose a whole number as the random seed
+# then make gene predictions with FindGenes (not shown)
+set.seed(NULL) # return to the original state by unsetting the seed
+```
+
+
+# Exporting the output
+
+
+
+The genes can be exported in a variety of formats, including as a FASTA file with `writeXStringSet`, GenBank (gbk) or general feature format (gff) file with `WriteGenes`, or delimited file formats (e.g., csv, tab, etc.) with `write.table`.
+
+Now that you know the tricks of the trade, you can work your own magic to find new genes!
+
+
+# Session Information
+

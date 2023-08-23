@@ -1,0 +1,176 @@
+---
+title: "Upsize your clustering with Clusterize"
+author: "Erik S. Wright"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+---
+
+
+```{r}
+par(mar=c(4.1, 4.1, 0.3, 0.1))
+set.seed(123)
+```
+
+
+# Introduction
+
+
+
+You may have found yourself in a familiar predicament for many bioinformaticians: you have a lot of sequences and you need to downsize before you can get going. You may also theorize that this must be an easy problem to solve  given sequences, output clusters. But what can you utilize to solve this problem? This vignette will familiar*ize* you with the `Clusterize` function in the **DECIPHER** package. Clusterize will revolution*ize* all your clustering needs!
+\\
+Why `Clusterize`?
+
+* Scalability - `Clusterize` will linear*ize* the search space so that many sequences can be clustered in a reasonable amount of time.
+* Simplicity - Although you can individual*ize* `Clusterize`, the defaults are straightforward and should meet most of your needs.
+* Accuracy - `Clusterize` will maxim*ize* your ability to extract biologically meaningful results from your sequences.
+
+
+This vignette will summar*ize* the use of `Clusterize` to cluster DNA, RNA, or protein sequences.
+
+
+# Getting Started
+
+
+
+To get started we need to load the **DECIPHER** package, which automatically mobil*ize* a few other required packages.
+
+```{r startup,results=hide}
+library(DECIPHER)
+```
+
+There's no need to memor*ize* the inputs to `Clusterize`, because its help page can be accessed through:
+
+
+```
+> ? Clusterize
+```
+
+
+
+# Optimize your inputs to Clusterize
+
+
+`Clusterize` requires that you first digit*ize* your sequences by loading them into memory. For the purpose of this vignette, we will capital*ize* on the fact that **DECIPHER** already includes some built-in sets of sequences.
+
+```{r expr1,eval=TRUE}
+# specify the path to your file of sequences:
+fas <- "<<path to training FASTA file>>"
+# OR use the example DNA sequences:
+fas <- system.file("extdata",
+	"50S_ribosomal_protein_L2.fas",
+	package="DECIPHER")
+# read the sequences into memory
+dna <- readDNAStringSet(fas)
+dna
+```
+
+The `Clusterize` algorithm will general*ize* to nucleotide or protein sequences, so we must choose which we are going to use. Here, we hypothes*ize* that weaker similarities can be detected between proteins and, therefore, decide to use the translated coding (amino acid) sequences. If you wish to cluster at high similarity, you could also strateg*ize* that nucleotide sequences would be better because there would be more nucleotide than amino acid differences.
+
+```{r expr2,eval=TRUE}
+aa <- translate(dna)
+aa
+seqs <- aa # could also cluster the nucleotides
+```
+
+Now you can choose how to parameter*ize* the function, with the main arguments being `myXStringSet` and `cutoff`. In this case, we will initial*ize* `cutoff` at `seq(0.5, 0, -0.1)` to cluster sequences from 50% to 100% similarity by 10%'s. It is important to recogn*ize* that `cutoff`s can be provided in *ascending* or *descending* order and, when *descending*, groups at each `cutoff` will be nested within the previous `cutoff`'s groups.
+
+We must also choose whether to custom*ize* the calculation of distance. The defaults will penal*ize* gaps as single events, such that each consecutive set of gaps (i.e., insertion or deletion) is considered equivalent to one mismatch. If you want to standard*ize* the definition of distance to be the same as most other clustering programs then set: `penalizeGapLetterMatches` to `TRUE` (i.e., every gap position is a mismatch), `method` to `"shortest"`, `minCoverage` to `0`, and `includeTerminalGaps` to `TRUE`. It is possible to rational*ize* many different measures of distance -- see the `DistanceMatrix` function for more information about alternative parameterizations.
+
+We can further personal*ize* the inputs as desired. The main function argument to emphas*ize* is `processors`, which controls whether the function is parallelized on multiple computer threads (if **DECIPHER**) was built with OpenMP enabled). Setting `processors` to a value greater than `1` will speed up clustering considerably, especially for large s*ize* clustering problems. Once we are ready, it's time to run `Clusterize` and wait for the output to material*ize*!
+
+```{r expr3,eval=TRUE}
+clusters <- Clusterize(seqs, cutoff=seq(0.5, 0, -0.1), processors=1)
+class(clusters)
+colnames(clusters)
+str(clusters)
+apply(clusters, 2, max) # number of clusters per cutoff
+```
+
+Notice that `Clusterize` will character*ize* the clustering based on how many clustered pairs came from relatedness sorting versus rare k-mers, and `Clusterize` will predict the effectiveness of clustering. Depending on the input sequences, the percentage of clusters originating from relatedness sorting will equal*ize* with the number originating from rare k-mers, but more commonly clusters will originate from one source or the other. The clustering effectiveness formal*ize*s the concept of "inexact" clustering by approximating the fraction of possible sequence pairs that were correctly clustered together. You can incentiv*ize* a higher clustering effectiveness by increasing `maxPhase3` at the expense of (proportionally) longer run times.
+
+We can now real*ize* our objective of decreasing the number of sequences. Here, we will priorit*ize* keeping only the longest diverse sequences.
+
+```{r expr4,eval=TRUE}
+o <- order(clusters[[2]], width(seqs), decreasing=TRUE) # 40
+o <- o[!duplicated(clusters[[2]])]
+aa[o]
+dna[o]
+```
+
+
+# Visualize the output of Clusterize
+
+We can scrutin*ize* the clusters by selecting them and looking at their multiple sequence alignment:
+
+```{r expr5,eval=TRUE}
+t <- table(clusters[[1]]) # select the clusters at a cutoff
+t <- sort(t, decreasing=TRUE)
+head(t)
+w <- which(clusters[[1]] == names(t[1]))
+AlignSeqs(seqs[w], verbose=FALSE)
+```
+
+It's possible to util*ize* the `heatmap` function to view the clustering results.
+
+\begin{centerfig}
+```{r expr6,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6}
+aligned_seqs <- AlignSeqs(seqs, verbose=FALSE)
+d <- DistanceMatrix(aligned_seqs, verbose=FALSE)
+tree <- TreeLine(myDistMatrix=d, method="UPGMA", verbose=FALSE)
+heatmap(as.matrix(clusters), scale="column", Colv=NA, Rowv=tree)
+```
+\caption{ {#f1} Visualization of the clustering.}
+\end{centerfig}
+
+As can be seen in Figure \@ref(f1), `Clusterize` will organ*ize* its clusters such that each new cluster is within the previous cluster when `cutoff` is provided in descending order. We can also see that sequences from the same species tend to cluster together, which is an alternative way to systemat*ize* sequences without clustering.
+
+\clearpage
+
+
+# Specialize clustering for your goals
+
+
+The most common use of clustering is to categor*ize* sequences into groups sharing similarity above a threshold and pick one representative sequence per group. These settings empitom*ize* this typical user scenario:
+
+```{r expr7,eval=TRUE}
+c1 <- Clusterize(dna, cutoff=0.2, invertCenters=TRUE, processors=1)
+w <- which(c1 < 0 & !duplicated(c1))
+dna[w] # select cluster representatives (negative cluster numbers)
+```
+
+By default, `Clusterize` will cluster sequences with linkage to the representative sequence in each group, but it is also possible to tell `Clusterize` to minim*ize* the number of clusters by establishing linkage to any sequence in the cluster (i.e., single-linkage):
+
+```{r expr8,eval=TRUE}
+c2 <- Clusterize(dna, cutoff=0.2, singleLinkage=TRUE, processors=1)
+max(abs(c1)) # center-linkage
+max(c2) # single-linkage (fewer clusters, but broader clusters)
+```
+
+It is possible to synthes*ize* a plot showing a cross tabulation of taxonomy and cluster number. We may ideal*ize* the clustering as matching taxonomic labels (\@ref(f2)), but this is not exactly the case.
+
+\begin{centerfig}
+```{r expr9,eval=TRUE,echo=TRUE,fig=TRUE,include=TRUE,height=6,width=6}
+genus <- sapply(strsplit(names(dna), " "), `[`, 1)
+t <- table(genus, c2[[1]])
+heatmap(sqrt(t), scale="none", Rowv=NA, col=hcl.colors(100))
+```
+\caption{ {#f2} Another visualization of the clustering.}
+\end{centerfig}
+
+\clearpage
+
+
+# Finalize your use of Clusterize
+
+Notably, `Clusterize` is a stochastic algorithm, meaning it will randomize which sequences are selected during pre-sorting. Even though the clusters will typically stabilize with enough iterations, you can set the random number seed (before every run) to guarantee reproducibility of the clusters:
+
+```{r expr10,eval=TRUE}
+set.seed(123) # initialize the random number generator
+clusters <- Clusterize(seqs, cutoff=0.1, processors=1)
+set.seed(NULL) # reset the seed
+```
+
+Now you know how to utilize `Clusterize` to cluster sequences.
+
+# Session Information
+
