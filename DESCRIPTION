@@ -1,7 +1,7 @@
 Package: DECIPHER
 Type: Package
 Title: Tools for curating, analyzing, and manipulating biological sequences
-Version: 2.29.0
+Version: 2.29.1
 Date: 2023-04-23
 Author: Erik Wright
 Maintainer: Erik Wright <eswright@pitt.edu>
@@ -12,3 +12,10 @@ Imports: methods, DBI, S4Vectors, IRanges, XVector
 LinkingTo: Biostrings, S4Vectors, IRanges, XVector
 License: GPL-3
 ByteCompile: true
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.2.3
+Suggests: 
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
