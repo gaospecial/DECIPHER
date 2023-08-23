@@ -3,6 +3,10 @@ title: "Finding Chimeric Sequences"
 author: "Erik S. Wright"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Finding Chimeric Sequences}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
 ---
 
 

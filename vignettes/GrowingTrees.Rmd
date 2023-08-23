@@ -3,6 +3,10 @@ title: "Growing phylogenetic trees with TreeLine"
 author: "Erik S. Wright"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Growing phylogenetic trees with TreeLine}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
 ---
 
 

@@ -3,6 +3,10 @@ title: "Repeat, Repeat!"
 author: "Erik S. Wright"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Repeat, Repeat!}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
 ---
 
 # Introduction

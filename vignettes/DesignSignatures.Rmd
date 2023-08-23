@@ -3,6 +3,10 @@ title: "Design Primers That Yield Group-Specific Signatures"
 author: "Erik S. Wright"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Design Primers That Yield Group-Specific Signatures}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
 ---
 
 

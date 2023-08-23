@@ -3,6 +3,10 @@ title: "The Magic of Gene Finding"
 author: "Erik S. Wright"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{The Magic of Gene Finding}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
 ---
 
 # Introduction

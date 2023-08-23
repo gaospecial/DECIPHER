@@ -3,26 +3,11 @@ title: "Design Group-Specific FISH Probes"
 author: "Erik S. Wright"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Design Group-Specific FISH Probes}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
 ---
-
-
-\title{Design Group-Specific FISH Probes}
-\author{Erik S. Wright}
-\date{\today}
-
-
-\newenvironment{centerfig}
-{\begin{figure}[htp]\centering}
-{\end{figure}}
-\renewcommand{\indent}{\hspace*{\tindent}}
-\DefineVerbatimEnvironment{Sinput}{Verbatim} {xleftmargin=2em} \DefineVerbatimEnvironment{Soutput}{Verbatim}{xleftmargin=2em} \DefineVerbatimEnvironment{Scode}{Verbatim}{xleftmargin=2em} \fvset{listparameters={\setlength{\topsep}{0pt}}} \renewenvironment{Schunk}{\vspace{\topsep}}{\vspace{\topsep}}
-\SweaveOpts{keep.source=TRUE}
-```{r echo=false}
-options(continue=" ")
-options(width=80)
-```
-
-
 
 
 # Introduction

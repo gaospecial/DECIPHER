@@ -3,6 +3,10 @@ title: "The Double Life of RNA: Uncovering Non-Coding RNAs"
 author: "Erik S. Wright"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{The Double Life of RNA: Uncovering Non-Coding RNAs}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
 ---
 
 # Introduction
