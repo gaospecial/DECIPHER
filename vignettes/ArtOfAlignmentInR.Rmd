@@ -3,10 +3,13 @@ title: "The Art of Multiple Sequence Alignment in R"
 author: "Erik S. Wright"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{The Art of Multiple Sequence Alignment in R}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
 ---
 
 # Introduction
-
 
 
 \setlength{\intextsep}{0pt}

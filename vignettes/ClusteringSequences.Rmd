@@ -38,7 +38,7 @@ This vignette will summar*ize* the use of `Clusterize` to cluster DNA, RNA, or p
 
 To get started we need to load the **DECIPHER** package, which automatically mobil*ize* a few other required packages.
 
-```{r startup,results=hide}
+```{r startup}
 library(DECIPHER)
 ```
 
@@ -83,7 +83,7 @@ We must also choose whether to custom*ize* the calculation of distance. The defa
 We can further personal*ize* the inputs as desired. The main function argument to emphas*ize* is `processors`, which controls whether the function is parallelized on multiple computer threads (if **DECIPHER**) was built with OpenMP enabled). Setting `processors` to a value greater than `1` will speed up clustering considerably, especially for large s*ize* clustering problems. Once we are ready, it's time to run `Clusterize` and wait for the output to material*ize*!
 
 ```{r expr3,eval=TRUE}
-clusters <- Clusterize(seqs, cutoff=seq(0.5, 0, -0.1), processors=1)
+clusters <- Clusterize(seqs, cutoff=seq(0.5, 0, -0.1), processors=NULL)
 class(clusters)
 colnames(clusters)
 str(clusters)

@@ -10,22 +10,8 @@ vignette: >
 ---
 
 
-\title{Design Microarray Probes}
-\author{Erik S. Wright}
-\date{\today}
-
-
-\newenvironment{centerfig}
-{\begin{figure}[htp]\centering}
-{\end{figure}}
-\renewcommand{\indent}{\hspace*{\tindent}}
-\DefineVerbatimEnvironment{Sinput}{Verbatim} {xleftmargin=2em} \DefineVerbatimEnvironment{Soutput}{Verbatim}{xleftmargin=2em} \DefineVerbatimEnvironment{Scode}{Verbatim}{xleftmargin=2em} \fvset{listparameters={\setlength{\topsep}{0pt}}} \renewenvironment{Schunk}{\vspace{\topsep}}{\vspace{\topsep}}
-\SweaveOpts{keep.source=TRUE}
-```{r echo=false}
-options(continue=" ")
-options(width=80)
-options(SweaveHooks=list(fig=function()
-	par(mar=c(4.1, 4.1, 0.3, 0.1))))
+```{r echo=FALSE}
+par(mar=c(4.1, 4.1, 0.3, 0.1))
 set.seed(123)
 ```
 
@@ -42,17 +28,12 @@ This document describes how to design and validate sequence-specific probes for 
 # Getting Started
 
 
-
-\newlength\tindent
-\setlength{\tindent}{\parindent}
-\setlength{\parindent}{0pt}
-
 ## Startup
 
 
 To get started we need to load the **DECIPHER** package, which automatically loads several other required packages.
 
-```{r startup,results=hide}
+```{r startup}
 library(DECIPHER)
 ```
 
@@ -192,7 +173,7 @@ x_out <- NNLS(A, b, verbose=FALSE)
 ```
 
 \begin{centerfig}
-```{r expr11,eval=TRUE,echo=FALSE,results=hide,fig=TRUE,include=TRUE,height=4,width=4.5}
+```{r expr11,eval=TRUE,echo=FALSE,fig=TRUE,include=TRUE,height=4,width=4.5}
 ranges <- range(c(x_out$x, x))
 ramp <- colorRampPalette(c("white", "yellow", "orange", "red"),
 	space = "rgb")
@@ -227,7 +208,7 @@ for (i in 1:10) { # 10 iterations
 ```
 
 \begin{centerfig}
-```{r expr13,eval=TRUE,echo=FALSE,results=hide,fig=TRUE,include=TRUE,height=4,width=4.5}
+```{r expr13,eval=TRUE,echo=FALSE,fig=TRUE,include=TRUE,height=4,width=4.5}
 ranges <- range(c(x_out$x, x))
 ramp <- colorRampPalette(c("white", "yellow", "orange", "red"),
 	space = "rgb")
@@ -282,7 +263,7 @@ x_out <- NNLS(A, b, verbose=FALSE)
 ```
 
 \begin{centerfig}
-```{r expr17,eval=TRUE,echo=FALSE,results=hide,fig=TRUE,include=TRUE,height=4,width=4.5}
+```{r expr17,eval=TRUE,echo=FALSE,fig=TRUE,include=TRUE,height=4,width=4.5}
 ranges <- range(c(x_out$x, x))
 ramp <- colorRampPalette(c("white", "yellow", "orange", "red"),
 	space = "rgb")
@@ -297,13 +278,4 @@ abline(a=0, b=1) # identity line
 \caption{The combined results of multiple simulations.}
 \end{centerfig}
 
-\clearpage
-
-# Session Information
-
-All of the output in this vignette was produced under the following conditions:
-
-```{r sessinfo,echo=FALSE,results=tex}
-toLatex(sessionInfo(), locale=FALSE)
-```
 

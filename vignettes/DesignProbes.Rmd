@@ -56,7 +56,7 @@ Troy, NY 12810-3590 USA
 
 To get started we need to load the **DECIPHER** package, which automatically loads several other required packages.
 
-```{r startup,results=hide}
+```{r startup}
 library(DECIPHER)
 ```
 
@@ -657,8 +657,4 @@ Finally, we can order the first and second probe and try them out in an experime
 # Session Information
 
 All of the output in this vignette was produced under the following conditions:
-
-```{r sessinfo,echo=FALSE,results=tex}
-toLatex(sessionInfo(), locale=FALSE)
-```
 

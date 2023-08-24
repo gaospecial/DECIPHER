@@ -113,7 +113,6 @@ text(0.2, 0, "0.4 subs./site", pos=3, xpd=TRUE)
 \caption{ {#f2} Tree with (aBayes) support probabilities at each internal node.}
 \end{centerfig}
 
-\clearpage
 
 We lucked out because maximum likelihood and maximum parsimony trees both provide branch supports in the form of the fraction of optimized trees that contained a given partition (branch).  These are accessible from the "support" attribute.  As luck would have it, support values and (aBayes) probabilities are correlated, but support tends to be more conservative.
 
@@ -134,7 +133,6 @@ abline(a=0, b=1, lty=2) # line of identity (y=x)
 \caption{ {#f3} Comparison of aBayes probabilities and branch support values.}
 \end{centerfig}
 
-\clearpage
 
 
 # Ancestral State Reconstruction
@@ -152,7 +150,6 @@ attr(new_tree[[1]], "change") # state changes on first branch left of (virtual) 
 \caption{ {#f4} Edges labeled with the number of state transitions.}
 \end{centerfig}
 
-\clearpage
 
 
 # Exporting the Tree
@@ -176,25 +173,4 @@ cat("[", paste(names(params), params, sep="=", collapse=","), "]", sep="", appen
 # Session Information
 
 
-
-All of the output in this vignette was produced under the following
-conditions:
-
-```{r sessinfo,echo=FALSE,results=tex}
-toLatex(sessionInfo(), locale=FALSE)
-```
-
-\begin{thebibliography}{}
-
-\bibitem{Anisimova:2011}
-{Anisimova, M.}, {Gil, M.}, {Dufayard, J.}, {Dessimoz, C.}, \& {Gascuel, O.}
-\newblock Survey of branch support methods demonstrates accuracy, power, and robustness of fast likelihood-based approximation schemes.
-\newblock {\em Syst Biol.}, 60(5), 685-699.
-
-\bibitem{Joy:2016}
-{Joy, J.}, {Liang, R.}, {McCloskey, R.}, {Nguyen, T.}, \& {Poon, A.}
-\newblock Ancestral Reconstruction.
-\newblock {\em PLoS Comp. Biol.}, 12(7), e1004763.
-
-\end{thebibliography}
 
