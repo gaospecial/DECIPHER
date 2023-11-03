@@ -1,0 +1,113 @@
+---
+title: "How to design species-specific primers"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{DesignSpeciesSpecificPrimers}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+
+This document describes how to design group-specific primers using the **DECIPHER** package through the use of the `DesignPrimers()` function. As a case study, this tutorial focuses on the Internal Transcribed Spacer (ITS)[^ITS] of fully sequenced genomes belonging to different species of the genus *Streptomyces*. 
+
+[^ITS]: The ITS resides on the chromosome between the genes coding for the 16S and 23S ribosomal RNA. 
+
+The examples in this document are directed towards finding **primers that target a single species** of *Streptomyces* among a number of closely related *Streptomyces* species.
+
+```{r include=FALSE}
+suppressPackageStartupMessages(library(DECIPHER))
+suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(stringr))
+```
+
+```{r setup, eval=FALSE}
+library(DECIPHER)
+library(dplyr)
+library(stringr)
+```
+
+Support we have the sequences of different strains.
+
+```{r}
+fas <- system.file("extdata", "Streptomyces_ITS_aligned.fas", package="DECIPHER")
+```
+
+Import sequence to a in-memory SQLite database.
+
+```{r}
+# create the sequence database in memory
+dbConn <- dbConnect(SQLite(), ":memory:")
+Seqs2DB(fas, "FASTA", dbConn, "Streptomyces")
+```
+
+Defining groups of the sequences in database.
+
+```{r}
+desc <- dbGetQuery(dbConn, "select description from Seqs")
+desc |> as_tibble()
+```
+
+Species names are extracted from description.
+
+The first way doing this job only use base functions.
+
+The second way use `stringr` functions.
+
+```{r}
+species = desc |> 
+  unlist() |> 
+  str_remove("^.*Streptomyces ") |> 
+  str_remove("sp[\\._ ]") |> 
+  trimws() |> 
+  str_remove(" .*$")
+unique(species)
+```
+
+Now that we have our 19 different species names.
+
+Next, we must add them to the database as the identifier of each species.
+
+```{r}
+Add2DB(data.frame(identifier=species, stringsAsFactors=FALSE), dbConn)
+```
+
+To continue, we create a set of k-mers, namely "tiles".
+
+```{r}
+tiles = TileSeqs(dbConn, add2tbl="Tiles", minCoverage=1)
+```
+
+```{r}
+head(tiles)
+```
+
+Tiles are then used to design all possible primers.
+
+```{r}
+primers = DesignPrimers(tiles, 
+                         identifier = "avermitilis",
+                         minCoverage = 1, 
+                         minGroupCoverage = 1)
+```
+
+
+```{r}
+primers |> as_tibble()
+```
+```{r}
+primers[1,] |> glimpse()
+```
+
+```{r}
+primers[1,] |> select(ends_with("coverage"))
+```
+

@@ -43,7 +43,12 @@ system("hybrid-min -V")
 
 To get started we need to load the **DECIPHER** package, which automatically loads several other required packages.
 
-```{r startup}
+```{r include=FALSE}
+suppressPackageStartupMessages(library(DECIPHER))
+suppressPackageStartupMessages(library(dplyr))
+```
+
+```{r setup, eval=FALSE}
 library(DECIPHER)
 library(dplyr)
 ```
