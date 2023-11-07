@@ -21,6 +21,8 @@ jobs:
 
       - name: Install package
         run: |
+          install.packages("curl")
+          install.packages("pkgcache") 
           install.packages("pkgdepends")
           library("pkgdepends")
           install.packages("pak")
