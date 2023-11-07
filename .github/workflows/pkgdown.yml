@@ -21,8 +21,9 @@ jobs:
 
       - name: Install package
         run: |
+          install.packages("pkgdepends")
+          library("pkgdepends")
           install.packages("pak")
-          pak::pak("r-lib/pkgdepends")
           pak::local_install()
         shell: Rscript {0}
 
