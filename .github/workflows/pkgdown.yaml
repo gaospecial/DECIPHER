@@ -28,11 +28,12 @@ jobs:
 
       - uses: r-lib/actions/setup-pandoc@v2
 
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
+      - uses: actions/setup-python@v4
+        with: 
           python-version: 3.8
-          
+      
+      - uses: s-weigand/setup-conda@v1
+
       - name: Install OligoArrayAux
         run: conda install -c bioconda oligoarrayaux
         
