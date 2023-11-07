@@ -22,7 +22,9 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v3 devel
+      - uses: actions/checkout@v3
+        with:
+           ref: devel
 
       - uses: r-lib/actions/setup-pandoc@v2
 
