@@ -1,141 +1,121 @@
-url: ~
+url: https://gaospecial.github.io/DECIPHER/
 template:
   bootstrap: 5
-
 destination: docs
-
 home:
-  strip_header: true
-
-
+  strip_header: yes
 reference:
-  - title:  Primary functions for interacting with a sequence database
-    contents:
-    - Add2DB    
-    - DB2Seqs    
-    - SearchDB    
-    - Seqs2DB
-
-  - title:  Secondary functions for typical database tasks
-    contents:
-    - IdentifyByRank    
-    - IdLengths
-
-  - title:  Functions related to forming consensus
-    contents:
-    - ConsensusSequence    
-    - Disambiguate    
-    - IdConsensus
-
-  - title:  Phylogenetics and sequence comparison
-    contents:
-    - DistanceMatrix    
-    - Clusterize    
-    - MaskAlignment    
-    - ReadDendrogram    
-    - StaggerAlignment    
-    - TreeLine    
-    - WriteDendrogram
-
-  - title:  Visualization with a web browser
-    contents:
-    - BrowseDB    
-    - BrowseSeqs
-
-  - title:  Manipulating sequences
-    contents:
-    - CorrectFrameshifts    
-    - OrientNucleotides    
-    - RemoveGaps    
-    - TrimDNA
-
-  - title:  Analyzing sequences
-    contents:
-    - DetectRepeats    
-    - DigestDNA    
-    - PredictDBN    
-    - PredictHEC
-
-  - title:  Multiple sequence alignment
-    contents:
-    - AdjustAlignment    
-    - AlignDB    
-    - AlignProfiles    
-    - AlignSeqs    
-    - AlignTranslation    
-    - ScoreAlignment
-
-  - title:  Comparison of sequences that are not collinear (i.e., genomes)
-    contents:
-    - AlignSynteny    
-    - FindSynteny    
-    - Synteny-class
-
-  - title:  Functions related to chimeras (PCR artifacts)
-    contents:
-    - CreateChimeras    
-    - FindChimeras    
-    - FormGroups
-
-  - title:  Functions related to DNA microarrays
-    contents:
-    - Array2Matrix    
-    - CalculateEfficiencyArray    
-    - DesignArray    
-    - NNLS
-
-  - title:  Functions related to probes for fluorescence *in situ* hybridization (FISH)
-    contents:
-    - CalculateEfficiencyFISH    
-    - DesignProbes    
-    - TileSeqs
-
-  - title:  Functions related to primers for polymerase chain reaction (PCR)
-    contents:
-    - AmplifyDNA    
-    - CalculateEfficiencyPCR    
-    - DesignPrimers    
-    - DesignSignatures    
-    - MeltDNA
-
-  - title:  Classifying sequences into a taxonomy
-    contents:
-    - LearnTaxa    
-    - IdTaxa    
-    - Taxa-class
-    
-
-  - title:  Gene calling (a.k.a. gene finding)
-    contents:
-    - ExtractGenes    
-    - FindGenes    
-    - FindNonCoding    
-    - Genes-class
-    - LearnNonCoding    
-    - NonCoding-class   
-    - WriteGenes
-    
-  - title: Other functions
-    contents:
-    - AA_REDUCED
-    - Codec
-    - Cophenetic
-    - DECIPHER-package
-    - HEC_MI
-    - MIQS
-    - MODELS
-    - MapCharacters
-    - NonCodingRNA
-    - PFASUM
-    - RESTRICTION_ENZYMES
-    - TerminalChar
-    - TrainingSet_16S
-    - deltaGrules
-    - deltaGrulesRNA
-    - deltaHrules
-    - deltaHrulesRNA
-    - deltaSrules
-    - deltaSrulesRNA
-
+- title: Primary functions for interacting with a sequence database
+  contents:
+  - Add2DB
+  - DB2Seqs
+  - SearchDB
+  - Seqs2DB
+- title: Secondary functions for typical database tasks
+  contents:
+  - IdentifyByRank
+  - IdLengths
+- title: Functions related to forming consensus
+  contents:
+  - ConsensusSequence
+  - Disambiguate
+  - IdConsensus
+- title: Phylogenetics and sequence comparison
+  contents:
+  - DistanceMatrix
+  - Clusterize
+  - MaskAlignment
+  - ReadDendrogram
+  - StaggerAlignment
+  - TreeLine
+  - WriteDendrogram
+- title: Visualization with a web browser
+  contents:
+  - BrowseDB
+  - BrowseSeqs
+- title: Manipulating sequences
+  contents:
+  - CorrectFrameshifts
+  - OrientNucleotides
+  - RemoveGaps
+  - TrimDNA
+- title: Analyzing sequences
+  contents:
+  - DetectRepeats
+  - DigestDNA
+  - PredictDBN
+  - PredictHEC
+- title: Multiple sequence alignment
+  contents:
+  - AdjustAlignment
+  - AlignDB
+  - AlignProfiles
+  - AlignSeqs
+  - AlignTranslation
+  - ScoreAlignment
+- title: Comparison of sequences that are not collinear (i.e., genomes)
+  contents:
+  - AlignSynteny
+  - FindSynteny
+  - Synteny-class
+- title: Functions related to chimeras (PCR artifacts)
+  contents:
+  - CreateChimeras
+  - FindChimeras
+  - FormGroups
+- title: Functions related to DNA microarrays
+  contents:
+  - Array2Matrix
+  - CalculateEfficiencyArray
+  - DesignArray
+  - NNLS
+- title: Functions related to probes for fluorescence *in situ* hybridization (FISH)
+  contents:
+  - CalculateEfficiencyFISH
+  - DesignProbes
+  - TileSeqs
+- title: Functions related to primers for polymerase chain reaction (PCR)
+  contents:
+  - AmplifyDNA
+  - CalculateEfficiencyPCR
+  - DesignPrimers
+  - DesignSignatures
+  - MeltDNA
+- title: Classifying sequences into a taxonomy
+  contents:
+  - LearnTaxa
+  - IdTaxa
+  - Taxa-class
+- title: Gene calling (a.k.a. gene finding)
+  contents:
+  - ExtractGenes
+  - FindGenes
+  - FindNonCoding
+  - Genes-class
+  - LearnNonCoding
+  - NonCoding-class
+  - WriteGenes
+- title: Other functions
+  contents:
+  - AA_REDUCED
+  - Codec
+  - Cophenetic
+  - DECIPHER-package
+  - HEC_MI
+  - MIQS
+  - MODELS
+  - MapCharacters
+  - NonCodingRNA
+  - PFASUM
+  - RESTRICTION_ENZYMES
+  - TerminalChar
+  - TrainingSet_16S
+  - deltaGrules
+  - deltaGrulesRNA
+  - deltaHrules
+  - deltaHrulesRNA
+  - deltaSrules
+  - deltaSrulesRNA
 development:
   mode: devel
+
