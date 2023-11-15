@@ -1,0 +1,23 @@
+pandoc: 2.19.2
+pkgdown: 2.0.7
+pkgdown_sha: ~
+articles:
+  ArtOfAlignmentInR: ArtOfAlignmentInR.html
+  ClassifySequences: ClassifySequences.html
+  ClusteringSequences: ClusteringSequences.html
+  DECIPHERing: DECIPHERing.html
+  DesignMicroarray: DesignMicroarray.html
+  DesignPrimers: DesignPrimers.html
+  DesignProbes: DesignProbes.html
+  DesignSignatures: DesignSignatures.html
+  DesignSpeciesSpecificPrimers: DesignSpeciesSpecificPrimers.html
+  FindChimeras: FindChimeras.html
+  FindingGenes: FindingGenes.html
+  FindingNonCodingRNAs: FindingNonCodingRNAs.html
+  GrowingTrees: GrowingTrees.html
+  RepeatRepeat: RepeatRepeat.html
+last_built: 2023-11-15T10:01Z
+urls:
+  reference: https://gaospecial.github.io/DECIPHER/reference
+  article: https://gaospecial.github.io/DECIPHER/articles
+
